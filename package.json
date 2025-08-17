@@ -1,0 +1,24 @@
+{
+  "name": "wellness-app",
+  "version": "1.0.0",
+  "description": "Decentralized health and wellness application on Base blockchain",
+  "private": true,
+  "scripts": {
+    "dev:backend": "pnpm --filter backend dev",
+    "dev:miniapp": "pnpm --filter miniapp dev",
+    "build:contracts": "pnpm --filter contracts build",
+    "build:miniapp": "pnpm --filter miniapp build",
+    "deploy:contracts": "pnpm --filter contracts deploy",
+    "test:contracts": "pnpm --filter contracts test",
+    "install:all": "pnpm install",
+    "clean": "pnpm -r exec rm -rf node_modules && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}

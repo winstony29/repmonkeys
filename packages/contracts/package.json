@@ -1,0 +1,15 @@
+{
+  "name": "@wellness-app/contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for the wellness application",
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test",
+    "deploy:goerli": "forge script script/Deploy.s.sol:DeployScript --rpc-url base_goerli --broadcast --verify",
+    "deploy:mainnet": "forge script script/Deploy.s.sol:DeployScript --rpc-url base_mainnet --broadcast --verify"
+  },
+  "devDependencies": {
+    "forge-std": "^1.7.0"
+  }
+}
+
