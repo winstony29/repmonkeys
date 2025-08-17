@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-interface WorkoutPlan {
+export interface WorkoutPlan {
   type: 'workout';
   exercises: Array<{
     name: string;
@@ -12,7 +12,7 @@ interface WorkoutPlan {
   difficulty: 'beginner' | 'intermediate' | 'advanced';
 }
 
-interface Recipe {
+export interface Recipe {
   type: 'recipe';
   name: string;
   ingredients: string[];
@@ -28,7 +28,7 @@ interface Recipe {
   };
 }
 
-type WellnessResponse = WorkoutPlan | Recipe | { type: 'general'; message: string };
+export type WellnessResponse = WorkoutPlan | Recipe | { type: 'general'; message: string };
 
 @Injectable()
 export class AiService {

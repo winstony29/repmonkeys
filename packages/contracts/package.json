@@ -9,7 +9,7 @@
     "deploy:mainnet": "forge script script/Deploy.s.sol:DeployScript --rpc-url base_mainnet --broadcast --verify"
   },
   "devDependencies": {
-    "forge-std": "^1.7.0"
+    "forge-std": "^1.1.2"
   }
 }
 

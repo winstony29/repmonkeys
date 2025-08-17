@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-interface User {
+export interface User {
   id: string;
   walletAddress: string;
   goals: string[];

@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Address, Avatar } from '@coinbase/onchainkit'
-import { useOnchainAddress } from '@coinbase/onchainkit'
-import { useBalance, useReadContract } from 'wagmi'
+import { Address, Avatar } from '@coinbase/onchainkit/identity'
+import { useAccount, useBalance, useReadContract } from 'wagmi'
 import { wellnessNFTAbi, wellTokenAbi } from '@/lib/contracts'
 import { Heart, Trophy, MessageCircle, Activity, Target } from 'lucide-react'
 
@@ -11,7 +10,7 @@ export default function UserProfile() {
   const [wellnessPrompt, setWellnessPrompt] = useState('')
   const [aiResponse, setAiResponse] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const address = useOnchainAddress()
+  const { address } = useAccount()
 
   // Get user's WellnessNFT token ID
   const { data: tokenId } = useReadContract({

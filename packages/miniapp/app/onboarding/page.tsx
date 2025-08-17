@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useOnchainAddress } from '@coinbase/onchainkit'
-import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { wellnessNFTAbi } from '@/lib/contracts'
 import { Heart, Target, Sparkles, CheckCircle } from 'lucide-react'
 
@@ -25,7 +24,7 @@ export default function OnboardingPage() {
   const [goals, setGoals] = useState<string[]>([])
   const [currentGoal, setCurrentGoal] = useState('')
   const [isCreating, setIsCreating] = useState(false)
-  const address = useOnchainAddress()
+  const { address } = useAccount()
   const router = useRouter()
 
   const { writeContract, data: hash } = useWriteContract()

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ConnectWallet } from '@coinbase/onchainkit'
-import { useOnchainAddress } from '@coinbase/onchainkit'
+import { ConnectWallet } from '@coinbase/onchainkit/wallet'
+import { useAccount } from 'wagmi'
 import { useReadContract } from 'wagmi'
 import { useRouter } from 'next/navigation'
 import UserProfile from '@/components/UserProfile'
@@ -11,7 +11,7 @@ import { wellnessNFTAbi } from '@/lib/contracts'
 export default function Home() {
   const [hasProfile, setHasProfile] = useState<boolean | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const address = useOnchainAddress()
+  const { address, isConnected } = useAccount()
   const router = useRouter()
 
   // Check if user has a WellnessNFT profile
