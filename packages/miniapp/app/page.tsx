@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ConnectWallet } from '@coinbase/onchainkit/wallet'
+import { ConnectWallet } from '@coinbase/onchainkit'
 import { useAccount } from 'wagmi'
 import { useReadContract } from 'wagmi'
 import { useRouter } from 'next/navigation'

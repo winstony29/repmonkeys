@@ -49,7 +49,7 @@ export class BlockchainService {
   private readonly walletClient = createWalletClient({
     chain: baseGoerli,
     transport: http(process.env.BASE_GOERLI_RPC || 'https://goerli.base.org'),
-    account: privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`),
+    account: process.env.PRIVATE_KEY ? privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`) : undefined,
   });
   
   // Contract addresses (these will be set after deployment)

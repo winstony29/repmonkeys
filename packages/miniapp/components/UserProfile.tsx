@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Address, Avatar } from '@coinbase/onchainkit/identity'
+import { Address, Avatar } from '@coinbase/onchainkit'
 import { useAccount, useBalance, useReadContract } from 'wagmi'
 import { wellnessNFTAbi, wellTokenAbi } from '@/lib/contracts'
 import { Heart, Trophy, MessageCircle, Activity, Target } from 'lucide-react'
