@@ -57,6 +57,28 @@ export class BlockchainService {
   private wellTokenAddress: `0x${string}` | null = null;
   
   constructor() {
+    this.logger.log('🔧 Initializing BlockchainService...');
+    
+    try {
+      // Validate environment variables
+      if (!process.env.PRIVATE_KEY) {
+        this.logger.warn('⚠️ PRIVATE_KEY not set - blockchain operations will be limited');
+      } else {
+        this.logger.log('✅ Private key configured');
+      }
+      
+      if (!process.env.BASE_GOERLI_RPC) {
+        this.logger.log('📡 Using default Base Goerli RPC endpoint');
+      } else {
+        this.logger.log('📡 Using custom Base Goerli RPC endpoint');
+      }
+      
+      this.logger.log('✅ BlockchainService initialized successfully');
+    } catch (error) {
+      this.logger.error('❌ Failed to initialize BlockchainService:', error.stack);
+      throw error;
+    }
+    
     // In production, these would be loaded from environment variables or database
     this.wellnessNFTAddress = process.env.WELLNESS_NFT_ADDRESS as `0x${string}` || null;
     this.wellTokenAddress = process.env.WELL_TOKEN_ADDRESS as `0x${string}` || null;

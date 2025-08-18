@@ -3,6 +3,7 @@
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { OnchainKitProvider } from '@coinbase/onchainkit'
+import ErrorBoundary from '../components/ErrorBoundary'
 import { base, baseGoerli } from 'viem/chains'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WagmiProvider } from 'wagmi'
@@ -43,7 +44,9 @@ export default function RootLayout({
               apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
               chain={baseGoerli}
             >
-              {children}
+              <ErrorBoundary>
+                {children}
+              </ErrorBoundary>
             </OnchainKitProvider>
           </QueryClientProvider>
         </WagmiProvider>

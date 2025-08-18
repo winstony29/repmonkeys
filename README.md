@@ -16,14 +16,14 @@ A comprehensive decentralized wellness application built on the Base blockchain,
 - **Two-Token Economy**: USDC (operational) + $WELL (rewards)
 - **AI Agent Model**: Hub-and-spoke architecture with specialized wellness agents
 - **User Identity**: ERC-721 NFTs with Sogni AI generated artwork
-- **Monorepo Structure**: pnpm workspaces for efficient development
+- **Monorepo Structure**: npm workspaces for efficient development
 - **Miniapp Architecture**: Built for Coinbase Wallet integration
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js >= 18.0.0
-- pnpm >= 8.0.0
+- npm >= 8.0.0
 - Foundry (for smart contracts)
 - Coinbase Wallet (for testing the miniapp)
 
@@ -33,7 +33,7 @@ A comprehensive decentralized wellness application built on the Base blockchain,
 ```bash
 git clone <repository-url>
 cd wellness-app
-pnpm install:all
+npm run install:all
 ```
 
 2. **Set up environment variables**
@@ -52,20 +52,20 @@ cp packages/miniapp/env.example packages/miniapp/.env
 3. **Deploy smart contracts**
 ```bash
 # Build contracts
-pnpm build:contracts
+npm run build:contracts
 
 # Deploy to Base Goerli testnet
-pnpm deploy:contracts
+npm run deploy:contracts
 ```
 
 4. **Start backend server**
 ```bash
-pnpm dev:backend
+npm run dev:backend
 ```
 
 5. **Start miniapp**
 ```bash
-pnpm dev:miniapp
+npm run dev:miniapp
 ```
 
 ## 📱 User Flow
@@ -87,7 +87,6 @@ pnpm dev:miniapp
     /backend           # NestJS API server
     /miniapp           # Next.js miniapp with OnchainKit
   - package.json       # Root workspace config
-  - pnpm-workspace.yaml
 ```
 
 ### Smart Contracts
@@ -135,6 +134,49 @@ pnpm dev:miniapp
 - **Input Validation**: Comprehensive request validation
 - **Error Handling**: Secure error responses without sensitive data
 
+## 🔧 Troubleshooting
+
+### Installation Issues
+
+If you encounter npm installation errors, try installing dependencies individually:
+
+```bash
+# Install each package separately
+cd packages/backend && npm install
+cd ../miniapp && npm install  
+cd ../contracts && npm install
+cd ../..  # Return to root directory
+```
+
+### Missing Dependencies
+
+If you see "class-validator" or similar missing package errors:
+
+```bash
+cd packages/backend
+npm install class-validator class-transformer
+```
+
+### Port Conflicts
+
+- **Backend**: Runs on port 3001 - `http://localhost:3001/api`
+- **Frontend**: Runs on port 3000 - `http://localhost:3000`
+
+Check health endpoint: `curl http://localhost:3001/api/health`
+
+### Deployment Issues
+
+If you encounter RPC connectivity errors during contract deployment:
+
+```bash
+# Try using Base Sepolia instead of Goerli
+npm run deploy:contracts:sepolia
+
+# Or check if you need to set environment variables for private key
+# Make sure your .env file in packages/contracts has:
+# PRIVATE_KEY=your_actual_private_key_here
+```
+
 ## 🧪 Testing
 
 ### Smart Contracts
@@ -146,13 +188,13 @@ forge test
 ### Backend
 ```bash
 cd packages/backend
-pnpm test
+npm test
 ```
 
 ### Miniapp
 ```bash
 cd packages/miniapp
-pnpm dev
+npm run dev
 # Open in browser and test with Coinbase Wallet
 ```
 
@@ -160,24 +202,26 @@ pnpm dev
 
 ### Smart Contracts
 ```bash
-# Base Goerli testnet
-pnpm deploy:contracts
+# Base Sepolia testnet (default)
+npm run deploy:contracts
 
-# Base mainnet (when ready)
-pnpm deploy:contracts:mainnet
+# Or explicitly specify network:
+npm run deploy:contracts:sepolia  # Base Sepolia testnet (recommended)
+npm run deploy:contracts:goerli   # Base Goerli testnet (deprecated)
+npm run deploy:contracts:mainnet  # Base mainnet (when ready)
 ```
 
 ### Backend
 ```bash
 cd packages/backend
-pnpm build
-pnpm start:prod
+npm run build
+npm run start:prod
 ```
 
 ### Miniapp
 ```bash
 cd packages/miniapp
-pnpm build
+npm run build
 # Deploy to your preferred hosting platform
 # (Vercel, Netlify, etc.)
 ```

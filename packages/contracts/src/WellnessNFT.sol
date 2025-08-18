@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
+
 
 /**
  * @title WellnessNFT
@@ -14,9 +14,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
  * - Only owner can mint new NFTs
  */
 contract WellnessNFT is ERC721, ERC721URIStorage, Ownable {
-    using Counters for Counters.Counter;
-    
-    Counters.Counter private _tokenIds;
+    uint256 private _tokenIds;
     
     // Mapping to track if a user already has an NFT
     mapping(address => bool) public hasProfile;
@@ -35,8 +33,8 @@ contract WellnessNFT is ERC721, ERC721URIStorage, Ownable {
         require(!hasProfile[to], "User already has a profile");
         require(bytes(uri).length > 0, "URI cannot be empty");
         
-        _tokenIds.increment();
-        uint256 newTokenId = _tokenIds.current();
+        _tokenIds++;
+        uint256 newTokenId = _tokenIds;
         
         _safeMint(to, newTokenId);
         _setTokenURI(newTokenId, uri);
@@ -64,10 +62,6 @@ contract WellnessNFT is ERC721, ERC721URIStorage, Ownable {
     }
     
     // Override required functions
-    function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
-        super._burn(tokenId);
-    }
-    
     function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {
         return super.tokenURI(tokenId);
     }
