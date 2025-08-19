@@ -1,23 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { 
-  ArrowRight, 
-  Heart, 
-  Brain, 
-  Trophy, 
-  Zap, 
-  Shield, 
-  Star, 
-  CheckCircle, 
-  Smartphone,
-  Target,
-  Users,
-  Sparkles,
-  Play,
-  ChevronRight,
-  Wallet
-} from 'lucide-react'
 
 export default function Home() {
   const [showApp, setShowApp] = useState(false)
@@ -29,18 +12,17 @@ export default function Home() {
 
   const connectWallet = () => {
     setIsConnected(true)
-    // You can add OnchainKit wallet connection here later
   }
 
   if (showApp) {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Top Navigation */}
+        {/* Navigation */}
         <nav className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between max-w-7xl mx-auto">
+          <div className="flex items-center justify-between max-w-6xl mx-auto">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
-                <Heart className="w-5 h-5 text-white" />
+                <span className="text-white font-bold">W</span>
               </div>
               <span className="text-xl font-semibold text-gray-900">WellSpace</span>
             </div>
@@ -49,72 +31,68 @@ export default function Home() {
               {!isConnected ? (
                 <button 
                   onClick={connectWallet}
-                  className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
+                  className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
                 >
-                  <Wallet className="w-4 h-4" />
-                  <span>Connect Wallet</span>
+                  Connect Wallet
                 </button>
               ) : (
-                <div className="flex items-center space-x-2 bg-green-50 text-green-700 px-3 py-2 rounded-lg text-sm font-medium">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span>Connected</span>
+                <div className="bg-green-50 text-green-700 px-3 py-2 rounded-lg text-sm font-medium">
+                  ✓ Connected
                 </div>
               )}
             </div>
           </div>
         </nav>
 
-        {/* Main App Interface */}
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="grid lg:grid-cols-4 gap-6">
-            {/* Sidebar */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-xl border border-gray-200 p-6">
-                <div className="text-center mb-6">
-                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-green-500 rounded-full mx-auto mb-3 flex items-center justify-center">
-                    <Heart className="w-8 h-8 text-white" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900">Your Wellness Profile</h3>
-                  <p className="text-sm text-gray-600 mt-1">Level 3 • Wellness Warrior</p>
+        {/* App Dashboard */}
+        <div className="max-w-6xl mx-auto px-6 py-8">
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Profile Card */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-green-500 rounded-full mx-auto mb-3 flex items-center justify-center">
+                  <span className="text-white text-2xl">🌟</span>
                 </div>
-                
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm text-gray-600">Daily Streak</span>
-                    <span className="font-semibold text-blue-600">12 days</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm text-gray-600">$WELL Tokens</span>
-                    <span className="font-semibold text-green-600">156.2</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-sm text-gray-600">Total Score</span>
-                    <span className="font-semibold text-purple-600">2,840</span>
-                  </div>
+                <h3 className="font-semibold text-gray-900">Your Wellness Profile</h3>
+                <p className="text-sm text-gray-600 mt-1">Level 3 • Wellness Warrior</p>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-600">Daily Streak</span>
+                  <span className="font-semibold text-blue-600">12 days</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-600">$WELL Tokens</span>
+                  <span className="font-semibold text-green-600">156.2</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-sm text-gray-600">Total Score</span>
+                  <span className="font-semibold text-purple-600">2,840</span>
                 </div>
               </div>
             </div>
 
             {/* Main Content */}
-            <div className="lg:col-span-3 space-y-6">
+            <div className="lg:col-span-2 space-y-6">
               {/* Today's Focus */}
               <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Today's Focus</h2>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer">
+                <div className="grid gap-4">
+                  <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
                     <div className="flex items-center space-x-3 mb-2">
                       <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <span className="text-green-600">✓</span>
                       </div>
                       <span className="font-medium text-gray-900">Morning Meditation</span>
                     </div>
                     <p className="text-sm text-gray-600">15 minutes • Completed</p>
                   </div>
                   
-                  <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer">
+                  <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
                     <div className="flex items-center space-x-3 mb-2">
                       <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <Target className="w-5 h-5 text-blue-600" />
+                        <span className="text-blue-600">🎯</span>
                       </div>
                       <span className="font-medium text-gray-900">Exercise Goal</span>
                     </div>
@@ -126,7 +104,7 @@ export default function Home() {
               {/* AI Insights */}
               <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <div className="flex items-center space-x-3 mb-4">
-                  <Brain className="w-5 h-5 text-purple-600" />
+                  <span className="text-purple-600 text-xl">🧠</span>
                   <h2 className="text-lg font-semibold text-gray-900">AI Wellness Insights</h2>
                 </div>
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
@@ -140,7 +118,7 @@ export default function Home() {
               <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
-                    <Trophy className="w-5 h-5 text-yellow-600" />
+                    <span className="text-yellow-600 text-xl">🏆</span>
                     <h2 className="text-lg font-semibold text-gray-900">Available Rewards</h2>
                   </div>
                   <button className="text-blue-600 text-sm font-medium hover:text-blue-700">
@@ -169,38 +147,29 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
-      <nav className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
-                <Heart className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-semibold text-gray-900">WellSpace</span>
+      <nav className="border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between max-w-6xl mx-auto">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold">W</span>
             </div>
-            
-            <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-gray-600 hover:text-gray-900 text-sm font-medium">Features</a>
-              <a href="#how-it-works" className="text-gray-600 hover:text-gray-900 text-sm font-medium">How it works</a>
-              <a href="#community" className="text-gray-600 hover:text-gray-900 text-sm font-medium">Community</a>
-            </div>
-
-            <button 
-              onClick={startJourney}
-              className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center space-x-2"
-            >
-              <span>Get started</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            <span className="text-xl font-semibold text-gray-900">WellSpace</span>
           </div>
+
+          <button 
+            onClick={startJourney}
+            className="bg-gray-900 text-white px-6 py-2 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+          >
+            Get started →
+          </button>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
+      <section className="max-w-6xl mx-auto px-6 py-20">
         <div className="text-center max-w-4xl mx-auto">
           <div className="inline-flex items-center space-x-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-medium mb-8">
-            <Sparkles className="w-4 h-4" />
+            <span>✨</span>
             <span>Built on Base • Powered by AI</span>
           </div>
           
@@ -219,23 +188,21 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
             <button 
               onClick={startJourney}
-              className="bg-gray-900 text-white px-8 py-4 rounded-xl font-medium hover:bg-gray-800 transition-colors flex items-center space-x-2 text-lg"
+              className="bg-gray-900 text-white px-8 py-4 rounded-xl font-medium hover:bg-gray-800 transition-colors text-lg"
             >
-              <span>Start your journey</span>
-              <ArrowRight className="w-5 h-5" />
+              Start your journey →
             </button>
             
-            <button className="border border-gray-300 text-gray-700 px-8 py-4 rounded-xl font-medium hover:bg-gray-50 transition-colors flex items-center space-x-2 text-lg">
-              <Play className="w-5 h-5" />
-              <span>Watch demo</span>
+            <button className="border border-gray-300 text-gray-700 px-8 py-4 rounded-xl font-medium hover:bg-gray-50 transition-colors text-lg">
+              ▶ Watch demo
             </button>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="bg-gray-50 py-20">
-        <div className="max-w-7xl mx-auto px-6">
+      <section className="bg-gray-50 py-20">
+        <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               Everything you need for wellness
@@ -246,109 +213,33 @@ export default function Home() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="bg-white rounded-2xl p-8 border border-gray-200 hover:shadow-lg transition-shadow">
+            <div className="bg-white rounded-2xl p-8 border border-gray-200">
               <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-6">
-                <Brain className="w-6 h-6 text-blue-600" />
+                <span className="text-2xl">🧠</span>
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-3">AI-Powered Insights</h3>
-              <p className="text-gray-600 leading-relaxed">
+              <p className="text-gray-600">
                 Get personalized recommendations based on your habits, sleep patterns, and wellness goals.
               </p>
             </div>
 
-            <div className="bg-white rounded-2xl p-8 border border-gray-200 hover:shadow-lg transition-shadow">
+            <div className="bg-white rounded-2xl p-8 border border-gray-200">
               <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-6">
-                <Heart className="w-6 h-6 text-green-600" />
+                <span className="text-2xl">💖</span>
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-3">Wellness NFTs</h3>
-              <p className="text-gray-600 leading-relaxed">
+              <p className="text-gray-600">
                 Mint unique NFTs that represent your wellness journey and unlock exclusive content.
               </p>
             </div>
 
-            <div className="bg-white rounded-2xl p-8 border border-gray-200 hover:shadow-lg transition-shadow">
+            <div className="bg-white rounded-2xl p-8 border border-gray-200">
               <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center mb-6">
-                <Zap className="w-6 h-6 text-yellow-600" />
+                <span className="text-2xl">⚡</span>
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-3">Earn $WELL Tokens</h3>
-              <p className="text-gray-600 leading-relaxed">
+              <p className="text-gray-600">
                 Complete wellness activities and earn tokens that can be used for rewards and perks.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-2xl p-8 border border-gray-200 hover:shadow-lg transition-shadow">
-              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-6">
-                <Target className="w-6 h-6 text-purple-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Smart Goal Setting</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Set achievable wellness goals with AI assistance and track your progress over time.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-2xl p-8 border border-gray-200 hover:shadow-lg transition-shadow">
-              <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-6">
-                <Users className="w-6 h-6 text-indigo-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Community Challenges</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Join wellness challenges with friends and the community to stay motivated.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-2xl p-8 border border-gray-200 hover:shadow-lg transition-shadow">
-              <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-6">
-                <Smartphone className="w-6 h-6 text-orange-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Mobile-First Design</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Beautiful, intuitive interface designed for mobile with seamless wallet integration.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* How it Works */}
-      <section id="how-it-works" className="py-20">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              How WellSpace works
-            </h2>
-            <p className="text-xl text-gray-600">
-              Simple steps to start your wellness journey
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-2xl font-bold text-blue-600">1</span>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Start Free</h3>
-              <p className="text-gray-600">
-                Begin tracking your wellness habits immediately. No wallet or crypto knowledge required.
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-2xl font-bold text-green-600">2</span>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Track & Improve</h3>
-              <p className="text-gray-600">
-                Log activities, set goals, and receive AI-powered insights to optimize your wellness.
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-2xl font-bold text-purple-600">3</span>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Earn Rewards</h3>
-              <p className="text-gray-600">
-                Connect your wallet when ready to earn tokens, mint NFTs, and unlock Web3 features.
               </p>
             </div>
           </div>
@@ -365,15 +256,12 @@ export default function Home() {
             Join thousands of users who are already on their wellness journey
           </p>
           
-          <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-            <button 
-              onClick={startJourney}
-              className="bg-white text-gray-900 px-8 py-4 rounded-xl font-medium hover:bg-gray-100 transition-colors flex items-center space-x-2 text-lg"
-            >
-              <span>Start for free</span>
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
+          <button 
+            onClick={startJourney}
+            className="bg-white text-gray-900 px-8 py-4 rounded-xl font-medium hover:bg-gray-100 transition-colors text-lg"
+          >
+            Start for free →
+          </button>
           
           <p className="text-gray-400 text-sm mt-6">
             No credit card required • Connect wallet optionally
@@ -383,10 +271,10 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="bg-white border-t border-gray-200 py-12">
-        <div className="max-w-7xl mx-auto px-6">
+        <div className="max-w-6xl mx-auto px-6">
           <div className="flex items-center justify-center space-x-3 mb-8">
             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
-              <Heart className="w-5 h-5 text-white" />
+              <span className="text-white font-bold">W</span>
             </div>
             <span className="text-xl font-semibold text-gray-900">WellSpace</span>
           </div>
