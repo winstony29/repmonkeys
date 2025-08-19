@@ -14,6 +14,7 @@ const config: Config = {
     extend: {
       fontFamily: {
         serif: ['Pixelify Sans', 'serif'],
+        'sf-pro': ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'SF Pro Text', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         dpad: `

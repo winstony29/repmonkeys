@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+/* SF Pro Font Stack - Uses SF Pro on Apple devices, falls back to system fonts */
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -151,6 +153,6 @@ Usage:
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sf-pro;
   }
 }
