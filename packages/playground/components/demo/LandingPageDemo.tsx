@@ -19,7 +19,6 @@ import { wellnessNFTAbi, wellTokenAbi, CONTRACT_ADDRESSES, formatTokenAmount } f
 import { useWellnessAPI } from '@/lib/api';
 
 export default function LandingPageDemo() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
   const [currentView, setCurrentView] = useState<'landing' | 'onboarding' | 'dashboard'>('landing');
   const [wellnessPrompt, setWellnessPrompt] = useState('');
   const [aiResponse, setAiResponse] = useState<any>(null);
@@ -61,10 +60,6 @@ export default function LandingPageDemo() {
     query: { enabled: !!tokenId },
   });
 
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
-  };
-
   const startJourney = () => {
     setCurrentView('onboarding');
   };
@@ -82,7 +77,6 @@ export default function LandingPageDemo() {
       setAiResponse(response);
     } catch (error) {
       console.error('Failed to get AI response:', error);
-      // Fallback to mock response
       setAiResponse({
         type: 'general',
         message: "I'm here to help with your wellness journey! Try asking about workouts, nutrition, or wellness tips."
@@ -98,9 +92,9 @@ export default function LandingPageDemo() {
   };
 
   const wellnessGoals = [
-    'Lose weight', 'Build muscle', 'Improve cardiovascular health',
-    'Better sleep', 'Reduce stress', 'Increase energy',
-    'Better nutrition', 'Mental wellness', 'Flexibility and mobility'
+    'Weight Management', 'Muscle Building', 'Cardio Health',
+    'Better Sleep', 'Stress Relief', 'Energy Boost',
+    'Nutrition', 'Mental Health', 'Flexibility'
   ];
 
   const imageThemes = [
@@ -125,338 +119,307 @@ export default function LandingPageDemo() {
     
     setIsGeneratingImage(true);
     try {
-      // TODO: Replace with actual Sogni AI API call
       const prompt = selectedImageTheme === 'custom' 
         ? customPrompt 
         : `${imageThemes.find(t => t.id === selectedImageTheme)?.description} wellness NFT artwork, high quality, digital art`;
       
-      // Mock API call - will be replaced with actual Sogni AI integration
       console.log('Generating image with prompt:', prompt);
-      
-      // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 3000));
       
-      // Mock generated image URL - will be replaced with actual Sogni AI response
-      const mockImageUrl = `https://via.placeholder.com/400x400/4F46E5/FFFFFF?text=${encodeURIComponent(selectedImageTheme || 'Custom')}`;
+      const mockImageUrl = `https://via.placeholder.com/400x400/6366F1/FFFFFF?text=${encodeURIComponent(selectedImageTheme || 'Custom')}`;
       setGeneratedImageUrl(mockImageUrl);
       
     } catch (error) {
       console.error('Failed to generate image:', error);
-      // Handle error - maybe show a fallback image or error message
     } finally {
       setIsGeneratingImage(false);
     }
   };
 
-  const renderAiResponse = () => {
-    if (!aiResponse) return null;
-
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mt-4">
-        <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2 flex items-center gap-2">
-          🧠 AI Wellness Assistant
-        </h4>
-        
-        {aiResponse.type === 'workout' && (
-          <div className="space-y-3">
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
-              <h5 className="font-medium text-blue-700 dark:text-blue-300 text-sm mb-1">Your Workout Plan:</h5>
-              <p className="text-xs text-blue-600 dark:text-blue-400">
-                Duration: {aiResponse.totalDuration} | Difficulty: {aiResponse.difficulty}
-              </p>
-            </div>
-            <div className="space-y-2">
-              {aiResponse.exercises?.map((exercise: any, index: number) => (
-                <div key={index} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <span className="font-medium text-gray-900 dark:text-white text-sm">{exercise.name}</span>
-                  <span className="text-xs text-gray-600 dark:text-gray-400">
-                    {exercise.sets} sets × {exercise.reps} reps
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {aiResponse.type === 'recipe' && (
-          <div className="space-y-3">
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
-              <h5 className="font-medium text-green-700 dark:text-green-300 text-sm mb-1">Recipe: {aiResponse.name}</h5>
-              <p className="text-xs text-green-600 dark:text-green-400">
-                Prep: {aiResponse.prepTime} | Cook: {aiResponse.cookTime}
-              </p>
-            </div>
-            <div>
-              <h6 className="font-medium text-gray-900 dark:text-white text-sm mb-1">Ingredients:</h6>
-              <ul className="space-y-1">
-                {aiResponse.ingredients?.map((ingredient: string, index: number) => (
-                  <li key={index} className="text-xs text-gray-600 dark:text-gray-400">• {ingredient}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-
-        {aiResponse.type === 'general' && (
-          <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3">
-            <p className="text-purple-600 dark:text-purple-300 text-sm">{aiResponse.message}</p>
-          </div>
-        )}
-      </div>
-    );
-  };
-
   // Onboarding View
   if (currentView === 'onboarding') {
     return (
-      <div className="w-full max-w-sm mx-auto bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden">
+      <div className="w-full max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
         <div className="aspect-[9/16] flex flex-col">
           {/* Header */}
-          <div className="flex justify-between items-center p-4 bg-gradient-to-r from-blue-500 to-green-500">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold">W</span>
+          <div className="bg-slate-100 px-6 py-4 border-b border-slate-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-200 rounded-xl flex items-center justify-center">
+                  <span className="text-blue-700 font-bold text-lg">W</span>
+                </div>
+                <div>
+                  <h1 className="text-slate-800 font-semibold text-lg">WellSpace</h1>
+                  <p className="text-slate-600 text-xs">Your wellness journey</p>
+                </div>
               </div>
-              <h1 className="text-white font-bold text-lg">WellSpace</h1>
+              <button
+                onClick={() => setCurrentView('landing')}
+                className="text-slate-600 hover:text-slate-800 transition-colors p-2 hover:bg-slate-200 rounded-lg"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
             </div>
-            <button
-              onClick={() => setCurrentView('landing')}
-              className="text-white/80 hover:text-white p-1"
-            >
-              ←
-            </button>
           </div>
 
-          {/* Onboarding Content */}
-          <div className="flex-1 p-6 flex flex-col">
-            <div className="text-center mb-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                Welcome to Your Wellness Journey!
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                Let's personalize your experience
-              </p>
+          {/* Progress Bar */}
+          <div className="px-6 py-4 bg-rose-50">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium text-slate-700">Step {onboardingStep} of 4</span>
+              <span className="text-sm text-slate-500">{Math.round((onboardingStep / 4) * 100)}%</span>
             </div>
-
-            {/* Progress */}
-            <div className="mb-6">
-              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-2">
-                <span>Step {onboardingStep} of 4</span>
-                <span>{Math.round((onboardingStep / 4) * 100)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div 
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                  style={{ width: `${(onboardingStep / 4) * 100}%` }}
-                />
-              </div>
+            <div className="w-full bg-rose-200 rounded-full h-2">
+              <div 
+                className="bg-rose-400 h-2 rounded-full transition-all duration-500 ease-out" 
+                style={{ width: `${(onboardingStep / 4) * 100}%` }}
+              />
             </div>
+          </div>
 
-            {/* Step Content */}
-            <div className="flex-1">
-              {onboardingStep === 1 && (
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-gray-900 dark:text-white">Connect Your Wallet</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                    Connect your wallet to start earning $WELL tokens and minting your wellness profile NFT.
-                  </p>
-                  <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                    <Wallet>
-                      <ConnectWallet>
-                        {address && (
-                          <div className="flex items-center space-x-2 justify-center">
-                            <Avatar className="h-6 w-6" />
-                            <Name className="text-sm" />
-                          </div>
-                        )}
-                      </ConnectWallet>
-                    </Wallet>
+          {/* Content */}
+          <div className="flex-1 px-6 py-6 overflow-y-auto">
+            {onboardingStep === 1 && (
+              <div className="space-y-6">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-blue-200 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
                   </div>
-                  {address && (
-                    <button
-                      onClick={() => setOnboardingStep(2)}
-                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-                    >
-                      Continue
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {onboardingStep === 2 && (
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-gray-900 dark:text-white">Choose Your Goals</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                    Select what you want to focus on in your wellness journey.
+                  <h2 className="text-xl font-bold text-slate-900 mb-2">Connect Your Wallet</h2>
+                  <p className="text-slate-600 text-sm leading-relaxed">
+                    Securely connect your wallet to start earning $WELL tokens and mint your unique wellness profile NFT.
                   </p>
-                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                    {wellnessGoals.map((goal) => (
-                      <button
-                        key={goal}
-                        onClick={() => toggleGoal(goal)}
-                        className={cn(
-                          "p-3 text-xs border rounded-lg transition-colors text-left",
-                          userGoals.includes(goal)
-                            ? "bg-blue-500 text-white border-blue-500"
-                            : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-gray-700"
-                        )}
-                      >
-                        {goal}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => setOnboardingStep(3)}
-                    disabled={userGoals.length === 0}
-                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-medium rounded-lg transition-colors"
-                  >
-                    Continue ({userGoals.length} selected)
-                  </button>
                 </div>
-              )}
 
-              {onboardingStep === 3 && (
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-gray-900 dark:text-white">Design Your Wellness NFT</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                    Choose a theme for your personalized wellness NFT that will be generated by AI and minted to your wallet.
-                  </p>
-                  
-                  {!generatedImageUrl ? (
-                    <>
-                      <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                        {imageThemes.map((theme) => (
-                          <button
-                            key={theme.id}
-                            onClick={() => setSelectedImageTheme(theme.id)}
-                            className={cn(
-                              "p-3 text-left border rounded-lg transition-colors",
-                              selectedImageTheme === theme.id
-                                ? "bg-purple-500 text-white border-purple-500"
-                                : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-gray-700"
-                            )}
-                          >
-                            <div className="flex items-center space-x-2 mb-1">
-                              <span className="text-lg">{theme.emoji}</span>
-                              <span className="text-xs font-medium">{theme.name}</span>
+                <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                  <Wallet>
+                    <ConnectWallet>
+                      {address && (
+                        <div className="flex items-center space-x-3 justify-center py-2">
+                          <Avatar className="h-8 w-8" />
+                          <div className="text-left">
+                            <Name className="text-sm font-medium" />
+                            <div className="text-xs text-slate-500 truncate max-w-[120px]">
+                              {address.slice(0, 6)}...{address.slice(-4)}
                             </div>
-                            <p className="text-xs opacity-75">{theme.description}</p>
-                          </button>
-                        ))}
-                      </div>
-
-                      {selectedImageTheme === 'custom' && (
-                        <div className="mt-3">
-                          <textarea
-                            value={customPrompt}
-                            onChange={(e) => setCustomPrompt(e.target.value)}
-                            placeholder="Describe your unique wellness NFT vision..."
-                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-none"
-                            rows={3}
-                          />
+                          </div>
                         </div>
                       )}
-
-                      <button
-                        onClick={generateWellnessImage}
-                        disabled={isGeneratingImage || (!selectedImageTheme || (selectedImageTheme === 'custom' && !customPrompt.trim()))}
-                        className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 text-white font-medium rounded-lg transition-colors flex items-center justify-center space-x-2"
-                      >
-                        {isGeneratingImage ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            <span>Generating with AI...</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>🎨</span>
-                            <span>Generate My NFT</span>
-                          </>
-                        )}
-                      </button>
-                    </>
-                  ) : (
-                    <div className="space-y-4 text-center">
-                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
-                        <h4 className="font-medium text-purple-700 dark:text-purple-300 text-sm mb-3">Your Generated NFT</h4>
-                        <div className="w-32 h-32 mx-auto mb-3 rounded-lg overflow-hidden border-2 border-purple-200 dark:border-purple-700">
-                          <img 
-                            src={generatedImageUrl} 
-                            alt="Generated Wellness NFT" 
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <p className="text-xs text-purple-600 dark:text-purple-400">
-                          Generated by Sogni AI • Ready to mint!
-                        </p>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            setGeneratedImageUrl(null);
-                            setSelectedImageTheme('');
-                            setCustomPrompt('');
-                          }}
-                          className="flex-1 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg transition-colors text-sm"
-                        >
-                          Regenerate
-                        </button>
-                        <button
-                          onClick={() => setOnboardingStep(4)}
-                          className="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors text-sm"
-                        >
-                          Continue with this NFT
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                    </ConnectWallet>
+                  </Wallet>
                 </div>
-              )}
 
-              {onboardingStep === 4 && (
-                <div className="space-y-4 text-center">
-                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-green-500 rounded-full mx-auto mb-4 flex items-center justify-center">
-                    <span className="text-white text-2xl">🎉</span>
+                {address && (
+                  <button
+                    onClick={() => setOnboardingStep(2)}
+                    className="w-full py-3 bg-blue-400 hover:bg-blue-500 text-white font-semibold rounded-xl transition-all duration-200"
+                  >
+                    Continue
+                  </button>
+                )}
+              </div>
+            )}
+
+            {onboardingStep === 2 && (
+              <div className="space-y-6">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-green-200 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                   </div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">You're All Set!</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                    Your wellness profile is ready. Your NFT will be minted and you'll start earning $WELL tokens as you complete activities!
+                  <h2 className="text-xl font-bold text-slate-900 mb-2">Choose Your Goals</h2>
+                  <p className="text-slate-600 text-sm leading-relaxed">
+                    Select the wellness areas you'd like to focus on. We'll personalize your experience accordingly.
                   </p>
-                  
-                  {generatedImageUrl && (
-                    <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 mb-4">
-                      <h4 className="font-medium text-purple-700 dark:text-purple-300 text-sm mb-2">Your NFT Preview:</h4>
-                      <div className="w-20 h-20 mx-auto mb-2 rounded-lg overflow-hidden border border-purple-200 dark:border-purple-700">
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto">
+                  {wellnessGoals.map((goal) => (
+                    <button
+                      key={goal}
+                      onClick={() => toggleGoal(goal)}
+                      className={cn(
+                        "p-4 rounded-xl border-2 transition-all duration-200 text-left",
+                        userGoals.includes(goal)
+                          ? "bg-green-100 border-green-300 text-green-700"
+                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                      )}
+                    >
+                      <div className="font-medium text-sm">{goal}</div>
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setOnboardingStep(3)}
+                  disabled={userGoals.length === 0}
+                  className="w-full py-3 bg-green-400 hover:bg-green-500 disabled:bg-slate-300 text-white font-semibold rounded-xl transition-all duration-200"
+                >
+                  Continue ({userGoals.length} selected)
+                </button>
+              </div>
+            )}
+
+            {onboardingStep === 3 && (
+              <div className="space-y-6">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-purple-200 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m0 0V1a1 1 0 011-1h2a1 1 0 011 1v18a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1h2a1 1 0 011-1z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-900 mb-2">Design Your NFT</h2>
+                  <p className="text-slate-600 text-sm leading-relaxed">
+                    Choose a theme for your personalized wellness NFT that will be generated by AI and minted to your wallet.
+                  </p>
+                </div>
+
+                {!generatedImageUrl ? (
+                  <>
+                    <div className="grid grid-cols-1 gap-3 max-h-64 overflow-y-auto">
+                      {imageThemes.map((theme) => (
+                        <button
+                          key={theme.id}
+                          onClick={() => setSelectedImageTheme(theme.id)}
+                          className={cn(
+                            "p-4 rounded-xl border-2 transition-all duration-200 text-left",
+                            selectedImageTheme === theme.id
+                              ? "bg-purple-100 border-purple-300 text-purple-700"
+                              : "bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                          )}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <span className="text-2xl">{theme.emoji}</span>
+                            <div>
+                              <div className="font-medium text-sm">{theme.name}</div>
+                              <div className="text-xs text-slate-500 mt-1">{theme.description}</div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {selectedImageTheme === 'custom' && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">Describe your vision</label>
+                        <textarea
+                          value={customPrompt}
+                          onChange={(e) => setCustomPrompt(e.target.value)}
+                          placeholder="Describe your unique wellness NFT vision..."
+                          className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-transparent resize-none text-sm"
+                          rows={3}
+                        />
+                      </div>
+                    )}
+
+                    <button
+                      onClick={generateWellnessImage}
+                      disabled={isGeneratingImage || (!selectedImageTheme || (selectedImageTheme === 'custom' && !customPrompt.trim()))}
+                      className="w-full py-3 bg-purple-400 hover:bg-purple-500 disabled:bg-slate-300 text-white font-semibold rounded-xl transition-all duration-200 flex items-center justify-center space-x-2"
+                    >
+                      {isGeneratingImage ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Generating with AI...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2" />
+                          </svg>
+                          <span>Generate My NFT</span>
+                        </>
+                      )}
+                    </button>
+                  </>
+                ) : (
+                  <div className="space-y-4 text-center">
+                    <div className="bg-purple-50 rounded-xl p-6 border border-purple-200">
+                      <h4 className="font-semibold text-purple-700 text-sm mb-4">Your Generated NFT</h4>
+                      <div className="w-32 h-32 mx-auto mb-4 rounded-xl overflow-hidden border-2 border-purple-300">
                         <img 
                           src={generatedImageUrl} 
-                          alt="Your Wellness NFT" 
+                          alt="Generated Wellness NFT" 
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      <p className="text-xs text-purple-600 dark:text-purple-400">Ready to mint to your wallet!</p>
+                      <p className="text-xs text-purple-600">
+                        Generated by Sogni AI • Ready to mint!
+                      </p>
                     </div>
-                  )}
-                  
-                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-4">
-                    <h4 className="font-medium text-blue-700 dark:text-blue-300 text-sm mb-2">Your Goals:</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {userGoals.map((goal) => (
-                        <span key={goal} className="bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 px-2 py-1 rounded text-xs">
-                          {goal}
-                        </span>
-                      ))}
+                    
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          setGeneratedImageUrl(null);
+                          setSelectedImageTheme('');
+                          setCustomPrompt('');
+                        }}
+                        className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-colors"
+                      >
+                        Regenerate
+                      </button>
+                      <button
+                        onClick={() => setOnboardingStep(4)}
+                        className="flex-1 py-3 bg-purple-400 hover:bg-purple-500 text-white font-semibold rounded-xl transition-all duration-200"
+                      >
+                        Continue
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={completeOnboarding}
-                    className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
-                  >
-                    Start My Journey! 🚀
-                  </button>
+                )}
+              </div>
+            )}
+
+            {onboardingStep === 4 && (
+              <div className="space-y-6 text-center">
+                <div className="w-16 h-16 bg-emerald-200 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                 </div>
-              )}
-            </div>
+                <h2 className="text-xl font-bold text-slate-900 mb-2">You're All Set!</h2>
+                <p className="text-slate-600 text-sm leading-relaxed">
+                  Your wellness profile is ready. Your NFT will be minted and you'll start earning $WELL tokens as you complete activities!
+                </p>
+                
+                {generatedImageUrl && (
+                  <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
+                    <h4 className="font-medium text-purple-700 text-sm mb-3">Your NFT Preview</h4>
+                    <div className="w-20 h-20 mx-auto mb-3 rounded-lg overflow-hidden border border-purple-300">
+                      <img 
+                        src={generatedImageUrl} 
+                        alt="Your Wellness NFT" 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <p className="text-xs text-purple-600">Ready to mint to your wallet!</p>
+                  </div>
+                )}
+                
+                <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                  <h4 className="font-medium text-blue-700 text-sm mb-3">Your Goals</h4>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {userGoals.map((goal) => (
+                      <span key={goal} className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">
+                        {goal}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={completeOnboarding}
+                  className="w-full py-4 bg-emerald-400 hover:bg-emerald-500 text-white font-semibold rounded-xl transition-all duration-200"
+                >
+                  Start My Journey 🚀
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -466,163 +429,171 @@ export default function LandingPageDemo() {
   // Dashboard View
   if (currentView === 'dashboard') {
     return (
-      <div className="w-full max-w-sm mx-auto bg-gray-50 dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden">
+      <div className="w-full max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
         <div className="aspect-[9/16] flex flex-col">
           {/* Header */}
-          <div className="flex justify-between items-center p-4 bg-gradient-to-r from-blue-500 to-green-500">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold">W</span>
+          <div className="bg-slate-100 px-6 py-4 border-b border-slate-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-200 rounded-xl flex items-center justify-center">
+                  <span className="text-blue-700 font-bold text-lg">W</span>
+                </div>
+                <div>
+                  <h1 className="text-slate-800 font-semibold text-lg">WellSpace</h1>
+                  <p className="text-slate-600 text-xs">Dashboard</p>
+                </div>
               </div>
-              <h1 className="text-white font-bold text-lg">WellSpace</h1>
-            </div>
-            <div className="flex items-center space-x-2">
-              {address ? (
-                <div className="bg-green-500/30 text-white text-xs px-2 py-1 rounded-lg">
+              {address && (
+                <div className="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full border border-green-200">
                   ✓ Connected
                 </div>
-              ) : (
-                <button className="bg-white/20 text-white text-xs px-3 py-1 rounded-lg hover:bg-white/30 transition-colors">
-                  Connect
-                </button>
               )}
             </div>
           </div>
 
           {/* Dashboard Content */}
-          <div className="flex-1 p-4 overflow-y-auto">
+          <div className="flex-1 p-6 overflow-y-auto space-y-6">
             {/* Profile Stats */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 mb-4">
-              <div className="text-center mb-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-green-500 rounded-full mx-auto mb-2 flex items-center justify-center">
-                  <span className="text-white text-lg">🌟</span>
+            <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
+              <div className="text-center mb-6">
+                <div className="w-20 h-20 bg-indigo-200 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                  <span className="text-indigo-600 text-2xl">⭐</span>
                 </div>
-                <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Wellness Profile</h3>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Level 3 • Wellness Warrior</p>
-                {tokenId && (
-                  <p className="text-xs text-gray-500 dark:text-gray-500">NFT #{tokenId.toString()}</p>
-                )}
+                <h3 className="font-bold text-slate-900 text-lg">Wellness Warrior</h3>
+                <p className="text-slate-600 text-sm">Level 3 • {tokenId && `NFT #${tokenId.toString()}`}</p>
               </div>
               
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2">
-                  <div className="text-lg font-bold text-blue-600 dark:text-blue-400">{streakCount}</div>
-                  <div className="text-xs text-blue-600 dark:text-blue-400">Day Streak</div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-white rounded-xl p-4 text-center border border-slate-200">
+                  <div className="text-2xl font-bold text-blue-500">{streakCount}</div>
+                  <div className="text-xs text-slate-600 mt-1">Day Streak</div>
                 </div>
-                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-2">
-                  <div className="text-lg font-bold text-green-600 dark:text-green-400">{formatWellBalance()}</div>
-                  <div className="text-xs text-green-600 dark:text-green-400">$WELL</div>
+                <div className="bg-white rounded-xl p-4 text-center border border-slate-200">
+                  <div className="text-2xl font-bold text-emerald-500">{formatWellBalance()}</div>
+                  <div className="text-xs text-slate-600 mt-1">$WELL</div>
                 </div>
-                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-2">
-                  <div className="text-lg font-bold text-purple-600 dark:text-purple-400">{totalScore.toLocaleString()}</div>
-                  <div className="text-xs text-purple-600 dark:text-purple-400">Score</div>
+                <div className="bg-white rounded-xl p-4 text-center border border-slate-200">
+                  <div className="text-2xl font-bold text-purple-500">{totalScore.toLocaleString()}</div>
+                  <div className="text-xs text-slate-600 mt-1">Score</div>
                 </div>
               </div>
             </div>
 
             {/* Today's Focus */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 mb-4">
-              <h4 className="font-semibold text-gray-900 dark:text-white mb-3 text-sm">Today's Focus</h4>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-3 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <div className="w-6 h-6 bg-green-100 dark:bg-green-800 rounded-lg flex items-center justify-center">
-                    <span className="text-green-600 dark:text-green-400 text-xs">✓</span>
+            <div className="bg-white rounded-2xl p-6 border border-slate-200">
+              <h4 className="font-bold text-slate-900 mb-4 flex items-center">
+                <span className="mr-2">🎯</span>
+                Today's Focus
+              </h4>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-4 p-3 bg-green-50 rounded-xl border border-green-200">
+                  <div className="w-10 h-10 bg-green-200 rounded-xl flex items-center justify-center">
+                    <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
                   </div>
                   <div className="flex-1">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">Morning Meditation</div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">15 min • Completed</div>
+                    <div className="font-medium text-slate-900 text-sm">Morning Meditation</div>
+                    <div className="text-xs text-slate-600">15 min • Completed</div>
                   </div>
                 </div>
                 
-                <div className="flex items-center space-x-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <div className="w-6 h-6 bg-blue-100 dark:bg-blue-800 rounded-lg flex items-center justify-center">
-                    <span className="text-blue-600 dark:text-blue-400 text-xs">🎯</span>
+                <div className="flex items-center space-x-4 p-3 bg-blue-50 rounded-xl border border-blue-200">
+                  <div className="w-10 h-10 bg-blue-200 rounded-xl flex items-center justify-center">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
                   </div>
                   <div className="flex-1">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">Exercise Goal</div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">30 min remaining</div>
+                    <div className="font-medium text-slate-900 text-sm">Exercise Goal</div>
+                    <div className="text-xs text-slate-600">30 min remaining</div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* AI Wellness Assistant */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 mb-4">
-              <div className="flex items-center space-x-2 mb-3">
-                <span className="text-purple-600 dark:text-purple-400">🧠</span>
-                <h4 className="font-semibold text-gray-900 dark:text-white text-sm">AI Assistant</h4>
+            {/* AI Assistant */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200">
+              <div className="flex items-center space-x-2 mb-4">
+                <span className="text-purple-600 text-xl">🧠</span>
+                <h4 className="font-bold text-slate-900">AI Assistant</h4>
               </div>
               
-              <div className="flex gap-2 mb-3">
+              <div className="flex gap-2 mb-4">
                 <input
                   type="text"
                   value={wellnessPrompt}
                   onChange={(e) => setWellnessPrompt(e.target.value)}
                   placeholder="Ask about workouts, recipes..."
-                  className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-transparent text-sm"
                 />
                 <button
                   onClick={askWellnessQuestion}
                   disabled={isLoadingAI || !wellnessPrompt.trim()}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm"
+                  className="px-6 py-3 bg-purple-400 text-white rounded-xl hover:bg-purple-500 disabled:bg-slate-300 transition-all duration-200 font-medium text-sm"
                 >
                   {isLoadingAI ? '...' : 'Ask'}
                 </button>
               </div>
 
-              {renderAiResponse()}
+              {aiResponse && (
+                <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
+                  <h4 className="text-sm font-medium text-purple-700 mb-2 flex items-center gap-2">
+                    🧠 AI Response
+                  </h4>
+                  <div className="text-purple-600 text-sm">{aiResponse.message}</div>
+                </div>
+              )}
             </div>
 
-            {/* OnchainKit Integration */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 mb-4">
-              <h4 className="font-semibold text-gray-900 dark:text-white mb-3 text-sm flex items-center space-x-2">
-                <span>⚡</span>
-                <span>Web3 Features</span>
+            {/* Web3 Features */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200">
+              <h4 className="font-bold text-slate-900 mb-4 flex items-center">
+                <span className="mr-2">⚡</span>
+                Web3 Features
               </h4>
-              <div className="space-y-3">
-                <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
-                  <h5 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Your Identity</h5>
+              <div className="space-y-4">
+                <div className="p-4 border border-slate-200 rounded-xl">
+                  <h5 className="text-sm font-medium text-slate-900 mb-3">Your Identity</h5>
                   {address ? (
                     <Identity address={address}>
                       <div className="flex items-center space-x-3">
-                        <Avatar className="h-8 w-8" />
+                        <Avatar className="h-10 w-10" />
                         <div className="flex flex-col">
                           <Name className="text-sm font-medium" />
-                          <Address className="text-xs text-gray-500 dark:text-gray-400 truncate" />
+                          <Address className="text-xs text-slate-500" />
                         </div>
                       </div>
-                      <div className="mt-2">
+                      <div className="mt-3">
                         <EthBalance className="text-xs" />
                       </div>
                     </Identity>
                   ) : (
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Connect wallet to view identity</div>
+                    <div className="text-xs text-slate-500">Connect wallet to view identity</div>
                   )}
                 </div>
 
-                <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
-                  <h5 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Fund Wallet</h5>
+                <div className="p-4 border border-slate-200 rounded-xl">
+                  <h5 className="text-sm font-medium text-slate-900 mb-3">Fund Wallet</h5>
                   <FundButton />
                 </div>
               </div>
             </div>
 
             {/* Rewards */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4">
-              <div className="flex items-center space-x-2 mb-3">
-                <span className="text-yellow-600 dark:text-yellow-400">🏆</span>
-                <h4 className="font-semibold text-gray-900 dark:text-white text-sm">Rewards</h4>
+            <div className="bg-amber-50 rounded-2xl p-6 border border-amber-200">
+              <div className="flex items-center space-x-2 mb-4">
+                <span className="text-amber-600 text-xl">🏆</span>
+                <h4 className="font-bold text-slate-900">Weekly Rewards</h4>
               </div>
-              <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">Weekly Challenge!</div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">Claim 25 $WELL tokens</div>
-                  </div>
-                  <button className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors">
-                    Claim
-                  </button>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-medium text-slate-900">Challenge Complete!</div>
+                  <div className="text-sm text-slate-600">Claim 25 $WELL tokens</div>
                 </div>
+                <button className="bg-amber-400 hover:bg-amber-500 text-white px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200">
+                  Claim
+                </button>
               </div>
             </div>
           </div>
@@ -633,96 +604,103 @@ export default function LandingPageDemo() {
 
   // Landing Page View
   return (
-    <div className="w-full max-w-sm mx-auto bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden">
+    <div className="w-full max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
       <div className="aspect-[9/16] flex flex-col">
         {/* Header */}
-        <div className="flex justify-between items-center p-4 bg-gradient-to-r from-blue-500 to-green-500">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">W</span>
+        <div className="bg-slate-100 px-6 py-6 border-b border-slate-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-blue-200 rounded-2xl flex items-center justify-center">
+                <span className="text-blue-700 font-bold text-xl">W</span>
+              </div>
+              <div>
+                <h1 className="text-slate-800 font-bold text-xl">WellSpace</h1>
+                <p className="text-slate-600 text-sm">Your wellness journey</p>
+              </div>
             </div>
-            <h1 className="text-white font-bold text-lg">WellSpace</h1>
           </div>
-          <button
-            onClick={toggleDarkMode}
-            className="text-white/80 hover:text-white p-1"
-          >
-            {isDarkMode ? '☀️' : '🌙'}
-          </button>
-        </div>
 
-        {/* Hero Content */}
-        <div className="flex-1 p-6 flex flex-col">
           {/* Badge */}
-          <div className="inline-flex items-center space-x-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-full text-xs font-medium mb-6 self-center">
-            <span>✨</span>
+          <div className="inline-flex items-center space-x-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-full text-sm font-medium border border-blue-200">
+            <span className="text-amber-500">✨</span>
             <span>Built on Base • Powered by AI</span>
           </div>
+        </div>
 
-          {/* Main Content */}
-          <div className="flex-1 flex flex-col justify-center text-center space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 leading-tight">
+        {/* Main Content */}
+        <div className="flex-1 px-6 py-8 flex flex-col justify-between">
+          <div className="space-y-8">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold text-slate-900 mb-4 leading-tight">
                 Your personal wellness
-                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-green-600">
+                <span className="block text-purple-600">
                   journey, reimagined
                 </span>
               </h2>
-              <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
-                Track habits, earn rewards, and get AI-powered insights to transform your health.
+              <p className="text-slate-600 leading-relaxed">
+                Track habits, earn rewards, and get AI-powered insights to transform your health with blockchain technology.
               </p>
             </div>
 
             {/* Features Grid */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-800 rounded-lg flex items-center justify-center mx-auto mb-2">
-                  <span className="text-blue-600 dark:text-blue-400">🧠</span>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                <div className="w-12 h-12 bg-blue-200 rounded-xl flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
                 </div>
-                <div className="text-xs font-medium text-blue-700 dark:text-blue-300">AI Insights</div>
+                <div className="text-sm font-semibold text-blue-700">AI Insights</div>
               </div>
               
-              <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                <div className="w-8 h-8 bg-green-100 dark:bg-green-800 rounded-lg flex items-center justify-center mx-auto mb-2">
-                  <span className="text-green-600 dark:text-green-400">💖</span>
+              <div className="text-center p-4 bg-green-50 rounded-2xl border border-green-100">
+                <div className="w-12 h-12 bg-green-200 rounded-xl flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
                 </div>
-                <div className="text-xs font-medium text-green-700 dark:text-green-300">Wellness NFTs</div>
+                <div className="text-sm font-semibold text-green-700">Wellness NFTs</div>
               </div>
               
-              <div className="text-center p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl">
-                <div className="w-8 h-8 bg-yellow-100 dark:bg-yellow-800 rounded-lg flex items-center justify-center mx-auto mb-2">
-                  <span className="text-yellow-600 dark:text-yellow-400">⚡</span>
+              <div className="text-center p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                <div className="w-12 h-12 bg-amber-200 rounded-xl flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
                 </div>
-                <div className="text-xs font-medium text-yellow-700 dark:text-yellow-300">$WELL Tokens</div>
+                <div className="text-sm font-semibold text-amber-700">$WELL Tokens</div>
               </div>
             </div>
 
-            {/* OnchainKit Demo */}
-            <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-xl">
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+            {/* Wallet Connection */}
+            <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
+              <h4 className="text-lg font-bold text-slate-900 mb-4 text-center">
                 Connect & Start
               </h4>
               <Wallet>
                 <ConnectWallet>
                   {address && (
-                    <div className="flex items-center space-x-2 justify-center">
-                      <Avatar className="h-6 w-6" />
-                      <Name className="text-sm" />
+                    <div className="flex items-center space-x-3 justify-center py-2">
+                      <Avatar className="h-8 w-8" />
+                      <div className="text-center">
+                        <Name className="text-sm font-medium" />
+                        <div className="text-xs text-slate-500">Connected</div>
+                      </div>
                     </div>
                   )}
                 </ConnectWallet>
               </Wallet>
             </div>
+          </div>
 
-            {/* CTA Buttons */}
-            <div className="space-y-3 mt-6">
-              <button 
-                onClick={startJourney}
-                className="w-full py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium rounded-xl transition-colors hover:bg-gray-800 dark:hover:bg-gray-100"
-              >
-                Start your journey →
-              </button>
-            </div>
+          {/* CTA Button */}
+          <div className="mt-8">
+            <button 
+              onClick={startJourney}
+              className="w-full py-4 bg-purple-400 hover:bg-purple-500 text-white font-bold rounded-2xl transition-all duration-200 text-lg"
+            >
+              Start your journey →
+            </button>
           </div>
         </div>
       </div>
