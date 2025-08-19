@@ -6,14 +6,16 @@
   "scripts": {
     "dev:backend": "cd packages/backend && npm run dev",
     "dev:miniapp": "cd packages/miniapp && npm run dev", 
+    "dev:sogni": "cd packages/sogni-api && npm run dev",
     "build:contracts": "cd packages/contracts && npm run build",
     "build:miniapp": "cd packages/miniapp && npm run build",
+    "build:sogni": "cd packages/sogni-api && npm run build",
     "deploy:contracts": "cd packages/contracts && npm run deploy",
     "deploy:contracts:sepolia": "cd packages/contracts && npm run deploy:sepolia",
     "deploy:contracts:goerli": "cd packages/contracts && npm run deploy:goerli",
     "deploy:contracts:mainnet": "cd packages/contracts && npm run deploy:mainnet",
     "test:contracts": "cd packages/contracts && npm run test",
-    "install:all": "cd packages/backend && npm install && cd ../miniapp && npm install && cd ../contracts && npm install",
+    "install:all": "cd packages/backend && npm install && cd ../miniapp && npm install && cd ../contracts && npm install && cd ../sogni-api && npm install",
     "clean": "rm -rf node_modules packages/*/node_modules"
   },
   "devDependencies": {
