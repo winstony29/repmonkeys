@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev:backend": "cd packages/backend && npm run dev",
-    "dev:miniapp": "cd packages/miniapp && npm run dev", 
+    "dev:miniapp": "cd packages/miniapp && npm run dev",
     "build:contracts": "cd packages/contracts && npm run build",
     "build:miniapp": "cd packages/miniapp && npm run build",
     "deploy:contracts": "cd packages/contracts && npm run deploy",
@@ -23,5 +23,8 @@
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=8.0.0"
+  },
+  "dependencies": {
+    "@coinbase/onchainkit": "^0.38.19"
   }
 }
