@@ -1,30 +1,25 @@
 {
-  "name": "wellness-app",
+  "name": "wellness-onchainkit-app",
   "version": "1.0.0",
-  "description": "Decentralized health and wellness application on Base blockchain",
+  "description": "Wellness app built with OnchainKit",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "dev:backend": "cd packages/backend && npm run dev",
-    "dev:miniapp": "cd packages/miniapp && npm run dev",
-    "build:contracts": "cd packages/contracts && npm run build",
-    "build:miniapp": "cd packages/miniapp && npm run build",
-    "deploy:contracts": "cd packages/contracts && npm run deploy",
-    "deploy:contracts:sepolia": "cd packages/contracts && npm run deploy:sepolia",
-    "deploy:contracts:goerli": "cd packages/contracts && npm run deploy:goerli",
-    "deploy:contracts:mainnet": "cd packages/contracts && npm run deploy:mainnet",
-    "test:contracts": "cd packages/contracts && npm run test",
-    "install:all": "cd packages/backend && npm install && cd ../miniapp && npm install && cd ../contracts && npm install",
-    "clean": "rm -rf node_modules packages/*/node_modules"
+    "dev": "pnpm --filter playground dev",
+    "dev:watch": "pnpm --filter playground dev:watch",
+    "dev:backend": "pnpm --filter backend dev",
+    "dev:contracts": "pnpm --filter contracts dev",
+    "build": "pnpm --filter playground build",
+    "build:contracts": "pnpm --filter contracts build",
+    "deploy:contracts": "pnpm --filter contracts deploy",
+    "dev:wellness": "concurrently \"pnpm --filter backend dev\" \"pnpm --filter playground dev:watch\"",
+    "f:play": "pnpm --filter playground",
+    "f:backend": "pnpm --filter backend",
+    "f:contracts": "pnpm --filter contracts"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
-  },
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=8.0.0"
-  },
-  "dependencies": {
-    "@coinbase/onchainkit": "^0.38.19"
+    "concurrently": "^8.2.2"
   }
 }

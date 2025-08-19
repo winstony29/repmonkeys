@@ -1,5 +1,5 @@
 {
-  "name": "@wellness-app/contracts",
+  "name": "contracts",
   "version": "1.0.0",
   "description": "Smart contracts for the wellness application",
   "scripts": {
