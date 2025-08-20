@@ -51,6 +51,7 @@ export default function LandingPage() {
   const { data: wellBalance } = useBalance({
     address,
     token: CONTRACT_ADDRESSES.WELL_TOKEN,
+    query: { enabled: !!address },
   });
 
   const wellnessGoals = [
@@ -65,12 +66,48 @@ export default function LandingPage() {
   ];
 
   const imageThemes = [
-    { id: 'nature', name: 'Nature & Zen', description: 'Peaceful natural landscapes' },
-    { id: 'abstract', name: 'Abstract Art', description: 'Colorful abstract patterns' },
-    { id: 'geometric', name: 'Geometric', description: 'Clean geometric designs' },
-    { id: 'minimalist', name: 'Minimalist', description: 'Simple and elegant' },
-    { id: 'cosmic', name: 'Cosmic', description: 'Space and galaxy themes' },
-    { id: 'custom', name: 'Custom', description: 'Describe your own idea' }
+    { 
+      id: 'nature', 
+      name: 'Nature & Zen', 
+      description: 'Peaceful natural landscapes',
+      prompt: 'serene natural landscape, peaceful zen garden, flowing water, lush greenery, meditation space, tranquil atmosphere',
+      stylePrompt: 'wellness, peaceful, calming, nature photography, high quality, serene, beautiful lighting'
+    },
+    { 
+      id: 'abstract', 
+      name: 'Abstract Art', 
+      description: 'Colorful abstract patterns',
+      prompt: 'flowing abstract wellness art, harmonious colors, balanced composition, energy flow, chakra colors, peaceful patterns',
+      stylePrompt: 'abstract art, wellness, colorful, balanced, harmonious, digital art, high quality, flowing'
+    },
+    { 
+      id: 'geometric', 
+      name: 'Geometric', 
+      description: 'Clean geometric designs',
+      prompt: 'geometric wellness mandala, sacred geometry, balanced patterns, symmetrical design, calming colors, mindfulness symbols',
+      stylePrompt: 'geometric art, wellness, minimalist, clean, balanced, symmetrical, high quality, professional'
+    },
+    { 
+      id: 'minimalist', 
+      name: 'Minimalist', 
+      description: 'Simple and elegant',
+      prompt: 'minimalist wellness art, simple clean design, balanced composition, negative space, calming colors, zen aesthetic',
+      stylePrompt: 'minimalist, wellness, clean, simple, elegant, zen, high quality, professional, balanced'
+    },
+    { 
+      id: 'cosmic', 
+      name: 'Cosmic', 
+      description: 'Space and galaxy themes',
+      prompt: 'cosmic wellness energy, galaxy meditation, starlight healing, celestial harmony, universe connection, peaceful cosmos',
+      stylePrompt: 'cosmic art, wellness, galaxy, peaceful, ethereal, high quality, beautiful, spiritual, calming'
+    },
+    { 
+      id: 'custom', 
+      name: 'Custom', 
+      description: 'Describe your own idea',
+      prompt: '',
+      stylePrompt: 'wellness, peaceful, calming, digital art, high quality, professional, beautiful'
+    }
   ];
 
   const featureDetails = {
@@ -144,17 +181,40 @@ export default function LandingPage() {
     
     setIsGeneratingImage(true);
     try {
-      const prompt = selectedImageTheme === 'custom' 
-        ? customPrompt 
-        : `${imageThemes.find(t => t.id === selectedImageTheme)?.description} wellness NFT artwork, high quality, digital art`;
+      const selectedTheme = imageThemes.find(t => t.id === selectedImageTheme);
       
-      console.log('Generating image with prompt:', prompt);
+      let prompt, stylePrompt;
+      if (selectedImageTheme === 'custom') {
+        prompt = customPrompt;
+        stylePrompt = 'wellness, peaceful, calming, digital art, high quality, professional, beautiful';
+      } else if (selectedTheme) {
+        prompt = selectedTheme.prompt;
+        stylePrompt = selectedTheme.stylePrompt;
+      } else {
+        throw new Error('No theme selected');
+      }
       
-      // Call the Sogni API through our helper function
-      const data = await apiGenerateImage(prompt);
+      console.log('Generating image with enhanced parameters:');
+      console.log('- Theme:', selectedImageTheme);
+      console.log('- Prompt:', prompt);
+      console.log('- Style:', stylePrompt);
+      
+      // Call the Sogni API with enhanced options
+      const options = {
+        stylePrompt,
+        negativePrompt: "blurry, low quality, distorted, ugly, bad anatomy, watermark, text, signature, deformed",
+        steps: 35, // Higher quality
+        guidance: 8.0, // Better prompt following
+        aspectRatio: "1:1", // Square for NFT
+        numberOfImages: 1
+      };
+      
+      const data = await apiGenerateImage(prompt, options);
       
       if (data.imageUrls && data.imageUrls.length > 0) {
         setGeneratedImageUrl(data.imageUrls[0]);
+        console.log('✅ Image generated successfully!');
+        console.log('Metadata:', data.metadata);
       } else {
         throw new Error('No image URLs returned from API');
       }
@@ -190,7 +250,7 @@ export default function LandingPage() {
   // Settings View
   if (currentView === 'settings') {
     return (
-      <div className="w-full max-w-sm mx-auto bg-black overflow-hidden min-h-screen">
+      <div className="w-full max-w-sm mx-auto bg-black overflow-hidden min-h-screen relative">
         <div className="flex flex-col min-h-screen">
           {/* Status Bar */}
           <div className="flex justify-between items-center px-6 py-2 text-white text-xs bg-black">
@@ -371,7 +431,7 @@ export default function LandingPage() {
   // Onboarding View
   if (currentView === 'onboarding') {
     return (
-      <div className="w-full max-w-sm mx-auto bg-black overflow-hidden">
+      <div className="w-full max-w-sm mx-auto bg-black overflow-hidden relative">
         <div className="aspect-[9/16] flex flex-col">
           {/* Status Bar */}
           <div className="flex justify-between items-center px-6 py-2 text-white text-xs bg-black">
@@ -793,7 +853,7 @@ export default function LandingPage() {
 
   // Landing Page View
   return (
-    <div className="w-full max-w-sm mx-auto bg-black overflow-hidden min-h-screen">
+    <div className="w-full max-w-sm mx-auto bg-black overflow-hidden min-h-screen relative">
       <div className="flex flex-col min-h-screen">
         {/* Status Bar */}
         <div className="flex justify-between items-center px-6 py-2 text-white text-xs bg-black">
