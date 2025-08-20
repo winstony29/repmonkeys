@@ -25,7 +25,7 @@ import WalletDemo from './demo/Wallet';
 import WalletAdvancedDefaultDemo from './demo/WalletAdvancedDefault';
 import WalletDefaultDemo from './demo/WalletDefault';
 import WalletIslandDemo from './demo/WalletIsland';
-import LandingPageDemo from './demo/LandingPageDemo';
+import LandingPage from './demo/LandingPage';
 import { ClearStorageButton } from './demo/ClearStorageButton';
 
 const activeComponentMapping: Record<OnchainKitComponent, React.FC> = {
@@ -49,7 +49,7 @@ const activeComponentMapping: Record<OnchainKitComponent, React.FC> = {
   [OnchainKitComponent.IdentityCard]: IdentityCardDemo,
   [OnchainKitComponent.Earn]: EarnDemo,
   [OnchainKitComponent.Signature]: SignatureDemo,
-  [OnchainKitComponent.LandingPage]: LandingPageDemo,
+  [OnchainKitComponent.LandingPage]: LandingPage,
 };
 
 export default function Demo() {

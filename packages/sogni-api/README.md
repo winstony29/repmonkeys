@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sogni AI API Service
 
-## Getting Started
+This service provides AI-powered image generation for the wellness NFT platform using Sogni AI.
 
-First, run the development server:
+## Features
+
+- **AI Image Generation**: Creates wellness-themed artwork using Sogni AI
+- **CORS Enabled**: Allows cross-origin requests from the playground
+- **Error Handling**: Robust error handling with detailed logging
+- **Custom Prompts**: Supports custom user prompts for personalized artwork
+
+## Setup
+
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. Environment Configuration
+
+Copy the environment template and add your Sogni AI credentials:
+
+```bash
+cp env.example .env.local
+```
+
+Edit `.env.local` with your Sogni AI credentials:
+
+```env
+SOGNI_APP_ID=your_sogni_app_id_here
+SOGNI_USER=your_sogni_username_here  
+SOGNI_PASS=your_sogni_password_here
+```
+
+### 3. Run the Service
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The API will be available at `http://localhost:3002`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## API Endpoints
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### POST /api/generate
 
-## Learn More
+Generates wellness-themed artwork from a text prompt.
 
-To learn more about Next.js, take a look at the following resources:
+**Request:**
+```json
+{
+  "prompt": "nature wellness NFT artwork, high quality, digital art"
+}
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Response:**
+```json
+{
+  "imageUrls": ["https://sogni-generated-image-url.jpg"]
+}
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Error Response:**
+```json
+{
+  "error": "Error message"
+}
+```
 
-## Deploy on Vercel
+## Integration
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This service is integrated with the wellness playground application. The playground calls this API when users generate their wellness NFT artwork during onboarding.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Port Configuration
+
+The service runs on port 3002 to avoid conflicts with other services:
+- Playground: `localhost:3000`
+- Sogni API: `localhost:3002`
+- Backend: `localhost:3001`
+
+## Troubleshooting
+
+1. **Missing Dependencies**: Ensure `@sogni-ai/sogni-client` is installed
+2. **CORS Issues**: Check that CORS headers are configured in `next.config.ts`
+3. **API Credentials**: Verify your Sogni AI credentials in `.env.local`
+4. **Network Issues**: Ensure the service is running on port 3002

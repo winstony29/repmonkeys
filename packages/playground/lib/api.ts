@@ -118,6 +118,29 @@ class WellnessAPI {
     })
   }
 
+  // Sogni AI Image Generation
+  async generateWellnessImage(prompt: string): Promise<{ imageUrls: string[] }> {
+    const response = await fetch('http://localhost:3002/api/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prompt }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    return data;
+  }
+
   // Health endpoint
   async healthCheck(): Promise<{ status: string; timestamp: string }> {
     return this.request<{ status: string; timestamp: string }>('/health')
@@ -154,6 +177,15 @@ export function useWellnessAPI() {
         return await wellnessAPI.getWellnessAdvice(prompt)
       } catch (error) {
         console.error('Failed to get wellness advice:', error)
+        throw error
+      }
+    },
+
+    async generateWellnessImage(prompt: string) {
+      try {
+        return await wellnessAPI.generateWellnessImage(prompt)
+      } catch (error) {
+        console.error('Failed to generate wellness image:', error)
         throw error
       }
     }
