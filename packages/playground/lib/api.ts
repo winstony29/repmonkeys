@@ -118,84 +118,6 @@ class WellnessAPI {
     })
   }
 
-  // Sogni AI Image Generation
-  async generateWellnessImage(
-    prompt: string, 
-    options?: {
-      negativePrompt?: string;
-      stylePrompt?: string;
-      steps?: number;
-      guidance?: number;
-      numberOfImages?: number;
-      aspectRatio?: string;
-      modelId?: string;
-      seed?: number;
-    }
-  ): Promise<{ 
-    imageUrls: string[]; 
-    metadata?: any 
-  }> {
-    const requestBody = {
-      prompt,
-      negativePrompt: options?.negativePrompt || "blurry, low quality, distorted, ugly, bad anatomy, watermark",
-      stylePrompt: options?.stylePrompt || "wellness, peaceful, calming, digital art, high quality, professional, beautiful",
-      steps: options?.steps || 30,
-      guidance: options?.guidance || 7.5,
-      numberOfImages: options?.numberOfImages || 1,
-      aspectRatio: options?.aspectRatio || "1:1",
-      ...(options?.modelId && { modelId: options.modelId }),
-      ...(options?.seed && { seed: options.seed }),
-    };
-
-    const response = await fetch('http://localhost:3002/api/generate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    
-    if (data.error) {
-      throw new Error(data.error);
-    }
-
-    return data;
-  }
-
-  // Get available Sogni AI models
-  async getSogniModels(): Promise<{ 
-    models: { 
-      recommended: any[]; 
-      all: any[] 
-    }; 
-    totalCount: number 
-  }> {
-    const response = await fetch('http://localhost:3002/api/models', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    
-    if (data.error) {
-      throw new Error(data.error);
-    }
-
-    return data;
-  }
-
   // Health endpoint
   async healthCheck(): Promise<{ status: string; timestamp: string }> {
     return this.request<{ status: string; timestamp: string }>('/health')
@@ -232,24 +154,6 @@ export function useWellnessAPI() {
         return await wellnessAPI.getWellnessAdvice(prompt)
       } catch (error) {
         console.error('Failed to get wellness advice:', error)
-        throw error
-      }
-    },
-
-    async generateWellnessImage(prompt: string, options?: any) {
-      try {
-        return await wellnessAPI.generateWellnessImage(prompt, options)
-      } catch (error) {
-        console.error('Failed to generate wellness image:', error)
-        throw error
-      }
-    },
-
-    async getSogniModels() {
-      try {
-        return await wellnessAPI.getSogniModels()
-      } catch (error) {
-        console.error('Failed to get Sogni models:', error)
         throw error
       }
     }

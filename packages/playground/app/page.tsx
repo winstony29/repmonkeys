@@ -1,13 +1,13 @@
 'use client';
 
 import { AppProvider } from '@/components/AppProvider';
-import Demo from '@/components/Demo';
+import LandingPage from '@/components/demo/LandingPage';
 
 export default function Home() {
   return (
     <AppProvider>
-      <main className="flex min-h-screen w-full bg-muted/40">
-        <Demo />
+      <main className="min-h-screen w-full">
+        <LandingPage />
       </main>
     </AppProvider>
   );

@@ -155,4 +155,45 @@ Usage:
   body {
     @apply bg-background text-foreground font-sf-pro;
   }
+  
+  /* Mobile-first responsive design */
+  html {
+    @apply scroll-smooth;
+  }
+  
+  /* Responsive utilities */
+  .container {
+    @apply w-full mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  /* Touch-friendly interactive elements */
+  button, a, input, textarea, select {
+    @apply touch-manipulation;
+  }
+  
+  /* Improved mobile scrolling */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Focus styles for accessibility */
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-blue-600;
+  }
+  
+  /* Responsive text scaling */
+  .text-responsive {
+    @apply text-sm sm:text-base lg:text-lg;
+  }
+  
+  /* Mobile-optimized spacing */
+  .spacing-mobile {
+    @apply space-y-4 sm:space-y-6 lg:space-y-8;
+  }
+  
+  /* Full viewport height on mobile */
+  .mobile-vh {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
 }

@@ -17,10 +17,10 @@ import { cn } from '@/lib/utils';
 import { useAccount, useReadContract, useBalance } from 'wagmi';
 import { wellnessNFTAbi, wellTokenAbi, CONTRACT_ADDRESSES, formatTokenAmount } from '@/lib/contracts';
 import { useWellnessAPI } from '@/lib/api';
-import Modal from './Modal';
+import { useSogniGeneration } from '@/lib/sogni';
 
 export default function LandingPage() {
-  const [currentView, setCurrentView] = useState<'landing' | 'onboarding' | 'dashboard' | 'settings'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'onboarding' | 'dashboard'>('landing');
   const [wellnessPrompt, setWellnessPrompt] = useState('');
   const [aiResponse, setAiResponse] = useState<any>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
@@ -32,11 +32,10 @@ export default function LandingPage() {
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [streakCount, setStreakCount] = useState(12);
   const [totalScore, setTotalScore] = useState(2840);
-  const [showFeatureModal, setShowFeatureModal] = useState(false);
-  const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
 
   const { address } = useAccount();
-  const { getWellnessAdvice, generateWellnessImage: apiGenerateImage } = useWellnessAPI();
+  const { getWellnessAdvice } = useWellnessAPI();
+  const { generateImage } = useSogniGeneration();
 
   // Get user's WellnessNFT token ID
   const { data: tokenId } = useReadContract({
@@ -51,7 +50,6 @@ export default function LandingPage() {
   const { data: wellBalance } = useBalance({
     address,
     token: CONTRACT_ADDRESSES.WELL_TOKEN,
-    query: { enabled: !!address },
   });
 
   const wellnessGoals = [
@@ -66,88 +64,13 @@ export default function LandingPage() {
   ];
 
   const imageThemes = [
-    { 
-      id: 'nature', 
-      name: 'Nature & Zen', 
-      description: 'Peaceful natural landscapes',
-      prompt: 'serene natural landscape, peaceful zen garden, flowing water, lush greenery, meditation space, tranquil atmosphere',
-      stylePrompt: 'wellness, peaceful, calming, nature photography, high quality, serene, beautiful lighting'
-    },
-    { 
-      id: 'abstract', 
-      name: 'Abstract Art', 
-      description: 'Colorful abstract patterns',
-      prompt: 'flowing abstract wellness art, harmonious colors, balanced composition, energy flow, chakra colors, peaceful patterns',
-      stylePrompt: 'abstract art, wellness, colorful, balanced, harmonious, digital art, high quality, flowing'
-    },
-    { 
-      id: 'geometric', 
-      name: 'Geometric', 
-      description: 'Clean geometric designs',
-      prompt: 'geometric wellness mandala, sacred geometry, balanced patterns, symmetrical design, calming colors, mindfulness symbols',
-      stylePrompt: 'geometric art, wellness, minimalist, clean, balanced, symmetrical, high quality, professional'
-    },
-    { 
-      id: 'minimalist', 
-      name: 'Minimalist', 
-      description: 'Simple and elegant',
-      prompt: 'minimalist wellness art, simple clean design, balanced composition, negative space, calming colors, zen aesthetic',
-      stylePrompt: 'minimalist, wellness, clean, simple, elegant, zen, high quality, professional, balanced'
-    },
-    { 
-      id: 'cosmic', 
-      name: 'Cosmic', 
-      description: 'Space and galaxy themes',
-      prompt: 'cosmic wellness energy, galaxy meditation, starlight healing, celestial harmony, universe connection, peaceful cosmos',
-      stylePrompt: 'cosmic art, wellness, galaxy, peaceful, ethereal, high quality, beautiful, spiritual, calming'
-    },
-    { 
-      id: 'custom', 
-      name: 'Custom', 
-      description: 'Describe your own idea',
-      prompt: '',
-      stylePrompt: 'wellness, peaceful, calming, digital art, high quality, professional, beautiful'
-    }
+    { id: 'nature', name: 'Nature & Zen', description: 'Peaceful natural landscapes' },
+    { id: 'abstract', name: 'Abstract Art', description: 'Colorful abstract patterns' },
+    { id: 'geometric', name: 'Geometric', description: 'Clean geometric designs' },
+    { id: 'minimalist', name: 'Minimalist', description: 'Simple and elegant' },
+    { id: 'cosmic', name: 'Cosmic', description: 'Space and galaxy themes' },
+    { id: 'custom', name: 'Custom', description: 'Describe your own idea' }
   ];
-
-  const featureDetails = {
-    'ai-insights': {
-      title: 'AI Health Insights',
-      description: 'Get personalized wellness recommendations powered by advanced AI technology. Our system analyzes your health data, activity patterns, and goals to provide actionable insights.',
-      features: [
-        'Personalized health recommendations',
-        'Activity pattern analysis',
-        'Goal-based suggestions',
-        'Real-time health monitoring',
-        'Predictive wellness analytics'
-      ],
-      benefits: 'Improve your wellness journey with data-driven insights that adapt to your unique lifestyle and health goals.'
-    },
-    'nft-minting': {
-      title: 'Wellness NFTs',
-      description: 'Mint unique NFTs that represent your wellness achievements and milestones. Each NFT is AI-generated and reflects your personal wellness journey.',
-      features: [
-        'AI-generated unique artwork',
-        'Achievement-based minting',
-        'Customizable themes',
-        'Blockchain verified ownership',
-        'Tradeable wellness collectibles'
-      ],
-      benefits: 'Own your wellness journey with verifiable, tradeable digital assets that celebrate your achievements.'
-    },
-    'token-rewards': {
-      title: 'Earn $WELL Tokens',
-      description: 'Get rewarded with $WELL tokens for maintaining healthy habits and achieving your wellness goals. Use tokens for premium features and rewards.',
-      features: [
-        'Habit-based token earning',
-        'Goal achievement bonuses',
-        'Daily activity rewards',
-        'Premium feature access',
-        'Community staking pools'
-      ],
-      benefits: 'Turn your healthy lifestyle into tangible rewards with our blockchain-based incentive system.'
-    }
-  };
 
   const toggleGoal = (goal: string) => {
     setUserGoals(prev => 
@@ -177,53 +100,15 @@ export default function LandingPage() {
   };
 
   const generateWellnessImage = async () => {
-    if (!selectedImageTheme && !customPrompt.trim()) return;
-    
     setIsGeneratingImage(true);
     try {
-      const selectedTheme = imageThemes.find(t => t.id === selectedImageTheme);
-      
-      let prompt, stylePrompt;
-      if (selectedImageTheme === 'custom') {
-        prompt = customPrompt;
-        stylePrompt = 'wellness, peaceful, calming, digital art, high quality, professional, beautiful';
-      } else if (selectedTheme) {
-        prompt = selectedTheme.prompt;
-        stylePrompt = selectedTheme.stylePrompt;
-      } else {
-        throw new Error('No theme selected');
-      }
-      
-      console.log('Generating image with enhanced parameters:');
-      console.log('- Theme:', selectedImageTheme);
-      console.log('- Prompt:', prompt);
-      console.log('- Style:', stylePrompt);
-      
-      // Call the Sogni API with enhanced options
-      const options = {
-        stylePrompt,
-        negativePrompt: "blurry, low quality, distorted, ugly, bad anatomy, watermark, text, signature, deformed",
-        steps: 35, // Higher quality
-        guidance: 8.0, // Better prompt following
-        aspectRatio: "1:1", // Square for NFT
-        numberOfImages: 1
-      };
-      
-      const data = await apiGenerateImage(prompt, options);
-      
-      if (data.imageUrls && data.imageUrls.length > 0) {
-        setGeneratedImageUrl(data.imageUrls[0]);
-        console.log('✅ Image generated successfully!');
-        console.log('Metadata:', data.metadata);
-      } else {
-        throw new Error('No image URLs returned from API');
-      }
-      
+      // Generate image using Sogni AI
+      const imageUrl = await generateImage(selectedImageTheme, customPrompt, userGoals);
+      setGeneratedImageUrl(imageUrl);
     } catch (error) {
       console.error('Failed to generate image:', error);
-      // Fallback to placeholder if Sogni API fails
-      const fallbackImageUrl = `https://via.placeholder.com/400x400/8B5CF6/FFFFFF?text=AI-Error`;
-      setGeneratedImageUrl(fallbackImageUrl);
+      // Fallback to placeholder on error
+      setGeneratedImageUrl('https://via.placeholder.com/400x400/8B5CF6/FFFFFF?text=Generation+Failed');
     } finally {
       setIsGeneratingImage(false);
     }
@@ -233,225 +118,17 @@ export default function LandingPage() {
     setCurrentView('dashboard');
   };
 
-  const openFeatureModal = (featureKey: string) => {
-    setSelectedFeature(featureKey);
-    setShowFeatureModal(true);
-  };
-
-  const closeFeatureModal = () => {
-    setShowFeatureModal(false);
-    setSelectedFeature(null);
-  };
-
-  const openSettings = () => {
-    setCurrentView('settings');
-  };
-
-  // Settings View
-  if (currentView === 'settings') {
-    return (
-      <div className="w-full max-w-sm mx-auto bg-black overflow-hidden min-h-screen relative">
-        <div className="flex flex-col min-h-screen">
-          {/* Status Bar */}
-          <div className="flex justify-between items-center px-6 py-2 text-white text-xs bg-black">
-            <span>9:41</span>
-            <div className="flex items-center space-x-1">
-              <div className="flex space-x-1">
-                <div className="w-1 h-1 bg-white rounded-full"></div>
-                <div className="w-1 h-1 bg-white rounded-full"></div>
-                <div className="w-1 h-1 bg-white/40 rounded-full"></div>
-              </div>
-              <svg className="w-4 h-4 ml-1" fill="white" viewBox="0 0 24 24">
-                <path d="M4 4h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2zm14 14V6H6v12h12z"/>
-              </svg>
-            </div>
-          </div>
-
-          {/* Header */}
-          <div className="bg-black px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={() => setCurrentView('landing')}
-                  className="text-white p-2 hover:bg-gray-800 rounded-full transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <div>
-                  <h1 className="text-white font-semibold text-lg">Settings</h1>
-                  <p className="text-gray-400 text-sm">Manage your preferences</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Main Content */}
-          <div className="flex-1 bg-white rounded-t-3xl px-6 py-8">
-            <div className="space-y-6">
-              {/* Account Section */}
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Account</h3>
-                <div className="space-y-3">
-                  <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">Profile Settings</p>
-                          <p className="text-sm text-gray-500">Manage your personal information</p>
-                        </div>
-                      </div>
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">Privacy & Security</p>
-                          <p className="text-sm text-gray-500">Control your data and privacy</p>
-                        </div>
-                      </div>
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Wellness Section */}
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Wellness</h3>
-                <div className="space-y-3">
-                  <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                          <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">Wellness Goals</p>
-                          <p className="text-sm text-gray-500">Customize your health objectives</p>
-                        </div>
-                      </div>
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-                          <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM4.343 4.343l1.414 1.414m9.899 9.899l1.414 1.414m-9.9-1.414l1.414-1.414M19.071 4.929l-1.414 1.414M7 12a5 5 0 1110 0 5 5 0 01-10 0z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">Notifications</p>
-                          <p className="text-sm text-gray-500">Manage reminders and alerts</p>
-                        </div>
-                      </div>
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* App Section */}
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-4">App</h3>
-                <div className="space-y-3">
-                  <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">Help & Support</p>
-                          <p className="text-sm text-gray-500">Get help and contact support</p>
-                        </div>
-                      </div>
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                          <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">Sign Out</p>
-                          <p className="text-sm text-gray-500">Disconnect your wallet</p>
-                        </div>
-                      </div>
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Onboarding View
   if (currentView === 'onboarding') {
     return (
-      <div className="w-full max-w-sm mx-auto bg-black overflow-hidden relative">
-        <div className="aspect-[9/16] flex flex-col">
-          {/* Status Bar */}
-          <div className="flex justify-between items-center px-6 py-2 text-white text-xs bg-black">
-            <span>9:41</span>
-            <div className="flex items-center space-x-1">
-              <div className="flex space-x-1">
-                <div className="w-1 h-1 bg-white rounded-full"></div>
-                <div className="w-1 h-1 bg-white rounded-full"></div>
-                <div className="w-1 h-1 bg-white/40 rounded-full"></div>
-              </div>
-              <svg className="w-4 h-4 ml-1" fill="white" viewBox="0 0 24 24">
-                <path d="M4 4h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2zm14 14V6H6v12h12z"/>
-              </svg>
-            </div>
-          </div>
+      <div className="min-h-screen w-full bg-black overflow-hidden">
+        <div className="flex flex-col min-h-screen max-w-md mx-auto lg:max-w-2xl xl:max-w-4xl">
+
 
           {/* Header */}
-          <div className="bg-black px-6 py-4">
+          <div className="bg-black px-6 py-6 lg:px-8 lg:py-8">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-4">
                 <button
                   onClick={() => setCurrentView('landing')}
                   className="text-white p-2 hover:bg-gray-800 rounded-full transition-colors"
@@ -461,15 +138,15 @@ export default function LandingPage() {
                   </svg>
                 </button>
                 <div>
-                  <h1 className="text-white font-semibold text-lg">Get started</h1>
-                  <p className="text-gray-400 text-sm">Step {onboardingStep} of 4</p>
+                  <h1 className="text-white font-semibold text-xl lg:text-2xl">Get started</h1>
+                  <p className="text-gray-400 text-sm lg:text-base">Step {onboardingStep} of 4</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Main Content */}
-          <div className="flex-1 bg-white rounded-t-3xl px-6 py-8 overflow-y-auto">
+          <div className="flex-1 bg-white rounded-t-3xl lg:rounded-t-none px-6 py-8 lg:px-8 lg:py-12 overflow-y-auto">
             {/* Progress Bar */}
             <div className="mb-8">
               <div className="w-full bg-gray-200 rounded-full h-1 mb-6">
@@ -711,8 +388,8 @@ export default function LandingPage() {
   // Dashboard View (existing wellness app content)
   if (currentView === 'dashboard') {
     return (
-      <div className="w-full max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
-        <div className="aspect-[9/16] flex flex-col">
+      <div className="min-h-screen w-full bg-white overflow-hidden">
+        <div className="flex flex-col min-h-screen max-w-md mx-auto lg:max-w-4xl xl:max-w-6xl lg:grid lg:grid-cols-3 lg:gap-8 lg:px-8">
           {/* Header with Profile */}
           <div className="bg-gray-900 px-6 py-6 text-white">
             <div className="flex items-center justify-between mb-6">
@@ -853,40 +530,22 @@ export default function LandingPage() {
 
   // Landing Page View
   return (
-    <div className="w-full max-w-sm mx-auto bg-black overflow-hidden min-h-screen relative">
-      <div className="flex flex-col min-h-screen">
-        {/* Status Bar */}
-        <div className="flex justify-between items-center px-6 py-2 text-white text-xs bg-black">
-          <span>9:41</span>
-          <div className="flex items-center space-x-1">
-            <div className="flex space-x-1">
-              <div className="w-1 h-1 bg-white rounded-full"></div>
-              <div className="w-1 h-1 bg-white rounded-full"></div>
-              <div className="w-1 h-1 bg-white/40 rounded-full"></div>
-            </div>
-            <svg className="w-4 h-4 ml-1" fill="white" viewBox="0 0 24 24">
-              <path d="M4 4h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2zm14 14V6H6v12h12z"/>
-            </svg>
-          </div>
-        </div>
-
+    <div className="min-h-screen w-full bg-black overflow-hidden">
+      <div className="flex flex-col min-h-screen max-w-md mx-auto lg:max-w-4xl xl:max-w-6xl">
         {/* Header */}
-        <div className="bg-black px-6 py-6">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
-                <span className="text-black font-bold text-lg">W</span>
+        <div className="bg-black px-6 py-8 lg:px-8 lg:py-12">
+          <div className="flex items-center justify-between mb-8 lg:mb-12">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 lg:w-16 lg:h-16 bg-white rounded-full flex items-center justify-center">
+                <span className="text-black font-bold text-xl lg:text-2xl">W</span>
               </div>
               <div>
-                <h1 className="text-white font-bold text-xl">WellSpace</h1>
-                <p className="text-gray-400 text-sm">Wellness reimagined</p>
+                <h1 className="text-white font-bold text-2xl lg:text-4xl">WellSpace</h1>
+                <p className="text-gray-400 text-sm lg:text-base">Wellness reimagined</p>
               </div>
             </div>
-            <button 
-              onClick={openSettings}
-              className="p-2 hover:bg-gray-800 rounded-full transition-all duration-300 transform hover:scale-110 active:scale-95"
-            >
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button className="p-2 lg:p-3 hidden lg:block">
+              <svg className="w-6 h-6 lg:w-8 lg:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="3"></circle>
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 -1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
               </svg>
@@ -894,25 +553,25 @@ export default function LandingPage() {
           </div>
 
           {/* Hero Section */}
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-3xl font-bold text-white mb-3 leading-tight">
+          <div className="space-y-6 lg:space-y-8">
+            <div className="lg:text-center">
+              <h2 className="text-3xl lg:text-5xl xl:text-6xl font-bold text-white mb-4 lg:mb-6 leading-tight">
                 Transform your wellness
               </h2>
-              <p className="text-gray-400 text-base leading-relaxed">
+              <p className="text-gray-400 text-base lg:text-xl leading-relaxed lg:max-w-3xl lg:mx-auto">
                 AI-powered insights, blockchain rewards, and personalized health tracking in one seamless experience.
               </p>
             </div>
 
             {/* Key Stat */}
-            <div className="bg-gray-900 rounded-2xl p-4 border border-gray-800">
+            <div className="bg-gray-900 rounded-2xl p-6 lg:p-8 border border-gray-800 lg:max-w-lg lg:mx-auto">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-400 text-sm">Your wellness score</p>
-                  <p className="text-white text-2xl font-bold">2,840</p>
+                  <p className="text-gray-400 text-sm lg:text-base">Your wellness score</p>
+                  <p className="text-white text-3xl lg:text-4xl font-bold">2,840</p>
                 </div>
                 <div className="text-green-400">
-                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-10 h-10 lg:w-12 lg:h-12" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
                   </svg>
                 </div>
@@ -922,85 +581,78 @@ export default function LandingPage() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 bg-white rounded-t-3xl px-6 py-8">
+        <div className="flex-1 bg-white rounded-t-3xl lg:rounded-t-none px-6 py-8 lg:px-8 lg:py-12">
           {/* Features Cards */}
-          <div className="space-y-4 mb-8">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Features</h3>
+          <div className="space-y-4 lg:space-y-6 mb-8 lg:mb-12">
+            <h3 className="text-xl lg:text-2xl font-bold text-gray-900 mb-6 lg:mb-8 lg:text-center">Features</h3>
+            <div className="lg:grid lg:grid-cols-3 lg:gap-6 lg:space-y-0 space-y-4">
             
-            <div 
-              onClick={() => openFeatureModal('ai-insights')}
-              className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-[1.01] cursor-pointer group"
-            >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center transition-colors duration-300 group-hover:bg-blue-200">
-                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              <div className="bg-white rounded-2xl p-6 lg:p-8 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-[1.01] cursor-pointer group">
+                <div className="flex lg:flex-col lg:text-center items-center space-x-4 lg:space-x-0 lg:space-y-4">
+                  <div className="w-12 h-12 lg:w-16 lg:h-16 bg-blue-100 rounded-full flex items-center justify-center transition-colors duration-300 group-hover:bg-blue-200">
+                    <svg className="w-6 h-6 lg:w-8 lg:h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 lg:flex-none">
+                    <h4 className="font-semibold text-gray-900 text-base lg:text-lg">AI Health Insights</h4>
+                    <p className="text-gray-600 text-sm lg:text-base">Personalized recommendations based on your data</p>
+                  </div>
+                  <svg className="w-5 h-5 text-gray-400 transition-transform duration-300 group-hover:translate-x-1 lg:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900 text-base">AI Health Insights</h4>
-                  <p className="text-gray-600 text-sm">Personalized recommendations based on your data</p>
-                </div>
-                <svg className="w-5 h-5 text-gray-400 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
               </div>
-            </div>
 
-            <div 
-              onClick={() => openFeatureModal('nft-minting')}
-              className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-[1.01] cursor-pointer group"
-            >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center transition-colors duration-300 group-hover:bg-green-200">
-                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              <div className="bg-white rounded-2xl p-6 lg:p-8 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-[1.01] cursor-pointer group">
+                <div className="flex lg:flex-col lg:text-center items-center space-x-4 lg:space-x-0 lg:space-y-4">
+                  <div className="w-12 h-12 lg:w-16 lg:h-16 bg-green-100 rounded-full flex items-center justify-center transition-colors duration-300 group-hover:bg-green-200">
+                    <svg className="w-6 h-6 lg:w-8 lg:h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 lg:flex-none">
+                    <h4 className="font-semibold text-gray-900 text-base lg:text-lg">Wellness NFTs</h4>
+                    <p className="text-gray-600 text-sm lg:text-base">Mint unique NFTs representing your achievements</p>
+                  </div>
+                  <svg className="w-5 h-5 text-gray-400 transition-transform duration-300 group-hover:translate-x-1 lg:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900 text-base">Wellness NFTs</h4>
-                  <p className="text-gray-600 text-sm">Mint unique NFTs representing your achievements</p>
-                </div>
-                <svg className="w-5 h-5 text-gray-400 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
               </div>
-            </div>
 
-            <div 
-              onClick={() => openFeatureModal('token-rewards')}
-              className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-[1.01] cursor-pointer group"
-            >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center transition-colors duration-300 group-hover:bg-yellow-200">
-                  <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              <div className="bg-white rounded-2xl p-6 lg:p-8 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-[1.01] cursor-pointer group">
+                <div className="flex lg:flex-col lg:text-center items-center space-x-4 lg:space-x-0 lg:space-y-4">
+                  <div className="w-12 h-12 lg:w-16 lg:h-16 bg-yellow-100 rounded-full flex items-center justify-center transition-colors duration-300 group-hover:bg-yellow-200">
+                    <svg className="w-6 h-6 lg:w-8 lg:h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 lg:flex-none">
+                    <h4 className="font-semibold text-gray-900 text-base lg:text-lg">Earn $WELL Tokens</h4>
+                    <p className="text-gray-600 text-sm lg:text-base">Get rewarded for maintaining healthy habits</p>
+                  </div>
+                  <svg className="w-5 h-5 text-gray-400 transition-transform duration-300 group-hover:translate-x-1 lg:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900 text-base">Earn $WELL Tokens</h4>
-                  <p className="text-gray-600 text-sm">Get rewarded for maintaining healthy habits</p>
-                </div>
-                <svg className="w-5 h-5 text-gray-400 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
               </div>
             </div>
           </div>
 
           {/* Wallet Connection */}
-          <div className="bg-gray-50 rounded-2xl p-6 mb-6">
-            <h4 className="text-base font-bold text-gray-900 mb-4">
+          <div className="bg-gray-50 rounded-2xl p-6 lg:p-8 mb-8 lg:mb-12 lg:max-w-lg lg:mx-auto">
+            <h4 className="text-lg lg:text-xl font-bold text-gray-900 mb-6 lg:text-center">
               Connect Your Wallet
             </h4>
             <Wallet>
               <ConnectWallet>
                 {address && (
-                  <div className="flex items-center space-x-3 py-2">
-                    <Avatar className="h-8 w-8" />
+                  <div className="flex items-center space-x-3 py-2 lg:justify-center">
+                    <Avatar className="h-10 w-10 lg:h-12 lg:w-12" />
                     <div>
-                      <Name className="text-sm font-medium" />
-                      <div className="text-xs text-gray-500">Connected</div>
+                      <Name className="text-base lg:text-lg font-medium" />
+                      <div className="text-sm text-gray-500">Connected</div>
                     </div>
                   </div>
                 )}
@@ -1009,61 +661,16 @@ export default function LandingPage() {
           </div>
 
           {/* CTA Button */}
-          <button 
-            onClick={startJourney}
-            className="w-full py-4 bg-black hover:bg-gray-900 text-white font-semibold rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] text-base shadow-lg hover:shadow-xl"
-          >
-            Get started
-          </button>
-        </div>
-      </div>
-
-      {/* Feature Modal */}
-      {selectedFeature && (
-        <Modal
-          isOpen={showFeatureModal}
-          onClose={closeFeatureModal}
-          title={featureDetails[selectedFeature as keyof typeof featureDetails]?.title || ''}
-        >
-          <div className="space-y-6">
-            <div>
-              <p className="text-gray-700 leading-relaxed mb-4">
-                {featureDetails[selectedFeature as keyof typeof featureDetails]?.description}
-              </p>
-            </div>
-
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-3">Key Features</h4>
-              <ul className="space-y-2">
-                {featureDetails[selectedFeature as keyof typeof featureDetails]?.features.map((feature, index) => (
-                  <li key={index} className="flex items-start space-x-3">
-                    <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <span className="text-gray-700 text-sm">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
-              <h5 className="font-medium text-blue-900 mb-2">Benefits</h5>
-              <p className="text-blue-800 text-sm">
-                {featureDetails[selectedFeature as keyof typeof featureDetails]?.benefits}
-              </p>
-            </div>
-
-            <button
-              onClick={closeFeatureModal}
-              className="w-full py-3 bg-black hover:bg-gray-900 text-white font-semibold rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]"
+          <div className="lg:text-center">
+            <button 
+              onClick={startJourney}
+              className="w-full lg:w-auto lg:px-12 py-4 lg:py-5 bg-black hover:bg-gray-900 text-white font-semibold rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] text-base lg:text-lg shadow-lg hover:shadow-xl"
             >
-              Got it
+              Get started
             </button>
           </div>
-        </Modal>
-      )}
+        </div>
+      </div>
     </div>
   );
 }
