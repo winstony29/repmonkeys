@@ -4,6 +4,7 @@ import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { BlockchainModule } from './blockchain/blockchain.module';
 import { AiModule } from './ai/ai.module';
+import { WellnessModule } from './wellness/wellness.module';
 import { HealthModule } from './health/health.module';
 
 @Module({
@@ -17,6 +18,7 @@ import { HealthModule } from './health/health.module';
     UserModule,
     BlockchainModule,
     AiModule,
+    WellnessModule,
   ],
 })
 export class AppModule {}
