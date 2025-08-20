@@ -5,6 +5,7 @@ import "forge-std/Script.sol";
 import "../src/WellToken.sol";
 import "../src/WellnessNFT.sol";
 import "../src/Rewards.sol";
+import "../src/UserProfile.sol";
 
 /**
  * @title DeployScript
@@ -28,6 +29,10 @@ contract DeployScript is Script {
         Rewards rewards = new Rewards(address(wellToken));
         console.log("Rewards deployed at:", address(rewards));
         
+        // Deploy UserProfile contract
+        UserProfile userProfile = new UserProfile();
+        console.log("UserProfile deployed at:", address(userProfile));
+        
         // Fund the rewards contract with some tokens for distribution
         // Transfer 10% of total supply to rewards contract
         uint256 fundingAmount = wellToken.totalSupply() / 10;
@@ -40,6 +45,7 @@ contract DeployScript is Script {
         console.log("WellToken:", address(wellToken));
         console.log("WellnessNFT:", address(wellnessNFT));
         console.log("Rewards:", address(rewards));
+        console.log("UserProfile:", address(userProfile));
         console.log("Total supply:", wellToken.totalSupply());
         console.log("Rewards funding:", fundingAmount);
     }

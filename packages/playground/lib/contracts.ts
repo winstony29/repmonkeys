@@ -74,11 +74,103 @@ export const rewardsAbi = [
   }
 ] as const
 
-// Contract addresses (set via environment variables)
+export const userProfileAbi = [
+  {
+    inputs: [
+      { name: '_goals', type: 'string[]' },
+      { name: '_imageTheme', type: 'string' },
+      { name: '_customPrompt', type: 'string' },
+      { name: '_profileImageUrl', type: 'string' }
+    ],
+    name: 'createProfile',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: '_newGoals', type: 'string[]' }],
+    name: 'updateGoals',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: '_newStreak', type: 'uint256' }],
+    name: 'updateStreak',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: '_newScore', type: 'uint256' }],
+    name: 'updateScore',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: '_newImageUrl', type: 'string' }],
+    name: 'updateProfileImage',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: '_user', type: 'address' }],
+    name: 'hasUserOnboarded',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: '_user', type: 'address' }],
+    name: 'getUserProfile',
+    outputs: [
+      { name: 'hasOnboarded', type: 'bool' },
+      { name: 'goals', type: 'string[]' },
+      { name: 'preferredImageTheme', type: 'string' },
+      { name: 'customPrompt', type: 'string' },
+      { name: 'streakCount', type: 'uint256' },
+      { name: 'totalScore', type: 'uint256' },
+      { name: 'createdAt', type: 'uint256' },
+      { name: 'lastActive', type: 'uint256' },
+      { name: 'profileImageUrl', type: 'string' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: '_user', type: 'address' }],
+    name: 'getUserGoals',
+    outputs: [{ name: '', type: 'string[]' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: '_user', type: 'address' }],
+    name: 'getUserStats',
+    outputs: [
+      { name: 'streak', type: 'uint256' },
+      { name: 'score', type: 'uint256' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [],
+    name: 'updateActivity',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  }
+] as const
+
+// Contract addresses (set via environment variables or fallback to deployed addresses)
 export const CONTRACT_ADDRESSES = {
-  WELLNESS_NFT: process.env.NEXT_PUBLIC_WELLNESS_NFT_ADDRESS as `0x${string}`,
-  WELL_TOKEN: process.env.NEXT_PUBLIC_WELL_TOKEN_ADDRESS as `0x${string}`,
-  REWARDS: process.env.NEXT_PUBLIC_REWARDS_CONTRACT_ADDRESS as `0x${string}`,
+  WELLNESS_NFT: (process.env.NEXT_PUBLIC_WELLNESS_NFT_ADDRESS || '0x56186c1e64ca8043def78d06aff222212ea5df71') as `0x${string}`,
+  WELL_TOKEN: (process.env.NEXT_PUBLIC_WELL_TOKEN_ADDRESS || '0x53eba1e079f885482238ee8bf01c4a9f09de458f') as `0x${string}`,
+  REWARDS: (process.env.NEXT_PUBLIC_REWARDS_CONTRACT_ADDRESS || '0x056e4a859558a3975761abd7385506bc4d8a8e60') as `0x${string}`,
+  USER_PROFILE: (process.env.NEXT_PUBLIC_USER_PROFILE_ADDRESS || '0x259435d8Df5171c5Cc48B6aF3F8578420be4bc99') as `0x${string}`,
 }
 
 // Utility function to format token amounts
@@ -106,7 +198,7 @@ export const parseTokenAmount = (amount: string, decimals: number = 18): bigint 
 
 // Wellness-specific contract interactions
 export const WELLNESS_CONTRACT_CONFIG = {
-  chainId: 8453, // Base mainnet
+  chainId: 84532, // Base Sepolia testnet (where contracts are deployed)
   contracts: {
     wellnessNFT: {
       address: CONTRACT_ADDRESSES.WELLNESS_NFT,
@@ -119,6 +211,10 @@ export const WELLNESS_CONTRACT_CONFIG = {
     rewards: {
       address: CONTRACT_ADDRESSES.REWARDS,
       abi: rewardsAbi,
+    },
+    userProfile: {
+      address: CONTRACT_ADDRESSES.USER_PROFILE,
+      abi: userProfileAbi,
     },
   },
 }
