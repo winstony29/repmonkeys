@@ -5,11 +5,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title UserProfile
- * @dev Smart contract to store user wellness data and onboarding status
+ * @dev Stores user wellness profiles and onboarding data on-chain
  */
 contract UserProfile is Ownable {
     
-    struct WellnessProfile {
+    struct Profile {
         bool hasOnboarded;
         string[] goals;
         string preferredImageTheme;
@@ -19,29 +19,27 @@ contract UserProfile is Ownable {
         uint256 createdAt;
         uint256 lastActive;
         string profileImageUrl;
+        uint256 nftTokenId;
     }
     
-    // Mapping from user address to their wellness profile
-    mapping(address => WellnessProfile) public userProfiles;
+    // Mapping from user address to their profile
+    mapping(address => Profile) private userProfiles;
     
-    // Mapping to track if user has completed specific achievements
-    mapping(address => mapping(string => bool)) public userAchievements;
-    
-    // Array to store all users who have profiles
-    address[] public profiledUsers;
+    // Array to keep track of all users who have onboarded
+    address[] public onboardedUsers;
     
     // Events
-    event ProfileCreated(address indexed user, uint256 timestamp);
-    event ProfileUpdated(address indexed user, uint256 timestamp);
+    event ProfileCreated(address indexed user, string[] goals, string imageTheme, uint256 timestamp);
+    event ProfileUpdated(address indexed user, string updateType, uint256 timestamp);
     event GoalsUpdated(address indexed user, string[] newGoals);
     event StreakUpdated(address indexed user, uint256 newStreak);
     event ScoreUpdated(address indexed user, uint256 newScore);
-    event AchievementUnlocked(address indexed user, string achievement);
+    event ActivityUpdated(address indexed user, uint256 timestamp);
     
     constructor() Ownable(msg.sender) {}
     
     /**
-     * @dev Create or update user profile during onboarding
+     * @dev Create a new user profile (onboarding)
      */
     function createProfile(
         string[] memory _goals,
@@ -49,106 +47,111 @@ contract UserProfile is Ownable {
         string memory _customPrompt,
         string memory _profileImageUrl
     ) external {
-        WellnessProfile storage profile = userProfiles[msg.sender];
+        require(!userProfiles[msg.sender].hasOnboarded, "User already has a profile");
+        require(_goals.length > 0, "At least one goal is required");
         
-        // If first time creating profile, add to users array
-        if (!profile.hasOnboarded) {
-            profiledUsers.push(msg.sender);
-            profile.createdAt = block.timestamp;
-            emit ProfileCreated(msg.sender, block.timestamp);
-        }
+        userProfiles[msg.sender] = Profile({
+            hasOnboarded: true,
+            goals: _goals,
+            preferredImageTheme: _imageTheme,
+            customPrompt: _customPrompt,
+            streakCount: 1,
+            totalScore: 100,
+            createdAt: block.timestamp,
+            lastActive: block.timestamp,
+            profileImageUrl: _profileImageUrl,
+            nftTokenId: 0
+        });
         
-        profile.hasOnboarded = true;
-        profile.goals = _goals;
-        profile.preferredImageTheme = _imageTheme;
-        profile.customPrompt = _customPrompt;
-        profile.profileImageUrl = _profileImageUrl;
-        profile.lastActive = block.timestamp;
+        onboardedUsers.push(msg.sender);
         
-        emit ProfileUpdated(msg.sender, block.timestamp);
-        emit GoalsUpdated(msg.sender, _goals);
+        emit ProfileCreated(msg.sender, _goals, _imageTheme, block.timestamp);
     }
     
     /**
-     * @dev Update user's wellness goals
+     * @dev Update user goals
      */
     function updateGoals(string[] memory _newGoals) external {
-        require(userProfiles[msg.sender].hasOnboarded, "User has not onboarded");
+        require(userProfiles[msg.sender].hasOnboarded, "User must onboard first");
+        require(_newGoals.length > 0, "At least one goal is required");
         
         userProfiles[msg.sender].goals = _newGoals;
         userProfiles[msg.sender].lastActive = block.timestamp;
         
         emit GoalsUpdated(msg.sender, _newGoals);
+        emit ProfileUpdated(msg.sender, "goals", block.timestamp);
     }
     
     /**
-     * @dev Update user's streak count
+     * @dev Update user streak count
      */
     function updateStreak(uint256 _newStreak) external {
-        require(userProfiles[msg.sender].hasOnboarded, "User has not onboarded");
+        require(userProfiles[msg.sender].hasOnboarded, "User must onboard first");
         
         userProfiles[msg.sender].streakCount = _newStreak;
         userProfiles[msg.sender].lastActive = block.timestamp;
         
         emit StreakUpdated(msg.sender, _newStreak);
+        emit ProfileUpdated(msg.sender, "streak", block.timestamp);
     }
     
     /**
-     * @dev Update user's total score
+     * @dev Update user total score
      */
     function updateScore(uint256 _newScore) external {
-        require(userProfiles[msg.sender].hasOnboarded, "User has not onboarded");
+        require(userProfiles[msg.sender].hasOnboarded, "User must onboard first");
         
         userProfiles[msg.sender].totalScore = _newScore;
         userProfiles[msg.sender].lastActive = block.timestamp;
         
         emit ScoreUpdated(msg.sender, _newScore);
+        emit ProfileUpdated(msg.sender, "score", block.timestamp);
     }
     
     /**
-     * @dev Update user's profile image URL
+     * @dev Update profile image URL (after NFT generation)
      */
     function updateProfileImage(string memory _newImageUrl) external {
-        require(userProfiles[msg.sender].hasOnboarded, "User has not onboarded");
+        require(userProfiles[msg.sender].hasOnboarded, "User must onboard first");
         
         userProfiles[msg.sender].profileImageUrl = _newImageUrl;
         userProfiles[msg.sender].lastActive = block.timestamp;
         
-        emit ProfileUpdated(msg.sender, block.timestamp);
+        emit ProfileUpdated(msg.sender, "image", block.timestamp);
     }
     
     /**
-     * @dev Mark user achievement as completed
+     * @dev Set NFT token ID for user
      */
-    function unlockAchievement(string memory _achievement) external {
-        require(userProfiles[msg.sender].hasOnboarded, "User has not onboarded");
-        require(!userAchievements[msg.sender][_achievement], "Achievement already unlocked");
+    function setNftTokenId(uint256 _tokenId) external {
+        require(userProfiles[msg.sender].hasOnboarded, "User must onboard first");
         
-        userAchievements[msg.sender][_achievement] = true;
+        userProfiles[msg.sender].nftTokenId = _tokenId;
         userProfiles[msg.sender].lastActive = block.timestamp;
         
-        emit AchievementUnlocked(msg.sender, _achievement);
+        emit ProfileUpdated(msg.sender, "nft", block.timestamp);
     }
     
     /**
-     * @dev Update user's last active timestamp
+     * @dev Update user activity timestamp
      */
     function updateActivity() external {
-        require(userProfiles[msg.sender].hasOnboarded, "User has not onboarded");
+        require(userProfiles[msg.sender].hasOnboarded, "User must onboard first");
+        
         userProfiles[msg.sender].lastActive = block.timestamp;
+        
+        emit ActivityUpdated(msg.sender, block.timestamp);
     }
     
-    // View functions
-    
     /**
-     * @dev Check if user has completed onboarding
+     * @dev Check if user has onboarded
      */
     function hasUserOnboarded(address _user) external view returns (bool) {
         return userProfiles[_user].hasOnboarded;
     }
     
     /**
-     * @dev Get user's complete profile
+     * @dev Get full user profile
      */
     function getUserProfile(address _user) external view returns (
         bool hasOnboarded,
@@ -159,9 +162,10 @@ contract UserProfile is Ownable {
         uint256 totalScore,
         uint256 createdAt,
         uint256 lastActive,
-        string memory profileImageUrl
+        string memory profileImageUrl,
+        uint256 nftTokenId
     ) {
-        WellnessProfile memory profile = userProfiles[_user];
+        Profile memory profile = userProfiles[_user];
         return (
             profile.hasOnboarded,
             profile.goals,
@@ -171,88 +175,80 @@ contract UserProfile is Ownable {
             profile.totalScore,
             profile.createdAt,
             profile.lastActive,
-            profile.profileImageUrl
+            profile.profileImageUrl,
+            profile.nftTokenId
         );
     }
     
     /**
-     * @dev Get user's wellness goals
+     * @dev Get user goals only
      */
     function getUserGoals(address _user) external view returns (string[] memory) {
+        require(userProfiles[_user].hasOnboarded, "User has not onboarded");
         return userProfiles[_user].goals;
     }
     
     /**
-     * @dev Get user's streak and score
+     * @dev Get user stats (streak and score)
      */
     function getUserStats(address _user) external view returns (uint256 streak, uint256 score) {
-        WellnessProfile memory profile = userProfiles[_user];
+        require(userProfiles[_user].hasOnboarded, "User has not onboarded");
+        Profile memory profile = userProfiles[_user];
         return (profile.streakCount, profile.totalScore);
     }
     
     /**
-     * @dev Check if user has specific achievement
+     * @dev Get user's profile image URL
      */
-    function hasAchievement(address _user, string memory _achievement) external view returns (bool) {
-        return userAchievements[_user][_achievement];
+    function getProfileImageUrl(address _user) external view returns (string memory) {
+        require(userProfiles[_user].hasOnboarded, "User has not onboarded");
+        return userProfiles[_user].profileImageUrl;
     }
     
     /**
-     * @dev Get total number of users with profiles
+     * @dev Get user's NFT token ID
+     */
+    function getNftTokenId(address _user) external view returns (uint256) {
+        require(userProfiles[_user].hasOnboarded, "User has not onboarded");
+        return userProfiles[_user].nftTokenId;
+    }
+    
+    /**
+     * @dev Get total number of onboarded users
      */
     function getTotalUsers() external view returns (uint256) {
-        return profiledUsers.length;
+        return onboardedUsers.length;
     }
     
     /**
-     * @dev Get user by index (for admin purposes)
+     * @dev Get onboarded user by index
      */
-    function getUserByIndex(uint256 _index) external view returns (address) {
-        require(_index < profiledUsers.length, "Index out of bounds");
-        return profiledUsers[_index];
+    function getOnboardedUser(uint256 _index) external view returns (address) {
+        require(_index < onboardedUsers.length, "Index out of bounds");
+        return onboardedUsers[_index];
     }
     
     /**
-     * @dev Admin function to reset user profile (for testing)
+     * @dev Admin function to increment user score (for rewards)
      */
-    function resetUserProfile(address _user) external onlyOwner {
-        delete userProfiles[_user];
+    function adminIncrementScore(address _user, uint256 _increment) external onlyOwner {
+        require(userProfiles[_user].hasOnboarded, "User has not onboarded");
         
-        // Remove from profiledUsers array
-        for (uint256 i = 0; i < profiledUsers.length; i++) {
-            if (profiledUsers[i] == _user) {
-                profiledUsers[i] = profiledUsers[profiledUsers.length - 1];
-                profiledUsers.pop();
-                break;
-            }
-        }
+        userProfiles[_user].totalScore += _increment;
+        userProfiles[_user].lastActive = block.timestamp;
+        
+        emit ScoreUpdated(_user, userProfiles[_user].totalScore);
     }
     
     /**
-     * @dev Admin function to get all user data (for analytics)
+     * @dev Admin function to increment user streak (for daily check-ins)
      */
-    function getAllUsersData() external view onlyOwner returns (
-        address[] memory users,
-        uint256[] memory streaks,
-        uint256[] memory scores,
-        uint256[] memory lastActiveTimestamps
-    ) {
-        uint256 totalUsers = profiledUsers.length;
-        users = new address[](totalUsers);
-        streaks = new uint256[](totalUsers);
-        scores = new uint256[](totalUsers);
-        lastActiveTimestamps = new uint256[](totalUsers);
+    function adminIncrementStreak(address _user) external onlyOwner {
+        require(userProfiles[_user].hasOnboarded, "User has not onboarded");
         
-        for (uint256 i = 0; i < totalUsers; i++) {
-            address user = profiledUsers[i];
-            WellnessProfile memory profile = userProfiles[user];
-            
-            users[i] = user;
-            streaks[i] = profile.streakCount;
-            scores[i] = profile.totalScore;
-            lastActiveTimestamps[i] = profile.lastActive;
-        }
+        userProfiles[_user].streakCount += 1;
+        userProfiles[_user].lastActive = block.timestamp;
         
-        return (users, streaks, scores, lastActiveTimestamps);
+        emit StreakUpdated(_user, userProfiles[_user].streakCount);
     }
 }
