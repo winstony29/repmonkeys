@@ -106,6 +106,10 @@ function LandingPageContent() {
   const [streakCount, setStreakCount] = useState(12);
   const [totalScore, setTotalScore] = useState(2840);
   
+  // Network switching state
+  const [isNetworkSwitching, setIsNetworkSwitching] = useState(false);
+  const [networkSwitchAttempts, setNetworkSwitchAttempts] = useState(0);
+  
   // Activity tracking state
   const [activities, setActivities] = useState([
     { id: 1, type: 'workout', name: 'Completed workout', timestamp: Date.now() - 2 * 60 * 60 * 1000, reward: 50, completed: true },
@@ -288,7 +292,98 @@ function LandingPageContent() {
     }
     
     // Save to smart contract if available
-    if (address && hasWellnessData && chainId === 84532) {
+    if (address && hasWellnessData) {
+      // Force network switch to Base Sepolia if not already connected
+      if (chainId !== 84532) {
+        console.log('🔄 Switching to Base Sepolia testnet for activity logging...');
+        try {
+          await (window.ethereum as any).request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x14a34' }], // 84532 in hex
+          });
+          console.log('✅ Switched to Base Sepolia testnet');
+          
+          // Wait a moment for the switch to complete
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Check if switch was successful
+          const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
+          if (newChainId !== '0x14a34') {
+            console.log('⚠️ Network switch failed, using localStorage only');
+            // Fallback to localStorage
+            if (address) {
+              const localStorageKey = `wellspace_user_${address}`;
+              const existingData = localStorage.getItem(localStorageKey);
+              if (existingData) {
+                try {
+                  const userData = JSON.parse(existingData);
+                  userData.streakCount = streakCount + 1;
+                  userData.totalScore = totalScore + reward;
+                  userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
+                  userData.weeklyGoals = weeklyGoals;
+                  localStorage.setItem(localStorageKey, JSON.stringify(userData));
+                } catch (error) {
+                  console.error('Error updating localStorage:', error);
+                }
+              }
+            }
+            return;
+          }
+        } catch (error: any) {
+          console.error('Error switching to Base Sepolia:', error);
+          if (error.code === 4902) {
+            // Chain not added, add it first
+            await addBaseSepoliaNetwork();
+            // Try switching again
+            try {
+              await (window.ethereum as any).request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0x14a34' }],
+              });
+            } catch (switchError) {
+              console.log('⚠️ Network switch failed after adding chain, using localStorage only');
+              // Fallback to localStorage
+              if (address) {
+                const localStorageKey = `wellspace_user_${address}`;
+                const existingData = localStorage.getItem(localStorageKey);
+                if (existingData) {
+                  try {
+                    const userData = JSON.parse(existingData);
+                    userData.streakCount = streakCount + 1;
+                    userData.totalScore = totalScore + reward;
+                    userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
+                    userData.weeklyGoals = weeklyGoals;
+                    localStorage.setItem(localStorageKey, JSON.stringify(userData));
+                  } catch (error) {
+                    console.error('Error updating localStorage:', error);
+                  }
+                }
+              }
+              return;
+            }
+          } else {
+            console.log('⚠️ Network switch failed, using localStorage only');
+            // Fallback to localStorage
+            if (address) {
+              const localStorageKey = `wellspace_user_${address}`;
+              const existingData = localStorage.getItem(localStorageKey);
+              if (existingData) {
+                try {
+                  const userData = JSON.parse(existingData);
+                  userData.streakCount = streakCount + 1;
+                  userData.totalScore = totalScore + reward;
+                  userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
+                  userData.weeklyGoals = weeklyGoals;
+                  localStorage.setItem(localStorageKey, JSON.stringify(userData));
+                } catch (error) {
+                  console.error('Error updating localStorage:', error);
+                }
+              }
+            }
+            return;
+          }
+        }
+      }
       try {
         console.log('📝 Logging activity to smart contract:', { type, name, reward });
         await writeContract({
@@ -380,7 +475,47 @@ function LandingPageContent() {
     setShowMealModal(false);
     
     // Save meal to smart contract if available
-    if (address && hasWellnessData && chainId === 84532) {
+    if (address && hasWellnessData) {
+      // Force network switch to Base Sepolia if not already connected
+      if (chainId !== 84532) {
+        console.log('🔄 Switching to Base Sepolia testnet for meal logging...');
+        try {
+          await (window.ethereum as any).request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x14a34' }], // 84532 in hex
+          });
+          console.log('✅ Switched to Base Sepolia testnet');
+          
+          // Wait a moment for the switch to complete
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Check if switch was successful
+          const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
+          if (newChainId !== '0x14a34') {
+            console.log('⚠️ Network switch failed, meal logged to localStorage only');
+            return;
+          }
+        } catch (error: any) {
+          console.error('Error switching to Base Sepolia:', error);
+          if (error.code === 4902) {
+            // Chain not added, add it first
+            await addBaseSepoliaNetwork();
+            // Try switching again
+            try {
+              await (window.ethereum as any).request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0x14a34' }],
+              });
+            } catch (switchError) {
+              console.log('⚠️ Network switch failed after adding chain, meal logged to localStorage only');
+              return;
+            }
+          } else {
+            console.log('⚠️ Network switch failed, meal logged to localStorage only');
+            return;
+          }
+        }
+      }
       try {
         console.log('🍽️ Logging meal to smart contract:', { type: newMeal.type, name: newMeal.name, calories: parseInt(newMeal.calories) });
         await writeContract({
@@ -508,6 +643,107 @@ function LandingPageContent() {
       console.log('🔍 Debug - Contract meals:', contractMeals);
     }
   }, [address, contractReadError, profileError, wellnessError, isOnboarded, hasWellnessData, profileData, wellnessData, contractActivities, contractMeals]);
+
+  // Force network switch to Base Sepolia on component mount
+  useEffect(() => {
+    if (address && chainId !== 84532) {
+      console.log('🔄 Component mounted - checking network connection...');
+      console.log('⚠️ Wrong network detected:', chainId);
+      
+      // Auto-switch to Base Sepolia
+      const forceNetworkSwitch = async () => {
+        try {
+          console.log('🔄 Auto-switching to Base Sepolia testnet...');
+          await (window.ethereum as any).request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x14a34' }], // 84532 in hex
+          });
+          console.log('✅ Auto-switched to Base Sepolia testnet');
+        } catch (error: any) {
+          console.error('Error auto-switching to Base Sepolia:', error);
+          if (error.code === 4902) {
+            // Chain not added, add it first
+            console.log('🔗 Adding Base Sepolia network first...');
+            await addBaseSepoliaNetwork();
+            // Try switching again
+            try {
+              await (window.ethereum as any).request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0x14a34' }],
+              });
+              console.log('✅ Auto-switched to Base Sepolia testnet after adding network');
+            } catch (switchError) {
+              console.log('⚠️ Auto-switch failed after adding network');
+            }
+          }
+        }
+      };
+      
+      // Delay the auto-switch slightly to avoid conflicts
+      setTimeout(forceNetworkSwitch, 1000);
+    }
+  }, [address, chainId]);
+
+  // Aggressive network switching - run immediately when wallet connects
+  useEffect(() => {
+    if (address) {
+      console.log('🔍 Wallet connected, checking network...');
+      
+      const checkAndSwitchNetwork = async () => {
+        // Get current network from MetaMask directly
+        try {
+          const currentChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
+          console.log('🔍 Current MetaMask chain ID:', currentChainId);
+          
+          if (currentChainId !== '0x14a34') { // Not Base Sepolia
+            console.log('🚨 WRONG NETWORK DETECTED! Forcing switch to Base Sepolia...');
+            setIsNetworkSwitching(true);
+            setNetworkSwitchAttempts(prev => prev + 1);
+            
+            // Force switch immediately
+            try {
+              await (window.ethereum as any).request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0x14a34' }],
+              });
+              console.log('✅ Forced network switch to Base Sepolia');
+              setIsNetworkSwitching(false);
+            } catch (error: any) {
+              console.error('❌ Network switch failed:', error);
+              if (error.code === 4902) {
+                console.log('🔗 Adding Base Sepolia network...');
+                await addBaseSepoliaNetwork();
+                // Try switching again
+                await (window.ethereum as any).request({
+                  method: 'wallet_switchEthereumChain',
+                  params: [{ chainId: '0x14a34' }],
+                });
+                console.log('✅ Network switch successful after adding chain');
+                setIsNetworkSwitching(false);
+              } else {
+                setIsNetworkSwitching(false);
+              }
+            }
+          } else {
+            console.log('✅ Already on Base Sepolia testnet');
+            setIsNetworkSwitching(false);
+          }
+        } catch (error) {
+          console.error('Error checking network:', error);
+          setIsNetworkSwitching(false);
+        }
+      };
+      
+      // Run immediately and also after a short delay
+      checkAndSwitchNetwork();
+      setTimeout(checkAndSwitchNetwork, 500);
+      setTimeout(() => {
+        if (networkSwitchAttempts < 3) {
+          checkAndSwitchNetwork();
+        }
+      }, 2000);
+    }
+  }, [address, networkSwitchAttempts]);
   
   // Update local state when contract data changes
   useEffect(() => {
@@ -709,17 +945,70 @@ function LandingPageContent() {
       }
       
       // Initialize wellness data on WellnessTracker contract if not already done
-      if (!hasWellnessData && chainId === 84532) {
-        console.log('🚀 Initializing wellness data on smart contract...');
-        await writeContract({
-          address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
-          abi: wellnessTrackerAbi,
-          functionName: 'initializeWellnessData',
-          args: [],
-        });
-        console.log('✅ Wellness data initialized on smart contract');
-      } else if (chainId !== 84532) {
-        console.log('⚠️ Wrong network detected, skipping smart contract initialization');
+      if (!hasWellnessData) {
+        // Force network switch to Base Sepolia if not already connected
+        if (chainId !== 84532) {
+          console.log('🔄 Switching to Base Sepolia testnet for profile initialization...');
+          try {
+            await (window.ethereum as any).request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: '0x14a34' }], // 84532 in hex
+            });
+            console.log('✅ Switched to Base Sepolia testnet');
+            
+            // Wait a moment for the switch to complete
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Check if switch was successful
+            const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
+            if (newChainId !== '0x14a34') {
+              console.log('⚠️ Network switch failed, skipping smart contract initialization');
+            } else {
+              console.log('🚀 Initializing wellness data on smart contract...');
+              await writeContract({
+                address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+                abi: wellnessTrackerAbi,
+                functionName: 'initializeWellnessData',
+                args: [],
+              });
+              console.log('✅ Wellness data initialized on smart contract');
+            }
+          } catch (error: any) {
+            console.error('Error switching to Base Sepolia:', error);
+            if (error.code === 4902) {
+              // Chain not added, add it first
+              await addBaseSepoliaNetwork();
+              // Try switching again
+              try {
+                await (window.ethereum as any).request({
+                  method: 'wallet_switchEthereumChain',
+                  params: [{ chainId: '0x14a34' }],
+                });
+                console.log('🚀 Initializing wellness data on smart contract...');
+                await writeContract({
+                  address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+                  abi: wellnessTrackerAbi,
+                  functionName: 'initializeWellnessData',
+                  args: [],
+                });
+                console.log('✅ Wellness data initialized on smart contract');
+              } catch (switchError) {
+                console.log('⚠️ Network switch failed after adding chain, skipping smart contract initialization');
+              }
+            } else {
+              console.log('⚠️ Network switch failed, skipping smart contract initialization');
+            }
+          }
+        } else {
+          console.log('🚀 Initializing wellness data on smart contract...');
+          await writeContract({
+            address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+            abi: wellnessTrackerAbi,
+            functionName: 'initializeWellnessData',
+            args: [],
+          });
+          console.log('✅ Wellness data initialized on smart contract');
+        }
       }
       
       // Save user profile to smart contract
@@ -781,9 +1070,40 @@ function LandingPageContent() {
   const initializeWellnessData = async () => {
     if (!address) return false;
     
+    // Force network switch to Base Sepolia if not already connected
     if (chainId !== 84532) {
-      setContractError('Please switch to Base Sepolia testnet to initialize wellness data on-chain');
-      return false;
+      console.log('🔄 Switching to Base Sepolia testnet...');
+      try {
+        await (window.ethereum as any).request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x14a34' }], // 84532 in hex
+        });
+        console.log('✅ Switched to Base Sepolia testnet');
+        
+        // Wait a moment for the switch to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check if switch was successful
+        const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
+        if (newChainId !== '0x14a34') {
+          setContractError('Failed to switch to Base Sepolia testnet. Please switch manually.');
+          return false;
+        }
+      } catch (error: any) {
+        console.error('Error switching to Base Sepolia:', error);
+        if (error.code === 4902) {
+          // Chain not added, add it first
+          await addBaseSepoliaNetwork();
+          // Try switching again
+          await (window.ethereum as any).request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x14a34' }],
+          });
+        } else {
+          setContractError('Failed to switch to Base Sepolia testnet. Please switch manually.');
+          return false;
+        }
+      }
     }
     
     try {
@@ -808,9 +1128,45 @@ function LandingPageContent() {
   const resetWeeklyGoals = async () => {
     if (!address || !hasWellnessData) return false;
     
+    // Force network switch to Base Sepolia if not already connected
     if (chainId !== 84532) {
-      setContractError('Please switch to Base Sepolia testnet to reset weekly goals on-chain');
-      return false;
+      console.log('🔄 Switching to Base Sepolia testnet for weekly goals reset...');
+      try {
+        await (window.ethereum as any).request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x14a34' }], // 84532 in hex
+        });
+        console.log('✅ Switched to Base Sepolia testnet');
+        
+        // Wait a moment for the switch to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check if switch was successful
+        const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
+        if (newChainId !== '0x14a34') {
+          setContractError('Failed to switch to Base Sepolia testnet. Please switch manually.');
+          return false;
+        }
+      } catch (error: any) {
+        console.error('Error switching to Base Sepolia:', error);
+        if (error.code === 4902) {
+          // Chain not added, add it first
+          await addBaseSepoliaNetwork();
+          // Try switching again
+          try {
+            await (window.ethereum as any).request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: '0x14a34' }],
+            });
+          } catch (switchError) {
+            setContractError('Failed to switch to Base Sepolia testnet after adding chain. Please switch manually.');
+            return false;
+          }
+        } else {
+          setContractError('Failed to switch to Base Sepolia testnet. Please switch manually.');
+          return false;
+        }
+      }
     }
     
     try {
@@ -870,6 +1226,39 @@ function LandingPageContent() {
       }
     }
   };
+
+  // Network switching overlay - prevent any OnchainKit components from rendering until network is correct
+  if (address && chainId !== 84532 && isNetworkSwitching) {
+    return (
+      <div className={cn(
+        "min-h-screen w-full overflow-hidden transition-colors duration-300",
+        isDarkMode ? "bg-black" : "bg-white"
+      )}>
+        <ThemeToggleButton />
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+            <h2 className={cn(
+              "text-xl font-semibold transition-colors",
+              isDarkMode ? "text-white" : "text-gray-900"
+            )}>Switching to Base Sepolia Testnet...</h2>
+            <p className={cn(
+              "transition-colors",
+              isDarkMode ? "text-gray-400" : "text-gray-600"
+            )}>Please approve the network switch in MetaMask</p>
+            <div className="mt-4 p-3 bg-red-100 border border-red-300 rounded-lg">
+              <p className="text-sm text-red-800">
+                <strong>Current Network:</strong> {chainId === 1 ? 'Ethereum Mainnet' : `Network ID ${chainId}`}
+              </p>
+              <p className="text-sm text-red-800 mt-1">
+                <strong>Required:</strong> Base Sepolia Testnet (Chain ID: 84532)
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Onboarding View
   if (currentView === 'onboarding') {
@@ -1466,18 +1855,21 @@ function LandingPageContent() {
             <div className={cn(
               "mb-6 p-4 rounded-xl border transition-colors",
               isDarkMode 
-                ? "bg-orange-900/20 border-orange-700/50 text-orange-200" 
-                : "bg-orange-50 border-orange-200 text-orange-800"
+                ? "bg-red-900/20 border-red-700/50 text-red-200" 
+                : "bg-red-50 border-red-200 text-red-800"
             )}>
               <div className="flex items-center space-x-3">
-                <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
                 <div>
-                  <p className="font-medium">⚠️ Wrong Network Detected</p>
+                  <p className="font-bold text-lg">🚨 CRITICAL: Wrong Network Detected</p>
                   <p className="text-sm opacity-90">
-                    You're currently connected to {chainId === 1 ? 'Ethereum Mainnet' : `Network ID ${chainId}`}. 
+                    You're currently connected to <strong>{chainId === 1 ? 'Ethereum Mainnet' : `Network ID ${chainId}`}</strong>. 
                     WellSpace requires <strong>Base Sepolia Testnet (Chain ID: 84532)</strong>.
+                  </p>
+                  <p className="text-sm opacity-90 mt-2">
+                    <strong>⚠️ WARNING:</strong> Transactions on the wrong network will fail and may charge you gas fees on the wrong blockchain!
                   </p>
                   <div className="mt-3 text-xs opacity-75">
                     <p><strong>To fix this:</strong></p>
@@ -1488,21 +1880,96 @@ function LandingPageContent() {
                       <li>If adding manually: Network Name: "Base Sepolia", RPC URL: "https://sepolia.base.org", Chain ID: "84532"</li>
                     </ol>
                   </div>
-                  <div className="mt-3">
+                  <div className="mt-3 flex space-x-3">
                     <button
                       onClick={addBaseSepoliaNetwork}
                       className={cn(
                         "px-4 py-2 text-sm rounded-lg transition-colors font-medium",
                         isDarkMode 
-                          ? "bg-orange-800/50 hover:bg-orange-800/70 text-orange-200" 
-                          : "bg-orange-100 hover:bg-orange-200 text-orange-800"
+                          ? "bg-red-800/50 hover:bg-red-800/70 text-red-200" 
+                          : "bg-red-100 hover:bg-red-200 text-red-800"
                       )}
                     >
                       🔗 Add Base Sepolia to MetaMask
                     </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await (window.ethereum as any).request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: '0x14a34' }],
+                          });
+                        } catch (error: any) {
+                          if (error.code === 4902) {
+                            await addBaseSepoliaNetwork();
+                          }
+                        }
+                      }}
+                      className={cn(
+                        "px-4 py-2 text-sm rounded-lg transition-colors font-medium",
+                        isDarkMode 
+                          ? "bg-blue-800/50 hover:bg-blue-800/70 text-blue-200" 
+                          : "bg-blue-100 hover:bg-blue-200 text-blue-800"
+                      )}
+                    >
+                      🔄 Switch to Base Sepolia Now
+                    </button>
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Network Status Indicator */}
+          {address && (
+            <div className="mb-6 flex items-center justify-between">
+              <div className={cn(
+                "flex items-center space-x-2 px-3 py-2 rounded-lg border transition-colors",
+                chainId === 84532
+                  ? isDarkMode 
+                    ? "bg-green-900/20 border-green-700/50 text-green-200" 
+                    : "bg-green-50 border-green-200 text-green-800"
+                  : isDarkMode 
+                    ? "bg-red-900/20 border-red-700/50 text-red-200" 
+                    : "bg-red-50 border-red-200 text-red-800"
+              )}>
+                <div className={cn(
+                  "w-2 h-2 rounded-full",
+                  chainId === 84532 ? "bg-green-500" : "bg-red-500"
+                )} />
+                <span className="text-sm font-medium">
+                  {chainId === 84532 ? '✅ Base Sepolia Testnet' : '❌ Wrong Network'}
+                </span>
+                {chainId !== 84532 && (
+                  <span className="text-xs opacity-75">
+                    (Current: {chainId === 1 ? 'Ethereum Mainnet' : `ID ${chainId}`})
+                  </span>
+                )}
+              </div>
+              {chainId !== 84532 && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await (window.ethereum as any).request({
+                        method: 'wallet_switchEthereumChain',
+                        params: [{ chainId: '0x14a34' }],
+                      });
+                    } catch (error: any) {
+                      if (error.code === 4902) {
+                        await addBaseSepoliaNetwork();
+                      }
+                    }
+                  }}
+                  className={cn(
+                    "px-3 py-2 text-sm rounded-lg transition-colors font-medium",
+                    isDarkMode 
+                      ? "bg-blue-800/50 hover:bg-blue-800/70 text-blue-200" 
+                      : "bg-blue-100 hover:bg-blue-200 text-blue-800"
+                  )}
+                >
+                  🔄 Switch Network
+                </button>
+              )}
             </div>
           )}
 
@@ -2028,6 +2495,67 @@ function LandingPageContent() {
   }
 
   // Landing Page View
+  // Check network before rendering any OnchainKit components
+  if (address && chainId !== 84532) {
+    return (
+      <div className={cn(
+        "min-h-screen w-full overflow-hidden transition-colors duration-300",
+        isDarkMode ? "bg-black" : "bg-white"
+      )}>
+        <ThemeToggleButton />
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-red-100 border-4 border-red-300 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h2 className={cn(
+              "text-2xl font-bold transition-colors mb-4",
+              isDarkMode ? "text-white" : "text-gray-900"
+            )}>🚨 Wrong Network Detected</h2>
+            <p className={cn(
+              "transition-colors mb-6",
+              isDarkMode ? "text-gray-400" : "text-gray-600"
+            )}>
+              You're currently connected to <strong>{chainId === 1 ? 'Ethereum Mainnet' : `Network ID ${chainId}`}</strong>.
+              <br />
+              WellSpace requires <strong>Base Sepolia Testnet (Chain ID: 84532)</strong>.
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={async () => {
+                  try {
+                    await (window.ethereum as any).request({
+                      method: 'wallet_switchEthereumChain',
+                      params: [{ chainId: '0x14a34' }],
+                    });
+                  } catch (error: any) {
+                    if (error.code === 4902) {
+                      await addBaseSepoliaNetwork();
+                    }
+                  }
+                }}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+              >
+                🔄 Switch to Base Sepolia Now
+              </button>
+              <button
+                onClick={addBaseSepoliaNetwork}
+                className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg transition-colors ml-3"
+              >
+                🔗 Add Base Sepolia to MetaMask
+              </button>
+            </div>
+            <div className="mt-6 p-4 bg-yellow-100 border border-yellow-300 rounded-lg text-sm text-yellow-800">
+              <p><strong>⚠️ Important:</strong> Transactions on the wrong network will fail and may charge you gas fees on the wrong blockchain!</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn(
       "min-h-screen w-full transition-colors duration-300",

@@ -7,7 +7,7 @@ import {
   Socials,
 } from '@coinbase/onchainkit/identity';
 import { ConnectWallet } from '@coinbase/onchainkit/wallet';
-import { base, mainnet } from 'viem/chains';
+import { baseSepolia } from 'viem/chains';
 import { useAccount } from 'wagmi';
 
 export default function IdentityDemo() {
@@ -20,23 +20,10 @@ export default function IdentityDemo() {
           <div className="flex flex-col gap-6">
             <div className="space-y-2">
               <h2 className="font-medium text-gray-500 text-sm">
-                Default Chain
+                Base Sepolia Testnet
               </h2>
               <div className="flex items-center space-x-4">
-                <Identity address={address} chain={mainnet}>
-                  <Avatar />
-                  <Name>
-                    <Badge />
-                  </Name>
-                  <Address />
-                  <Socials />
-                </Identity>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <h2 className="font-medium text-gray-500 text-sm">Base Chain</h2>
-              <div className="flex items-center space-x-4">
-                <Identity address={address} chain={base}>
+                <Identity address={address} chain={baseSepolia}>
                   <Avatar />
                   <Name>
                     <Badge />
