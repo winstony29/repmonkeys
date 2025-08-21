@@ -18,7 +18,6 @@ import { useAccount, useReadContract, useBalance } from 'wagmi';
 import { wellnessNFTAbi, wellTokenAbi, CONTRACT_ADDRESSES, formatTokenAmount } from '@/lib/contracts';
 import { useWellnessAPI } from '@/lib/api';
 import { useSogniGeneration } from '@/lib/sogni';
-import { useUserProfile } from '@/lib/useUserProfile';
 
 // Theme Context
 const ThemeContext = createContext<{
@@ -110,14 +109,6 @@ function LandingPageContent() {
   const { address } = useAccount();
   const { getWellnessAdvice } = useWellnessAPI();
   const { generateImage } = useSogniGeneration();
-  const { 
-    userProfile, 
-    hasOnboarded, 
-    createProfile, 
-    updateActivity,
-    isLoading: isProfileLoading,
-    isContractDeployed 
-  } = useUserProfile();
 
   // Get user's WellnessNFT token ID
   const { data: tokenId } = useReadContract({
@@ -162,40 +153,6 @@ function LandingPageContent() {
     );
   };
 
-  // Load user profile data from smart contract
-  useEffect(() => {
-    if (address && hasOnboarded && userProfile && isContractDeployed) {
-      // User has already onboarded, load their data
-      setUserGoals(userProfile.goals || []);
-      setSelectedImageTheme(userProfile.preferredImageTheme || '');
-      setCustomPrompt(userProfile.customPrompt || '');
-      setGeneratedImageUrl(userProfile.profileImageUrl || null);
-      setStreakCount(userProfile.streakCount || 0);
-      setTotalScore(userProfile.totalScore || 0);
-      
-      // Skip to dashboard if user has completed onboarding
-      if (currentView === 'landing') {
-        setCurrentView('dashboard');
-      }
-      
-      // Update activity
-      updateActivity();
-    }
-  }, [address, hasOnboarded, userProfile, isContractDeployed, currentView, updateActivity]);
-
-  // Reset data when wallet disconnects
-  useEffect(() => {
-    if (!address) {
-      setCurrentView('landing');
-      setUserGoals([]);
-      setSelectedImageTheme('');
-      setCustomPrompt('');
-      setGeneratedImageUrl(null);
-      setStreakCount(12); // Default values
-      setTotalScore(2840);
-    }
-  }, [address]);
-
   const startJourney = () => {
     setCurrentView('onboarding');
     setOnboardingStep(1);
@@ -230,28 +187,8 @@ function LandingPageContent() {
     }
   };
 
-  const completeOnboarding = async () => {
-    if (!isContractDeployed) {
-      // Fallback if contract not deployed
-      setCurrentView('dashboard');
-      return;
-    }
-
-    try {
-      // Save user profile to smart contract
-      await createProfile(
-        userGoals,
-        selectedImageTheme,
-        customPrompt,
-        generatedImageUrl || ''
-      );
-      
-      setCurrentView('dashboard');
-    } catch (error) {
-      console.error('Failed to save profile to blockchain:', error);
-      // Still proceed to dashboard even if blockchain save fails
-      setCurrentView('dashboard');
-    }
+  const completeOnboarding = () => {
+    setCurrentView('dashboard');
   };
 
   // Onboarding View
@@ -535,24 +472,14 @@ function LandingPageContent() {
 
                 <button
                   onClick={completeOnboarding}
-                  disabled={isProfileLoading}
                   className={cn(
                     "w-full py-3 font-semibold rounded-xl transition-all duration-200",
-                    isProfileLoading
-                      ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                      : isDarkMode
-                        ? "bg-gray-700 hover:bg-gray-600 text-white"
-                        : "bg-gray-800 hover:bg-gray-700 text-white"
+                    isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 text-white"
+                      : "bg-gray-800 hover:bg-gray-700 text-white"
                   )}
                 >
-                  {isProfileLoading ? (
-                    <div className="flex items-center justify-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                      <span>Saving to blockchain...</span>
-                    </div>
-                  ) : (
-                    'Enter WellSpace'
-                  )}
+                  Enter WellSpace
                 </button>
               </div>
             )}
@@ -1204,26 +1131,16 @@ function LandingPageContent() {
             </div>
 
             {/* CTA Button */}
-                        <button
+            <button 
               onClick={startJourney}
-              disabled={isProfileLoading}
               className={cn(
-                "w-full sm:w-auto px-8 sm:px-12 py-3 sm:py-4 font-semibold rounded-xl sm:rounded-2xl transition-all duration-300 transform shadow-lg text-base sm:text-lg",
-                isProfileLoading 
-                  ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                  : isDarkMode 
-                    ? "bg-white text-black hover:bg-gray-100 hover:scale-105" 
-                    : "bg-black text-white hover:bg-gray-800 hover:scale-105"
+                "w-full sm:w-auto px-8 sm:px-12 py-3 sm:py-4 font-semibold rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg text-base sm:text-lg",
+                isDarkMode 
+                  ? "bg-white text-black hover:bg-gray-100" 
+                  : "bg-black text-white hover:bg-gray-800"
               )}
             >
-              {isProfileLoading ? (
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                  <span>Checking profile...</span>
-                </div>
-              ) : (
-                'Get started'
-              )}
+              Get started
             </button>
 
             {/* Trust Indicators */}

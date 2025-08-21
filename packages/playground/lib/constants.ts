@@ -22,11 +22,18 @@ type EnvironmentKey = (typeof ENVIRONMENT)[keyof typeof ENVIRONMENT];
 
 export const ENVIRONMENT_VARIABLES: Record<EnvironmentKey, string | undefined> =
   {
-    [ENVIRONMENT.API_KEY]: process.env.NEXT_PUBLIC_OCK_API_KEY,
+    [ENVIRONMENT.API_KEY]: process.env.NEXT_PUBLIC_OCK_API_KEY || process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY,
     [ENVIRONMENT.ENVIRONMENT]: process.env.NEXT_PUBLIC_VERCEL_ENV,
-    [ENVIRONMENT.PROJECT_ID]: process.env.NEXT_PUBLIC_PROJECT_ID,
+    [ENVIRONMENT.PROJECT_ID]: process.env.NEXT_PUBLIC_PROJECT_ID || process.env.NEXT_PUBLIC_CDP_PROJECT_ID,
     [ENVIRONMENT.RESERVOIR_API_KEY]: process.env.NEXT_PUBLIC_RESERVOIR_API_KEY,
   };
+
+// Debug logging
+console.log('🔧 Environment Variables:', {
+  API_KEY: ENVIRONMENT_VARIABLES[ENVIRONMENT.API_KEY] ? 'Set' : 'Missing',
+  PROJECT_ID: ENVIRONMENT_VARIABLES[ENVIRONMENT.PROJECT_ID] ? 'Set' : 'Missing',
+  ENVIRONMENT: ENVIRONMENT_VARIABLES[ENVIRONMENT.ENVIRONMENT] || 'development',
+});
 
 export const ethToken: Token = {
   name: 'ETH',

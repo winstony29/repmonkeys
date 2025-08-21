@@ -116,6 +116,20 @@ export const userProfileAbi = [
     type: 'function'
   },
   {
+    inputs: [{ name: '_tokenId', type: 'uint256' }],
+    name: 'setNftTokenId',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [],
+    name: 'updateActivity',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
     inputs: [{ name: '_user', type: 'address' }],
     name: 'hasUserOnboarded',
     outputs: [{ name: '', type: 'bool' }],
@@ -134,7 +148,8 @@ export const userProfileAbi = [
       { name: 'totalScore', type: 'uint256' },
       { name: 'createdAt', type: 'uint256' },
       { name: 'lastActive', type: 'uint256' },
-      { name: 'profileImageUrl', type: 'string' }
+      { name: 'profileImageUrl', type: 'string' },
+      { name: 'nftTokenId', type: 'uint256' }
     ],
     stateMutability: 'view',
     type: 'function'
@@ -157,20 +172,27 @@ export const userProfileAbi = [
     type: 'function'
   },
   {
-    inputs: [],
-    name: 'updateActivity',
-    outputs: [],
-    stateMutability: 'nonpayable',
+    inputs: [{ name: '_user', type: 'address' }],
+    name: 'getProfileImageUrl',
+    outputs: [{ name: '', type: 'string' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: '_user', type: 'address' }],
+    name: 'getNftTokenId',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
     type: 'function'
   }
 ] as const
 
 // Contract addresses (set via environment variables or fallback to deployed addresses)
 export const CONTRACT_ADDRESSES = {
-  WELLNESS_NFT: (process.env.NEXT_PUBLIC_WELLNESS_NFT_ADDRESS || '0x56186c1e64ca8043def78d06aff222212ea5df71') as `0x${string}`,
-  WELL_TOKEN: (process.env.NEXT_PUBLIC_WELL_TOKEN_ADDRESS || '0x53eba1e079f885482238ee8bf01c4a9f09de458f') as `0x${string}`,
-  REWARDS: (process.env.NEXT_PUBLIC_REWARDS_CONTRACT_ADDRESS || '0x056e4a859558a3975761abd7385506bc4d8a8e60') as `0x${string}`,
-  USER_PROFILE: (process.env.NEXT_PUBLIC_USER_PROFILE_ADDRESS || '0x259435d8Df5171c5Cc48B6aF3F8578420be4bc99') as `0x${string}`,
+  WELLNESS_NFT: (process.env.NEXT_PUBLIC_WELLNESS_NFT_ADDRESS || '0x84b5fc5a47a4FcEe67793eB149032A4A981B5F04') as `0x${string}`,
+  WELL_TOKEN: (process.env.NEXT_PUBLIC_WELL_TOKEN_ADDRESS || '0x3d1B85c7c772295B754A74e928eA9d3C29769c7e') as `0x${string}`,
+  REWARDS: (process.env.NEXT_PUBLIC_REWARDS_CONTRACT_ADDRESS || '0x28Fd86Fe69bA36b9E12f5A8F0395D172Ac227D29') as `0x${string}`,
+  USER_PROFILE: (process.env.NEXT_PUBLIC_USER_PROFILE_ADDRESS || '0x62513A440FCb39604Aa2B5Ae926f14DDa9E129Ca') as `0x${string}`,
 }
 
 // Utility function to format token amounts

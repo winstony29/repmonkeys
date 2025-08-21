@@ -11,10 +11,14 @@ import {
   TransactionTypes,
 } from '@/types/onchainkit';
 import { OnchainKitProvider } from '@coinbase/onchainkit';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type React from 'react';
 import { createContext, useEffect, useState } from 'react';
+import { http, createConfig } from 'wagmi';
+import { WagmiProvider } from 'wagmi';
 import type { Address } from 'viem';
-import { base } from 'wagmi/chains';
+import { base, baseSepolia } from 'wagmi/chains';
+import { coinbaseWallet } from 'wagmi/connectors';
 
 type State = {
   activeComponent?: OnchainKitComponent;
@@ -47,7 +51,7 @@ type State = {
 
 export const defaultState: State = {
   activeComponent: OnchainKitComponent.LandingPage,
-  chainId: base.id,
+  chainId: baseSepolia.id,
   componentTheme: 'default',
   setComponentTheme: () => {},
   componentMode: 'auto',
@@ -60,6 +64,30 @@ export const defaultState: State = {
 };
 
 export const AppContext = createContext(defaultState);
+
+// Wagmi configuration
+const wagmiConfig = createConfig({
+  chains: [baseSepolia],
+  transports: {
+    [baseSepolia.id]: http(),
+  },
+  ssr: true,
+  connectors: [
+    coinbaseWallet({
+      appName: 'WellSpace',
+      appLogoUrl: 'https://wellspace.app/logo.png',
+      preference: 'smartWalletOnly',
+    }),
+    coinbaseWallet({
+      appName: 'WellSpace',
+      appLogoUrl: 'https://wellspace.app/logo.png', 
+      preference: 'eoaOnly',
+    }),
+  ],
+});
+
+// Create QueryClient instance
+const queryClient = new QueryClient();
 
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [activeComponent, setActiveComponent] =
@@ -154,64 +182,68 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AppContext.Provider
-      value={{
-        activeComponent,
-        setActiveComponent,
-        chainId,
-        setChainId,
-        componentTheme,
-        setComponentTheme,
-        componentMode,
-        setComponentMode,
-        checkoutOptions,
-        setCheckoutOptions,
-        checkoutTypes,
-        setCheckoutTypes,
-        paymasters,
-        setPaymaster,
-        transactionType,
-        setTransactionType,
-        defaultMaxSlippage,
-        setDefaultMaxSlippage,
-        nftToken,
-        setNFTToken,
-        setIsSponsored,
-        isSponsored,
-        vaultAddress,
-        setVaultAddress,
-        isSignUpEnabled,
-        setIsSignUpEnabled,
-      }}
-    >
-      <OnchainKitProvider
-        apiKey={ENVIRONMENT_VARIABLES[ENVIRONMENT.API_KEY]}
-        chain={base}
-        config={{
-          appearance: {
-            name: 'OnchainKit Playground',
-            logo: 'https://pbs.twimg.com/media/GkXUnEnaoAIkKvG?format=jpg&name=medium',
-            mode: componentMode,
-            theme: componentTheme === 'none' ? undefined : componentTheme,
-          },
-          paymaster: paymasters?.[chainId || 8453]?.url,
-          wallet: {
-            display: 'modal',
-            signUpEnabled: isSignUpEnabled,
-            termsUrl: 'https://www.coinbase.com/legal/cookie',
-            privacyUrl: 'https://www.coinbase.com/legal/privacy',
-            supportedWallets: {
-              rabby: false,
-              trust: false,
-              frame: false,
-            },
-          },
-        }}
-        projectId={ENVIRONMENT_VARIABLES[ENVIRONMENT.PROJECT_ID]}
-        schemaId="0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9"
-      >
-        {children}
-      </OnchainKitProvider>
-    </AppContext.Provider>
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <AppContext.Provider
+          value={{
+            activeComponent,
+            setActiveComponent,
+            chainId,
+            setChainId,
+            componentTheme,
+            setComponentTheme,
+            componentMode,
+            setComponentMode,
+            checkoutOptions,
+            setCheckoutOptions,
+            checkoutTypes,
+            setCheckoutTypes,
+            paymasters,
+            setPaymaster,
+            transactionType,
+            setTransactionType,
+            defaultMaxSlippage,
+            setDefaultMaxSlippage,
+            nftToken,
+            setNFTToken,
+            setIsSponsored,
+            isSponsored,
+            vaultAddress,
+            setVaultAddress,
+            isSignUpEnabled,
+            setIsSignUpEnabled,
+          }}
+        >
+          <OnchainKitProvider
+            apiKey={ENVIRONMENT_VARIABLES[ENVIRONMENT.API_KEY] || ''}
+            chain={baseSepolia}
+            config={{
+              appearance: {
+                name: 'WellSpace',
+                logo: 'https://wellspace.app/logo.png',
+                mode: componentMode,
+                theme: componentTheme === 'none' ? undefined : componentTheme,
+              },
+              paymaster: paymasters?.[chainId || 84532]?.url,
+              wallet: {
+                display: 'modal',
+                signUpEnabled: isSignUpEnabled,
+                termsUrl: 'https://www.coinbase.com/legal/cookie',
+                privacyUrl: 'https://www.coinbase.com/legal/privacy',
+                supportedWallets: {
+                  rabby: false,
+                  trust: false,
+                  frame: false,
+                },
+              },
+            }}
+            projectId={ENVIRONMENT_VARIABLES[ENVIRONMENT.PROJECT_ID] || ''}
+            schemaId="0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9"
+          >
+            {children}
+          </OnchainKitProvider>
+        </AppContext.Provider>
+      </QueryClientProvider>
+    </WagmiProvider>
   );
 };
