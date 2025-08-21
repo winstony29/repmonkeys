@@ -1653,14 +1653,6 @@ function LandingPageContent() {
                 {!address ? (
                   <div className="flex flex-col sm:flex-row gap-4 lg:justify-start justify-center">
                     <ConnectWallet />
-                    <button className={cn(
-                      "px-8 py-4 border-2 font-semibold rounded-2xl transition-all duration-300 text-lg",
-                      isDarkMode 
-                        ? "border-gray-600 text-white hover:border-gray-400" 
-                        : "border-gray-400 text-black hover:border-gray-600"
-                    )}>
-                      Watch demo
-                    </button>
                   </div>
                 ) : (
                   <div className="flex flex-col sm:flex-row gap-4 lg:justify-start justify-center">
@@ -1676,14 +1668,6 @@ function LandingPageContent() {
                       )}
                     >
                       {isCheckingContract ? 'Checking...' : (isUserOnboarded ? 'Continue Journey' : 'Get started')}
-                    </button>
-                    <button className={cn(
-                      "px-8 py-4 border-2 font-semibold rounded-2xl transition-all duration-300 text-lg",
-                      isDarkMode 
-                        ? "border-gray-600 text-white hover:border-gray-400" 
-                        : "border-gray-400 text-black hover:border-gray-600"
-                    )}>
-                      Watch demo
                     </button>
                   </div>
                 )}
@@ -1812,39 +1796,276 @@ function LandingPageContent() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
             <div className="text-center group">
-              <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:bg-blue-200 transition-colors">
-                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className={cn(
+                "w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 transition-colors",
+                isDarkMode 
+                  ? "bg-gray-700 group-hover:bg-gray-600" 
+                  : "bg-gray-200 group-hover:bg-gray-300"
+              )}>
+                <svg className={cn(
+                  "w-8 h-8 transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
-              <h3 className="text-xl lg:text-2xl font-bold text-gray-900 mb-4">AI Health Insights</h3>
-              <p className="text-gray-600 leading-relaxed">
+              <h3 className={cn(
+                "text-xl lg:text-2xl font-bold mb-4 transition-colors",
+                isDarkMode ? "text-white" : "text-gray-900"
+              )}>AI Health Insights</h3>
+              <p className={cn(
+                "leading-relaxed transition-colors",
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              )}>
                 Get personalized recommendations powered by advanced AI that learns from your wellness patterns and goals.
               </p>
             </div>
 
             <div className="text-center group">
-              <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:bg-green-200 transition-colors">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className={cn(
+                "w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 transition-colors",
+                isDarkMode 
+                  ? "bg-gray-700 group-hover:bg-gray-600" 
+                  : "bg-gray-200 group-hover:bg-gray-300"
+              )}>
+                <svg className={cn(
+                  "w-8 h-8 transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m0 0V1a1 1 0 011-1h2a1 1 0 011 1v18a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1h2a1 1 0 011-1z" />
                 </svg>
               </div>
-              <h3 className="text-xl lg:text-2xl font-bold text-gray-900 mb-4">Wellness NFTs</h3>
-              <p className="text-gray-600 leading-relaxed">
+              <h3 className={cn(
+                "text-xl lg:text-2xl font-bold mb-4 transition-colors",
+                isDarkMode ? "text-white" : "text-gray-900"
+              )}>Wellness NFTs</h3>
+              <p className={cn(
+                "leading-relaxed transition-colors",
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              )}>
                 Mint unique NFTs that represent your wellness achievements and milestones on your health journey.
               </p>
             </div>
 
             <div className="text-center group">
-              <div className="w-16 h-16 bg-yellow-100 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:bg-yellow-200 transition-colors">
-                <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className={cn(
+                "w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 transition-colors",
+                isDarkMode 
+                  ? "bg-gray-700 group-hover:bg-gray-600" 
+                  : "bg-gray-200 group-hover:bg-gray-300"
+              )}>
+                <svg className={cn(
+                  "w-8 h-8 transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                 </svg>
               </div>
-              <h3 className="text-xl lg:text-2xl font-bold text-gray-900 mb-4">Earn $WELL Tokens</h3>
-              <p className="text-gray-600 leading-relaxed">
+              <h3 className={cn(
+                "text-xl lg:text-2xl font-bold mb-4 transition-colors",
+                isDarkMode ? "text-white" : "text-gray-900"
+              )}>Earn $WELL Tokens</h3>
+              <p className={cn(
+                "leading-relaxed transition-colors",
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              )}>
                 Get rewarded with $WELL tokens for completing wellness activities and maintaining healthy habits.
               </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section id="how-it-works" className={cn(
+        "py-20 lg:py-32 transition-colors duration-300",
+        isDarkMode ? "bg-gray-50" : "bg-gray-100"
+      )}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16 lg:mb-20">
+            <h2 className={cn(
+              "text-3xl lg:text-4xl xl:text-5xl font-bold mb-6 transition-colors",
+              isDarkMode ? "text-gray-900" : "text-gray-900"
+            )}>
+              How it works
+            </h2>
+            <p className={cn(
+              "text-lg lg:text-xl max-w-3xl mx-auto transition-colors",
+              isDarkMode ? "text-gray-700" : "text-gray-600"
+            )}>
+              Simple steps to start your wellness journey with AI-powered insights and blockchain rewards
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12">
+            <div className="text-center">
+              <div className={cn(
+                "w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold transition-colors",
+                isDarkMode 
+                  ? "bg-gray-800 text-white" 
+                  : "bg-gray-800 text-white"
+              )}>
+                1
+              </div>
+              <h3 className={cn(
+                "text-xl lg:text-2xl font-bold mb-4 transition-colors",
+                isDarkMode ? "text-gray-900" : "text-gray-900"
+              )}>Connect Wallet</h3>
+              <p className={cn(
+                "leading-relaxed transition-colors",
+                isDarkMode ? "text-gray-700" : "text-gray-600"
+              )}>
+                Securely connect your Web3 wallet to start earning rewards and minting wellness NFTs.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className={cn(
+                "w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold transition-colors",
+                isDarkMode 
+                  ? "bg-gray-800 text-white" 
+                  : "bg-gray-800 text-white"
+              )}>
+                2
+              </div>
+              <h3 className={cn(
+                "text-xl lg:text-2xl font-bold mb-4 transition-colors",
+                isDarkMode ? "text-gray-900" : "text-gray-900"
+              )}>Track Wellness</h3>
+              <p className={cn(
+                "leading-relaxed transition-colors",
+                isDarkMode ? "text-gray-700" : "text-gray-600"
+              )}>
+                Log your activities, get AI insights, and build healthy habits while earning $WELL tokens.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className={cn(
+                "w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold transition-colors",
+                isDarkMode 
+                  ? "bg-gray-800 text-white" 
+                  : "bg-gray-800 text-white"
+              )}>
+                3
+              </div>
+              <h3 className={cn(
+                "text-xl lg:text-2xl font-bold mb-4 transition-colors",
+                isDarkMode ? "text-gray-900" : "text-gray-900"
+              )}>Earn Rewards</h3>
+              <p className={cn(
+                "leading-relaxed transition-colors",
+                isDarkMode ? "text-gray-700" : "text-gray-600"
+              )}>
+                Mint unique NFTs for milestones and accumulate $WELL tokens for your wellness achievements.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Rewards Section */}
+      <section id="rewards" className={cn(
+        "py-20 lg:py-32 transition-colors duration-300",
+        isDarkMode ? "bg-white" : "bg-white"
+      )}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16 lg:mb-20">
+            <h2 className={cn(
+              "text-3xl lg:text-4xl xl:text-5xl font-bold mb-6 transition-colors",
+              isDarkMode ? "text-gray-900" : "text-gray-900"
+            )}>
+              Rewards & Incentives
+            </h2>
+            <p className={cn(
+              "text-lg lg:text-xl max-w-3xl mx-auto transition-colors",
+              isDarkMode ? "text-gray-700" : "text-gray-600"
+            )}>
+              Get rewarded for your wellness journey with $WELL tokens and unique NFTs
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
+            <div className="space-y-6">
+              <div className={cn(
+                "p-6 rounded-2xl border transition-colors",
+                isDarkMode 
+                  ? "bg-gray-50 border-gray-200" 
+                  : "bg-gray-50 border-gray-200"
+              )}>
+                <div className="flex items-center space-x-4 mb-4">
+                  <div className={cn(
+                    "w-12 h-12 rounded-xl flex items-center justify-center transition-colors",
+                    isDarkMode 
+                      ? "bg-gray-800" 
+                      : "bg-gray-800"
+                  )}>
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className={cn(
+                      "text-xl font-bold transition-colors",
+                      isDarkMode ? "text-gray-900" : "text-gray-900"
+                    )}>$WELL Token Rewards</h3>
+                    <p className={cn(
+                      "text-sm transition-colors",
+                      isDarkMode ? "text-gray-700" : "text-gray-600"
+                    )}>Earn tokens for every wellness activity</p>
+                  </div>
+                </div>
+                <ul className={cn(
+                  "space-y-2 text-sm transition-colors",
+                  isDarkMode ? "text-gray-700" : "text-gray-600"
+                )}>
+                  <li>• Workout completion: +50 WELL</li>
+                  <li>• Meditation session: +25 WELL</li>
+                  <li>• Meal logging: +10 WELL</li>
+                  <li>• Sleep tracking: +30 WELL</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className={cn(
+                "p-6 rounded-2xl border transition-colors",
+                isDarkMode 
+                  ? "bg-gray-50 border-gray-200" 
+                  : "bg-gray-50 border-gray-200"
+              )}>
+                <div className="flex items-center space-x-4 mb-4">
+                  <div className={cn(
+                    "w-12 h-12 rounded-xl flex items-center justify-center transition-colors",
+                    isDarkMode 
+                      ? "bg-gray-800" 
+                      : "bg-gray-800"
+                  )}>
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m0 0V1a1 1 0 011-1h2a1 1 0 011 1v18a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1h2a1 1 0 011-1z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className={cn(
+                      "text-xl font-bold transition-colors",
+                      isDarkMode ? "text-gray-900" : "text-gray-900"
+                    )}>Wellness NFTs</h3>
+                    <p className={cn(
+                      "text-sm transition-colors",
+                      isDarkMode ? "text-gray-700" : "text-gray-600"
+                    )}>Unique digital collectibles for milestones</p>
+                  </div>
+                </div>
+                <ul className={cn(
+                  "space-y-2 text-sm transition-colors",
+                  isDarkMode ? "text-gray-700" : "text-gray-600"
+                )}>
+                  <li>• 7-day streak achievement</li>
+                  <li>• Monthly wellness goals</li>
+                  <li>• Special event participation</li>
+                  <li>• Community challenges</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -1867,7 +2088,7 @@ function LandingPageContent() {
               "text-base sm:text-lg lg:text-xl mb-8 sm:mb-12 max-w-2xl mx-auto leading-relaxed transition-colors",
               isDarkMode ? "text-gray-300" : "text-gray-600"
             )}>
-              Join thousands of users who are already earning rewards for their healthy lifestyle choices.
+              Start your wellness journey today and discover the power of AI-powered insights combined with blockchain rewards.
             </p>
 
             {/* Wallet Connection Card */}
@@ -1919,39 +2140,7 @@ function LandingPageContent() {
               Get started
             </button>
 
-            {/* App Features */}
-            <div className="mt-8 sm:mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 max-w-3xl mx-auto">
-              <div className="text-center">
-                <div className={cn(
-                  "text-2xl sm:text-3xl font-bold mb-1 transition-colors",
-                  isDarkMode ? "text-white" : "text-gray-900"
-                )}>Smart</div>
-                <div className={cn(
-                  "text-sm sm:text-base transition-colors",
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                )}>Contracts</div>
-              </div>
-              <div className="text-center">
-                <div className={cn(
-                  "text-2xl sm:text-3xl font-bold mb-1 transition-colors",
-                  isDarkMode ? "text-white" : "text-gray-900"
-                )}>AI</div>
-                <div className={cn(
-                  "text-sm sm:text-base transition-colors",
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                )}>Powered</div>
-              </div>
-              <div className="text-center">
-                <div className={cn(
-                  "text-2xl sm:text-3xl font-bold mb-1 transition-colors",
-                  isDarkMode ? "text-white" : "text-gray-900"
-                )}>Web3</div>
-                <div className={cn(
-                  "text-sm sm:text-base transition-colors",
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                )}>Native</div>
-              </div>
-            </div>
+
           </div>
         </div>
       </section>
