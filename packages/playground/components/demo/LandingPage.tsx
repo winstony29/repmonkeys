@@ -17,7 +17,7 @@ import {
 } from '@coinbase/onchainkit/wallet';
 import { FundButton } from '@coinbase/onchainkit/fund';
 import { cn } from '@/lib/utils';
-import { useAccount, useReadContract, useBalance, useWriteContract, useChainId } from 'wagmi';
+import { useAccount, useReadContract, useBalance, useWriteContract, useChainId, useDisconnect } from 'wagmi';
 import { wellnessNFTAbi, wellTokenAbi, userProfileAbi, wellnessTrackerAbi, CONTRACT_ADDRESSES, formatTokenAmount } from '@/lib/contracts';
 import { useWellnessAPI } from '@/lib/api';
 import { useSogniGeneration } from '@/lib/sogni';
@@ -98,6 +98,9 @@ function LandingPageContent() {
   const [wellnessPrompt, setWellnessPrompt] = useState('');
   const [aiResponse, setAiResponse] = useState<any>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
+  
+  // Disconnect confirmation state
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
   const [userGoals, setUserGoals] = useState<string[]>([]);
   const [onboardingStep, setOnboardingStep] = useState(1);
   const [selectedImageTheme, setSelectedImageTheme] = useState('');
@@ -142,6 +145,7 @@ function LandingPageContent() {
   const { isDarkMode } = useTheme();
 
   const { address } = useAccount();
+  const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { getWellnessAdvice } = useWellnessAPI();
   const { generateImage } = useSogniGeneration();
@@ -1535,12 +1539,25 @@ function LandingPageContent() {
                       {address && (
                         <div className="flex items-center space-x-4 py-3">
                           <Avatar className="h-12 w-12" />
-                          <div>
+                          <div className="flex-1">
                             <Name className="text-base font-semibold" />
                             <div className="text-sm text-gray-500">
                               {address.slice(0, 6)}...{address.slice(-4)}
                             </div>
                           </div>
+                          {/* Disconnect Wallet Button */}
+                          <button
+                            onClick={() => setShowDisconnectConfirm(true)}
+                            className={cn(
+                              "p-2 rounded-lg transition-colors text-sm font-medium",
+                              "text-red-600 hover:text-red-700 hover:bg-red-50"
+                            )}
+                            title="Disconnect Wallet"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                            </svg>
+                          </button>
                         </div>
                       )}
                     </ConnectWallet>
@@ -1890,6 +1907,21 @@ function LandingPageContent() {
                         )} title={isOnboarded ? "Profile saved on-chain" : "Profile saved locally"} />
                       </div>
                     </div>
+                    {/* Disconnect Wallet Button */}
+                    <button
+                      onClick={() => setShowDisconnectConfirm(true)}
+                      className={cn(
+                        "ml-2 p-1.5 rounded-lg transition-colors text-xs font-medium",
+                        isDarkMode 
+                          ? "text-red-400 hover:text-red-300 hover:bg-red-900/20" 
+                          : "text-red-600 hover:text-red-700 hover:bg-red-50"
+                      )}
+                      title="Disconnect Wallet"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                    </button>
                   </div>
                 )}
                 <button
@@ -3309,6 +3341,54 @@ function LandingPageContent() {
           </div>
         </div>
       </section>
+      
+      {/* Disconnect Confirmation Modal */}
+      {showDisconnectConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className={cn(
+            "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+            isDarkMode ? "bg-gray-900 border border-gray-700" : "bg-white border border-gray-200"
+          )}>
+            <div className="text-center mb-6">
+              <h3 className={cn(
+                "text-xl font-bold mb-2 transition-colors",
+                isDarkMode ? "text-white" : "text-black"
+              )}>
+                Disconnect Wallet?
+              </h3>
+              <p className={cn(
+                "text-sm transition-colors",
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              )}>
+                This will disconnect your wallet and you'll need to reconnect to continue using WellSpace.
+              </p>
+            </div>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowDisconnectConfirm(false)}
+                className={cn(
+                  "flex-1 px-4 py-2 rounded-lg border transition-colors font-medium",
+                  isDarkMode 
+                    ? "border-gray-600 text-gray-300 hover:bg-gray-800" 
+                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                )}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  disconnect();
+                  setShowDisconnectConfirm(false);
+                }}
+                className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors"
+              >
+                Disconnect
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

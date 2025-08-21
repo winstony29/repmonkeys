@@ -27,7 +27,7 @@ import {
   Brain
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAccount, useReadContract, useBalance, useWriteContract, useChainId } from 'wagmi';
+import { useAccount, useReadContract, useBalance, useWriteContract, useChainId, useDisconnect } from 'wagmi';
 import { wellnessTrackerAbi, CONTRACT_ADDRESSES } from '@/lib/contracts';
 import { http, createConfig, createStorage } from 'wagmi';
 import { WagmiProvider } from 'wagmi';
@@ -423,8 +423,12 @@ function MobileNavigation() {
 function MobileDashboard() {
   const { isDarkMode } = useTheme();
   const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
   const { userHandle, isConnected: isFarcasterConnected } = useFarcaster();
   const [currentView, setCurrentView] = useState<'dashboard' | 'activity' | 'meals' | 'goals' | 'rewards' | 'ai-chat'>('dashboard');
+  
+  // Disconnect confirmation state
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
   
   // Smart contract interaction
   const { writeContract, isPending: isWritingContract } = useWriteContract();
@@ -877,45 +881,59 @@ function MobileDashboard() {
               </CardContent>
             </Card>
 
-            {/* Quick Actions */}
-            <div className="space-y-3">
-              <Button 
-                onClick={() => setCurrentView('activity')}
-                variant="outline"
-                className="w-full h-12"
-              >
-                Log Activity
-              </Button>
-              <Button 
-                onClick={() => setCurrentView('meals')}
-                variant="outline"
-                className="w-full h-12"
-              >
-                Log Meal
-              </Button>
-              <Button 
-                onClick={() => setCurrentView('goals')}
-                variant="outline"
-                className="w-full h-12"
-              >
-                View Goals
-              </Button>
-              <Button 
-                onClick={() => setCurrentView('ai-chat')}
-                variant="outline"
-                className="w-full h-12"
-              >
-                <Brain className="w-4 h-4 mr-2" />
-                AI Wellness Chat
-              </Button>
-              <Button 
-                onClick={() => setCurrentView('rewards')}
-                variant="outline"
-                className="w-full h-12"
-              >
-                Rewards & NFTs
-              </Button>
-            </div>
+                         {/* Quick Actions */}
+             <div className="space-y-3">
+               <Button 
+                 onClick={() => setCurrentView('activity')}
+                 variant="outline"
+                 className="w-full h-12"
+               >
+                 Log Activity
+               </Button>
+               <Button 
+                 onClick={() => setCurrentView('meals')}
+                 variant="outline"
+                 className="w-full h-12"
+               >
+                 Log Meal
+               </Button>
+               <Button 
+                 onClick={() => setCurrentView('goals')}
+                 variant="outline"
+                 className="w-full h-12"
+               >
+                 View Goals
+               </Button>
+               <Button 
+                 onClick={() => setCurrentView('ai-chat')}
+                 variant="outline"
+                 className="w-full h-12"
+               >
+                 <Brain className="w-4 h-4 mr-2" />
+                 AI Wellness Chat
+               </Button>
+               <Button 
+                 onClick={() => setCurrentView('rewards')}
+                 variant="outline"
+                 className="w-full h-12"
+               >
+                 Rewards & NFTs
+               </Button>
+               
+               {/* Wallet Management */}
+               {address && (
+                 <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                   <Button 
+                     onClick={() => setShowDisconnectConfirm(true)}
+                     variant="outline"
+                     className="w-full h-10 text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-600 dark:hover:bg-red-900/20"
+                   >
+                     <Wallet className="w-4 h-4 mr-2" />
+                     Disconnect Wallet
+                   </Button>
+                 </div>
+               )}
+             </div>
 
             {/* Recent Activity */}
             <Card className={cn(
@@ -986,7 +1004,151 @@ function MobileDashboard() {
             {/* Wallet Status - Keep this for debugging connection issues */}
             <WalletStatus />
             
-
+            {/* Disconnect Confirmation Modal */}
+            {showDisconnectConfirm && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                <div className={cn(
+                  "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+                  isDarkMode ? "bg-gray-900 border border-gray-700" : "bg-white border border-gray-200"
+                )}>
+                  <div className="text-center mb-6">
+                    <h3 className={cn(
+                      "text-xl font-bold mb-2 transition-colors",
+                      isDarkMode ? "text-white" : "text-black"
+                    )}>
+                      Disconnect Wallet?
+                    </h3>
+                    <p className={cn(
+                      "text-sm transition-colors",
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    )}>
+                      This will disconnect your wallet and you'll need to reconnect to continue using WellSpace.
+                    </p>
+                  </div>
+                  
+                  <div className="flex space-x-3">
+                    <Button
+                      onClick={() => setShowDisconnectConfirm(false)}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        disconnect();
+                        setShowDisconnectConfirm(false);
+                      }}
+                      variant="destructive"
+                      className="flex-1"
+                    >
+                      Disconnect
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Debug Info - Remove this in production */}
+            <Card className={cn(
+              "transition-colors duration-300",
+              isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+            )}>
+              <CardHeader className="pb-3">
+                <CardTitle className={cn(
+                  "text-sm transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  Debug Info (Contract Data)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-xs">
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Raw Wellness Data:</strong> {safeStringify(wellnessData)}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>WELL Balance:</strong> {safeStringify(wellBalance)}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Contract Activities:</strong> {safeStringify(contractActivities)}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Parsed Activities:</strong> {safeStringify(recentActivities)}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Data Source:</strong> {recentActivities === sampleActivities ? 'Sample Data' : 'Smart Contract'}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Contract Meals:</strong> {safeStringify(contractMeals)}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Parsed Data:</strong> {safeStringify(parsedWellnessData)}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Contract Score:</strong> {parsedWellnessData.score}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Calculated Score:</strong> {calculatedWellnessScore}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Display Score:</strong> {displayWellnessScore}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Contract Data Loaded:</strong> {parsedWellnessData.score > 0 ? 'Yes' : 'No'}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Score Source:</strong> {parsedWellnessData.score > 0 ? 'Contract' : 'Calculated'}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Wallet Connected:</strong> {isConnected ? 'Yes' : 'No'}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Wallet Address:</strong> {address || 'None'}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 
