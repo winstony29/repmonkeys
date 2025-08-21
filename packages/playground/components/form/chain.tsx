@@ -26,7 +26,7 @@ export function Chain() {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="84532">Base Sepolia</SelectItem>
-          <SelectItem value="8453">Base</SelectItem>
+
         </SelectContent>
       </Select>
     </div>

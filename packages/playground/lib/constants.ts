@@ -1,6 +1,6 @@
 import type { Token } from '@coinbase/onchainkit/token';
 import type { Address } from 'viem';
-import { base } from 'viem/chains';
+import { baseSepolia } from 'viem/chains';
 
 export const deployedContracts: Record<number, { click: Address }> = {
   [8543]: {
@@ -22,11 +22,18 @@ type EnvironmentKey = (typeof ENVIRONMENT)[keyof typeof ENVIRONMENT];
 
 export const ENVIRONMENT_VARIABLES: Record<EnvironmentKey, string | undefined> =
   {
-    [ENVIRONMENT.API_KEY]: process.env.NEXT_PUBLIC_OCK_API_KEY,
+    [ENVIRONMENT.API_KEY]: process.env.NEXT_PUBLIC_OCK_API_KEY || process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY,
     [ENVIRONMENT.ENVIRONMENT]: process.env.NEXT_PUBLIC_VERCEL_ENV,
-    [ENVIRONMENT.PROJECT_ID]: process.env.NEXT_PUBLIC_PROJECT_ID,
+    [ENVIRONMENT.PROJECT_ID]: process.env.NEXT_PUBLIC_PROJECT_ID || process.env.NEXT_PUBLIC_CDP_PROJECT_ID,
     [ENVIRONMENT.RESERVOIR_API_KEY]: process.env.NEXT_PUBLIC_RESERVOIR_API_KEY,
   };
+
+// Debug logging
+console.log('🔧 Environment Variables:', {
+  API_KEY: ENVIRONMENT_VARIABLES[ENVIRONMENT.API_KEY] ? 'Set' : 'Missing',
+  PROJECT_ID: ENVIRONMENT_VARIABLES[ENVIRONMENT.PROJECT_ID] ? 'Set' : 'Missing',
+  ENVIRONMENT: ENVIRONMENT_VARIABLES[ENVIRONMENT.ENVIRONMENT] || 'development',
+});
 
 export const ethToken: Token = {
   name: 'ETH',
@@ -35,7 +42,7 @@ export const ethToken: Token = {
   decimals: 18,
   image:
     'https://wallet-api-production.s3.amazonaws.com/uploads/tokens/eth_288.png',
-  chainId: base.id,
+  chainId: baseSepolia.id,
 };
 
 export const usdcToken: Token = {
@@ -45,7 +52,7 @@ export const usdcToken: Token = {
   decimals: 6,
   image:
     'https://d3r81g40ycuhqg.cloudfront.net/wallet/wais/44/2b/442b80bd16af0c0d9b22e03a16753823fe826e5bfd457292b55fa0ba8c1ba213-ZWUzYjJmZGUtMDYxNy00NDcyLTg0NjQtMWI4OGEwYjBiODE2',
-  chainId: base.id,
+  chainId: baseSepolia.id,
 };
 
 export const degenToken: Token = {
@@ -55,7 +62,7 @@ export const degenToken: Token = {
   decimals: 18,
   image:
     'https://d3r81g40ycuhqg.cloudfront.net/wallet/wais/3b/bf/3bbf118b5e6dc2f9e7fc607a6e7526647b4ba8f0bea87125f971446d57b296d2-MDNmNjY0MmEtNGFiZi00N2I0LWIwMTItMDUyMzg2ZDZhMWNm',
-  chainId: base.id,
+  chainId: baseSepolia.id,
 };
 
 export const daiToken: Token = {
@@ -65,5 +72,5 @@ export const daiToken: Token = {
   decimals: 18,
   image:
     'https://d3r81g40ycuhqg.cloudfront.net/wallet/wais/92/13/9213e31b84c98a693f4c624580fdbe6e4c1cb550efbba15aa9ea68fd25ffb90c-ZTE1NmNjMGUtZGVkYi00ZDliLWI2N2QtNTY2ZWRjMmYwZmMw',
-  chainId: base.id,
+  chainId: baseSepolia.id,
 };

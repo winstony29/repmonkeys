@@ -14,11 +14,10 @@ import {
 } from '@coinbase/onchainkit/wallet';
 import { FundButton } from '@coinbase/onchainkit/fund';
 import { cn } from '@/lib/utils';
-import { useAccount, useReadContract, useBalance } from 'wagmi';
-import { wellnessNFTAbi, wellTokenAbi, CONTRACT_ADDRESSES, formatTokenAmount } from '@/lib/contracts';
+import { useAccount, useReadContract, useBalance, useWriteContract } from 'wagmi';
+import { wellnessNFTAbi, wellTokenAbi, userProfileAbi, CONTRACT_ADDRESSES, formatTokenAmount } from '@/lib/contracts';
 import { useWellnessAPI } from '@/lib/api';
 import { useSogniGeneration } from '@/lib/sogni';
-import { useUserProfile } from '@/lib/useUserProfile';
 
 // Theme Context
 const ThemeContext = createContext<{
@@ -104,20 +103,46 @@ function LandingPageContent() {
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [streakCount, setStreakCount] = useState(12);
   const [totalScore, setTotalScore] = useState(2840);
+  
+  // Activity tracking state
+  const [activities, setActivities] = useState([
+    { id: 1, type: 'workout', name: 'Completed workout', timestamp: Date.now() - 2 * 60 * 60 * 1000, reward: 50, completed: true },
+    { id: 2, type: 'meditation', name: 'Logged meditation', timestamp: Date.now() - 5 * 60 * 60 * 1000, reward: 25, completed: true },
+    { id: 3, type: 'nft', name: 'Minted new NFT', timestamp: Date.now() - 24 * 60 * 60 * 1000, reward: 'NFT', completed: true }
+  ]);
+  
+  // Weekly goals state
+  const [weeklyGoals, setWeeklyGoals] = useState({
+    exercise: { current: 4, target: 5, completed: true },
+    meditation: { current: 3, target: 7, completed: false },
+    sleep: { current: 6, target: 7, completed: false }
+  });
+  
+  // Meal logging state
+  const [meals, setMeals] = useState([
+    { id: 1, type: 'breakfast', name: 'Oatmeal with berries', calories: 320, timestamp: Date.now() - 4 * 60 * 60 * 1000 },
+    { id: 2, type: 'lunch', name: 'Grilled chicken salad', calories: 450, timestamp: Date.now() - 1 * 60 * 60 * 1000 }
+  ]);
+  
+  // Show meal logging modal
+  const [showMealModal, setShowMealModal] = useState(false);
+  const [newMeal, setNewMeal] = useState({ type: 'breakfast', name: '', calories: '' });
+  
+  // User onboarding status
+  const [isUserOnboarded, setIsUserOnboarded] = useState(false);
+  const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(false);
 
   const { isDarkMode } = useTheme();
 
   const { address } = useAccount();
   const { getWellnessAdvice } = useWellnessAPI();
   const { generateImage } = useSogniGeneration();
-  const { 
-    userProfile, 
-    hasOnboarded, 
-    createProfile, 
-    updateActivity,
-    isLoading: isProfileLoading,
-    isContractDeployed 
-  } = useUserProfile();
+  const { writeContract, isPending: isWritingContract } = useWriteContract();
+  
+  // Contract interaction state
+  const [contractError, setContractError] = useState<string | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [contractHealth, setContractHealth] = useState<'healthy' | 'degraded' | 'unhealthy'>('healthy');
 
   // Get user's WellnessNFT token ID
   const { data: tokenId } = useReadContract({
@@ -162,41 +187,12 @@ function LandingPageContent() {
     );
   };
 
-  // Load user profile data from smart contract
-  useEffect(() => {
-    if (address && hasOnboarded && userProfile && isContractDeployed) {
-      // User has already onboarded, load their data
-      setUserGoals(userProfile.goals || []);
-      setSelectedImageTheme(userProfile.preferredImageTheme || '');
-      setCustomPrompt(userProfile.customPrompt || '');
-      setGeneratedImageUrl(userProfile.profileImageUrl || null);
-      setStreakCount(userProfile.streakCount || 0);
-      setTotalScore(userProfile.totalScore || 0);
-      
-      // Skip to dashboard if user has completed onboarding
-      if (currentView === 'landing') {
-        setCurrentView('dashboard');
-      }
-      
-      // Update activity
-      updateActivity();
-    }
-  }, [address, hasOnboarded, userProfile, isContractDeployed, currentView, updateActivity]);
-
-  // Reset data when wallet disconnects
-  useEffect(() => {
-    if (!address) {
-      setCurrentView('landing');
-      setUserGoals([]);
-      setSelectedImageTheme('');
-      setCustomPrompt('');
-      setGeneratedImageUrl(null);
-      setStreakCount(12); // Default values
-      setTotalScore(2840);
-    }
-  }, [address]);
-
   const startJourney = () => {
+    if (!address) {
+      // If no wallet connected, this will be handled by showing ConnectWallet button
+      return;
+    }
+    // If wallet connected, go to onboarding (will auto-redirect to dashboard if already onboarded)
     setCurrentView('onboarding');
     setOnboardingStep(1);
   };
@@ -231,31 +227,363 @@ function LandingPageContent() {
   };
 
   const completeOnboarding = async () => {
-    if (!isContractDeployed) {
-      // Fallback if contract not deployed
-      setCurrentView('dashboard');
-      return;
+    if (address) {
+      try {
+        // Save user profile to smart contract
+        const success = await saveUserProfile(userGoals, selectedImageTheme, customPrompt);
+        if (success) {
+          setIsUserOnboarded(true);
+          setCurrentView('dashboard');
+          
+          // Show success message
+          console.log('✅ Onboarding completed successfully!');
+        } else {
+          console.error('Failed to save user profile to smart contract');
+          // Still show dashboard but with warning
+          setIsUserOnboarded(true);
+          setCurrentView('dashboard');
+          setContractError('Profile saved locally but smart contract transaction failed');
+        }
+      } catch (error) {
+        console.error('Error completing onboarding:', error);
+        // Fallback to dashboard anyway for now
+        setIsUserOnboarded(true);
+        setCurrentView('dashboard');
+        setContractError('Profile saved locally due to smart contract error');
+      }
     }
-
-    try {
-      // Save user profile to smart contract
-      await createProfile(
-        userGoals,
-        selectedImageTheme,
-        customPrompt,
-        generatedImageUrl || ''
-      );
+  };
+  
+  // Activity tracking functions
+  const logActivity = (type: string, name: string, reward: number) => {
+    const newActivity = {
+      id: Date.now(),
+      type,
+      name,
+      timestamp: Date.now(),
+      reward,
+      completed: true
+    };
+    
+    setActivities(prev => [newActivity, ...prev.slice(0, 9)]); // Keep last 10 activities
+    
+    // Update score and streak
+    setTotalScore(prev => prev + reward);
+    setStreakCount(prev => prev + 1);
+    
+    // Update weekly goals
+    if (type === 'workout') {
+      setWeeklyGoals(prev => ({
+        ...prev,
+        exercise: { ...prev.exercise, current: Math.min(prev.exercise.current + 1, prev.exercise.target) }
+      }));
+    } else if (type === 'meditation') {
+      setWeeklyGoals(prev => ({
+        ...prev,
+        meditation: { ...prev.meditation, current: Math.min(prev.meditation.current + 1, prev.meditation.target) }
+      }));
+    }
+    
+    // Save updated data to localStorage
+    if (address) {
+      const localStorageKey = `wellspace_user_${address}`;
+      const existingData = localStorage.getItem(localStorageKey);
+      if (existingData) {
+        try {
+          const userData = JSON.parse(existingData);
+          userData.streakCount = streakCount + 1;
+          userData.totalScore = totalScore + reward;
+          userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
+          userData.weeklyGoals = weeklyGoals;
+          localStorage.setItem(localStorageKey, JSON.stringify(userData));
+        } catch (error) {
+          console.error('Error updating localStorage:', error);
+        }
+      }
+    }
+  };
+  
+  // Meal logging functions
+  const addMeal = () => {
+    if (!newMeal.name.trim() || !newMeal.calories.trim()) return;
+    
+    const meal = {
+      id: Date.now(),
+      type: newMeal.type,
+      name: newMeal.name,
+      calories: parseInt(newMeal.calories),
+      timestamp: Date.now()
+    };
+    
+    setMeals(prev => [meal, ...prev]);
+    setNewMeal({ type: 'breakfast', name: '', calories: '' });
+    setShowMealModal(false);
+    
+    // Give reward for logging meal
+    logActivity('meal', 'Logged meal', 10);
+  };
+  
+  // Quick action functions
+  const handleQuickAction = (action: string) => {
+    switch (action) {
+      case 'workout':
+        logActivity('workout', 'Completed workout', 50);
+        break;
+      case 'meditation':
+        logActivity('meditation', 'Logged meditation', 25);
+        break;
+      case 'meal':
+        setShowMealModal(true);
+        break;
+      case 'sleep':
+        logActivity('sleep', 'Logged sleep', 30);
+        setWeeklyGoals(prev => ({
+          ...prev,
+          sleep: { ...prev.sleep, current: Math.min(prev.sleep.current + 1, prev.sleep.target) }
+        }));
+        break;
+    }
+  };
+  
+  // Utility function to format timestamps
+  const formatTimeAgo = (timestamp: number) => {
+    const now = Date.now();
+    const diff = now - timestamp;
+    const minutes = Math.floor(diff / (1000 * 60));
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    if (minutes < 60) return `${minutes} minutes ago`;
+    if (hours < 24) return `${hours} hours ago`;
+    return `${days} days ago`;
+  };
+  
+  // Get user onboarding status from smart contract
+  const { data: isOnboarded, isLoading: isCheckingContract, error: contractReadError } = useReadContract({
+    address: CONTRACT_ADDRESSES.USER_PROFILE,
+    abi: userProfileAbi,
+    functionName: 'hasUserOnboarded',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+  
+  // Get user profile data from smart contract
+  const { data: profileData, error: profileError } = useReadContract({
+    address: CONTRACT_ADDRESSES.USER_PROFILE,
+    abi: userProfileAbi,
+    functionName: 'getUserProfile',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && !!isOnboarded },
+  });
+  
+  // Debug logging
+  useEffect(() => {
+    if (address) {
+      console.log('🔍 Debug - Wallet connected:', address);
+      console.log('🔍 Debug - Contract address:', CONTRACT_ADDRESSES.USER_PROFILE);
+      console.log('🔍 Debug - Contract error:', contractReadError);
+      console.log('🔍 Debug - Profile error:', profileError);
+      console.log('🔍 Debug - Is onboarded:', isOnboarded);
+      console.log('🔍 Debug - Profile data:', profileData);
+    }
+  }, [address, contractReadError, profileError, isOnboarded, profileData]);
+  
+  // Update local state when contract data changes
+  useEffect(() => {
+    if (isOnboarded !== undefined) {
+      setIsUserOnboarded(!!isOnboarded);
       
-      setCurrentView('dashboard');
+      // If user is onboarded and we're trying to go to onboarding, redirect to dashboard
+      if (isOnboarded && currentView === 'onboarding') {
+        setCurrentView('dashboard');
+      }
+    }
+  }, [isOnboarded, currentView]);
+  
+  // Load profile data when available
+  useEffect(() => {
+    if (profileData && Array.isArray(profileData)) {
+      // profile is an array: [hasOnboarded, goals, imageTheme, customPrompt, streakCount, totalScore, createdAt, lastActive, profileImageUrl, nftTokenId]
+      setUserGoals([...(profileData[1] || [])]);
+      setSelectedImageTheme(profileData[2] || '');
+      setCustomPrompt(profileData[3] || '');
+      setStreakCount(Number(profileData[4]) || 0);
+      setTotalScore(Number(profileData[5]) || 0);
+      setGeneratedImageUrl(profileData[8] || null);
+    }
+  }, [profileData]);
+  
+  // Fallback: Load from localStorage if smart contract fails
+  useEffect(() => {
+    if (address && !isOnboarded && !isCheckingContract) {
+      const localStorageKey = `wellspace_user_${address}`;
+      const savedData = localStorage.getItem(localStorageKey);
+      
+      if (savedData) {
+        try {
+          const userData = JSON.parse(savedData);
+          console.log('📱 Loading from localStorage fallback:', userData);
+          
+          setIsUserOnboarded(true);
+          setUserGoals(userData.goals || []);
+          setSelectedImageTheme(userData.imageTheme || '');
+          setCustomPrompt(userData.customPrompt || '');
+          setStreakCount(userData.streakCount || 0);
+          setTotalScore(userData.totalScore || 0);
+          setGeneratedImageUrl(userData.profileImageUrl || null);
+          
+          // Load activities and weekly goals
+          if (userData.activities) {
+            setActivities(userData.activities);
+          }
+          if (userData.weeklyGoals) {
+            setWeeklyGoals(userData.weeklyGoals);
+          }
+          
+          // If we're on onboarding page, redirect to dashboard
+          if (currentView === 'onboarding') {
+            setCurrentView('dashboard');
+          }
+        } catch (error) {
+          console.error('Error parsing localStorage data:', error);
+        }
+      }
+    }
+  }, [address, isOnboarded, isCheckingContract, currentView]);
+
+  // Check contract health on mount and when address changes
+  useEffect(() => {
+    if (address) {
+      checkContractHealth();
+    }
+  }, [address]);
+  
+  // Check contract health and accessibility
+  const checkContractHealth = async () => {
+    if (!address) return;
+    
+    try {
+      // Try to read from the contract to check if it's accessible
+      const testRead = await fetch('/api/contract-health', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          address: CONTRACT_ADDRESSES.USER_PROFILE,
+          chainId: 84532 
+        })
+      });
+      
+      if (testRead.ok) {
+        setContractHealth('healthy');
+        setContractError(null);
+      } else {
+        setContractHealth('degraded');
+        setContractError('Contract may be temporarily unavailable');
+      }
     } catch (error) {
-      console.error('Failed to save profile to blockchain:', error);
-      // Still proceed to dashboard even if blockchain save fails
-      setCurrentView('dashboard');
+      setContractHealth('unhealthy');
+      setContractError('Unable to connect to smart contract');
     }
   };
 
+  const saveUserProfile = async (goals: string[], imageTheme: string, customPrompt: string) => {
+    if (!address) return false;
+    
+    setIsSavingProfile(true);
+    setContractError(null);
+    
+    try {
+      // Check contract health first
+      await checkContractHealth();
+      
+      if (contractHealth === 'unhealthy') {
+        throw new Error('Smart contract is currently unavailable');
+      }
+      
+      // Save user profile to smart contract
+      const result = await writeContract({
+        address: CONTRACT_ADDRESSES.USER_PROFILE,
+        abi: userProfileAbi,
+        functionName: 'createProfile',
+        args: [goals, imageTheme, customPrompt, generatedImageUrl || ''],
+      });
+      
+      console.log('📝 Transaction submitted:', result);
+      
+      // Save to localStorage as backup while transaction processes
+      const localStorageKey = `wellspace_user_${address}`;
+      const userData = {
+        goals,
+        imageTheme,
+        customPrompt,
+        streakCount,
+        totalScore,
+        profileImageUrl: generatedImageUrl || '',
+        timestamp: Date.now()
+      };
+      localStorage.setItem(localStorageKey, JSON.stringify(userData));
+      console.log('💾 Saved to localStorage backup:', userData);
+      
+      setIsSavingProfile(false);
+      return true;
+    } catch (error) {
+      console.error('Error saving user profile to smart contract:', error);
+      setContractError(error instanceof Error ? error.message : 'Failed to save profile');
+      
+      // Fallback: save to localStorage only
+      try {
+        const localStorageKey = `wellspace_user_${address}`;
+        const userData = {
+          goals,
+          imageTheme,
+          customPrompt,
+          streakCount,
+          totalScore,
+          profileImageUrl: generatedImageUrl || '',
+          timestamp: Date.now()
+        };
+        localStorage.setItem(localStorageKey, JSON.stringify(userData));
+        console.log('💾 Saved to localStorage fallback:', userData);
+        
+        setIsSavingProfile(false);
+        return true;
+      } catch (localError) {
+        console.error('Error saving to localStorage:', localError);
+        setIsSavingProfile(false);
+        return false;
+      }
+    }
+  };
+  
+
+
   // Onboarding View
   if (currentView === 'onboarding') {
+    // Show loading state while checking onboarding status
+    if (isCheckingContract) {
+      return (
+        <div className={cn(
+          "min-h-screen w-full overflow-hidden transition-colors duration-300",
+          isDarkMode ? "bg-black" : "bg-white"
+        )}>
+          <ThemeToggleButton />
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+              <h2 className={cn(
+                "text-xl font-semibold transition-colors",
+                isDarkMode ? "text-white" : "text-gray-900"
+              )}>Checking your profile...</h2>
+              <p className={cn(
+                "transition-colors",
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              )}>Please wait while we load your wellness data</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
     return (
       <div className={cn(
         "min-h-screen w-full overflow-hidden transition-colors duration-300",
@@ -519,39 +847,59 @@ function LandingPageContent() {
                   </p>
                 </div>
 
-                <div className="bg-green-50 rounded-xl p-4 border border-green-100">
+                {/* Contract Status Indicator */}
+                <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                      <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
                     <div>
-                      <p className="text-green-800 font-medium text-sm">Ready to Begin!</p>
-                      <p className="text-green-600 text-xs">Your profile and NFT are being prepared</p>
+                      <p className="text-blue-800 font-medium text-sm">Smart Contract Ready</p>
+                      <p className="text-blue-600 text-xs">Your profile will be saved on-chain</p>
                     </div>
                   </div>
                 </div>
 
+                {/* Error Display */}
+                {contractError && (
+                  <div className="bg-red-50 rounded-xl p-4 border border-red-100">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                        <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-red-800 font-medium text-sm">Contract Warning</p>
+                        <p className="text-red-600 text-xs">{contractError}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   onClick={completeOnboarding}
-                  disabled={isProfileLoading}
+                  disabled={isSavingProfile}
                   className={cn(
-                    "w-full py-3 font-semibold rounded-xl transition-all duration-200",
-                    isProfileLoading
-                      ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                      : isDarkMode
-                        ? "bg-gray-700 hover:bg-gray-600 text-white"
-                        : "bg-gray-800 hover:bg-gray-700 text-white"
+                    "w-full py-3 font-semibold rounded-xl transition-all duration-200 flex items-center justify-center space-x-2",
+                    isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 text-white disabled:bg-gray-500"
+                      : "bg-gray-800 hover:bg-gray-700 text-white disabled:bg-gray-500",
+                    isSavingProfile ? "opacity-75 cursor-not-allowed" : ""
                   )}
                 >
-                  {isProfileLoading ? (
-                    <div className="flex items-center justify-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                      <span>Saving to blockchain...</span>
-                    </div>
+                  {isSavingProfile ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Saving Profile...</span>
+                    </>
                   ) : (
-                    'Enter WellSpace'
+                    <span>Enter WellSpace</span>
                   )}
                 </button>
               </div>
@@ -644,11 +992,18 @@ function LandingPageContent() {
                         "text-sm font-medium transition-colors",
                         isDarkMode ? "text-white" : "text-gray-900"
                       )} />
-                      <div className={cn(
-                        "text-xs transition-colors",
-                        isDarkMode ? "text-gray-400" : "text-gray-500"
-                      )}>
-                        {address.slice(0, 6)}...{address.slice(-4)}
+                      <div className="flex items-center space-x-2">
+                        <div className={cn(
+                          "text-xs transition-colors",
+                          isDarkMode ? "text-gray-400" : "text-gray-500"
+                        )}>
+                          {address.slice(0, 6)}...{address.slice(-4)}
+                        </div>
+                        {/* Contract Status Indicator */}
+                        <div className={cn(
+                          "w-2 h-2 rounded-full",
+                          isOnboarded ? "bg-green-500" : "bg-yellow-500"
+                        )} title={isOnboarded ? "Profile saved on-chain" : "Profile saved locally"} />
                       </div>
                     </div>
                   </div>
@@ -673,6 +1028,40 @@ function LandingPageContent() {
 
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Contract Status Banner */}
+          {contractError && (
+            <div className={cn(
+              "mb-6 p-4 rounded-xl border transition-colors",
+              isDarkMode 
+                ? "bg-red-900/20 border-red-700/50 text-red-200" 
+                : "bg-red-50 border-red-200 text-red-800"
+            )}>
+              <div className="flex items-center space-x-3">
+                <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="font-medium">Smart Contract Notice</p>
+                  <p className="text-sm opacity-90">{contractError}</p>
+                  <p className="text-xs opacity-75 mt-1">
+                    Your data is safely stored locally and will sync when the contract is available.
+                  </p>
+                  <button
+                    onClick={checkContractHealth}
+                    className={cn(
+                      "mt-2 px-3 py-1 text-xs rounded-lg transition-colors",
+                      isDarkMode 
+                        ? "bg-red-800/50 hover:bg-red-800/70 text-red-200" 
+                        : "bg-red-100 hover:bg-red-200 text-red-800"
+                    )}
+                  >
+                    Retry Connection
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Welcome Section */}
           <div className="mb-8">
             <h1 className={cn(
@@ -685,71 +1074,84 @@ function LandingPageContent() {
             )}>Track your wellness journey and earn rewards</p>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    {/* Main Wellness Widget - Similar to Landing Page */}
+          <div className="mb-8">
             <div className={cn(
-              "rounded-2xl p-6 border shadow-sm transition-colors",
+              "max-w-2xl rounded-3xl p-8 border shadow-lg transition-colors duration-300",
               isDarkMode 
-                ? "bg-gray-800 border-gray-700" 
-                : "bg-white border-gray-200"
+                ? "bg-gray-800 border-gray-700 shadow-gray-900/50" 
+                : "bg-white border-gray-200 shadow-gray-200/50"
             )}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-                <span className="text-green-500 text-sm font-medium">+12%</span>
-              </div>
+              {/* Wellness Score Section */}
               <div className={cn(
-                "text-2xl font-bold mb-1 transition-colors",
-                isDarkMode ? "text-white" : "text-gray-900"
-              )}>{totalScore}</div>
-              <div className={cn(
-                "text-sm transition-colors",
-                isDarkMode ? "text-gray-400" : "text-gray-500"
-              )}>Wellness Score</div>
-            </div>
-
-            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
-                  </svg>
+                "rounded-2xl p-6 border mb-6 transition-colors duration-300",
+                isDarkMode 
+                  ? "bg-gray-900 border-gray-600" 
+                  : "bg-gray-50 border-gray-300"
+              )}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className={cn(
+                    "text-sm transition-colors duration-300",
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  )}>Your wellness score</div>
+                  <div className="text-green-500 text-sm font-medium">+12%</div>
                 </div>
-                <span className="text-green-500 text-sm font-medium">+2</span>
+                <div className={cn(
+                  "text-4xl font-bold transition-colors duration-300",
+                  isDarkMode ? "text-white" : "text-gray-900"
+                )}>{totalScore}</div>
               </div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">{streakCount}</div>
-              <div className="text-sm text-gray-500">Day Streak</div>
-            </div>
-
-            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                  </svg>
+              
+              {/* Stats Grid */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className={cn(
+                  "rounded-xl p-4 border transition-colors duration-300",
+                  isDarkMode 
+                    ? "bg-gray-900 border-gray-600 hover:bg-gray-800" 
+                    : "bg-gray-100 border-gray-300 hover:bg-gray-50"
+                )}>
+                  <div className={cn(
+                    "text-2xl font-bold mb-1 transition-colors duration-300",
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  )}>{streakCount}</div>
+                  <div className={cn(
+                    "text-xs transition-colors duration-300",
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  )}>Day Streak</div>
                 </div>
-                <span className="text-green-500 text-sm font-medium">+5.2</span>
-              </div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">
-                {wellBalance ? formatTokenAmount(wellBalance.value, wellBalance.decimals) : '0.00'}
-              </div>
-              <div className="text-sm text-gray-500">$WELL Balance</div>
-            </div>
-
-            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m0 0V1a1 1 0 011-1h2a1 1 0 011 1v18a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1h2a1 1 0 011-1z" />
-                  </svg>
+                <div className={cn(
+                  "rounded-xl p-4 border transition-colors duration-300",
+                  isDarkMode 
+                    ? "bg-gray-900 border-gray-600 hover:bg-gray-800" 
+                    : "bg-gray-100 border-gray-300 hover:bg-gray-50"
+                )}>
+                  <div className={cn(
+                    "text-2xl font-bold mb-1 transition-colors duration-300",
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  )}>3</div>
+                  <div className={cn(
+                    "text-xs transition-colors duration-300",
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  )}>NFTs Earned</div>
                 </div>
-                <span className="text-blue-500 text-sm font-medium">New</span>
+                <div className={cn(
+                  "rounded-xl p-4 border transition-colors duration-300",
+                  isDarkMode 
+                    ? "bg-gray-900 border-gray-600 hover:bg-gray-800" 
+                    : "bg-gray-100 border-gray-300 hover:bg-gray-50"
+                )}>
+                  <div className={cn(
+                    "text-2xl font-bold mb-1 transition-colors duration-300",
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  )}>
+                    {wellBalance ? formatTokenAmount(wellBalance.value, wellBalance.decimals) : '0.00'}
+                  </div>
+                  <div className={cn(
+                    "text-xs transition-colors duration-300",
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  )}>$WELL Balance</div>
+                </div>
               </div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">3</div>
-              <div className="text-sm text-gray-500">NFTs Earned</div>
             </div>
           </div>
 
@@ -758,14 +1160,30 @@ function LandingPageContent() {
             {/* Left Column - AI Assistant & Actions */}
             <div className="lg:col-span-2 space-y-6">
               {/* AI Wellness Assistant */}
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+              <div className={cn(
+                "rounded-2xl p-6 border shadow-sm transition-colors",
+                isDarkMode 
+                  ? "bg-gray-800 border-gray-700" 
+                  : "bg-white border-gray-200"
+              )}>
                 <div className="flex items-center space-x-3 mb-6">
-                  <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className={cn(
+                    "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
+                    isDarkMode 
+                      ? "bg-gray-700" 
+                      : "bg-gray-200"
+                  )}>
+                    <svg className={cn(
+                      "w-5 h-5 transition-colors",
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    )} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
                   </div>
-                  <h2 className="text-xl font-semibold text-gray-900">AI Wellness Assistant</h2>
+                  <h2 className={cn(
+                    "text-xl font-semibold transition-colors",
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  )}>AI Wellness Assistant</h2>
                 </div>
                 
                 <div className="space-y-4">
@@ -773,66 +1191,226 @@ function LandingPageContent() {
                     value={wellnessPrompt}
                     onChange={(e) => setWellnessPrompt(e.target.value)}
                     placeholder="Ask me about your wellness goals, nutrition, exercise, or any health-related questions..."
-                    className="w-full p-4 border border-gray-300 rounded-xl text-sm resize-none h-24 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className={cn(
+                      "w-full p-4 border rounded-xl text-sm resize-none h-24 focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-colors",
+                      isDarkMode 
+                        ? "border-gray-600 bg-gray-700 text-white placeholder-gray-400" 
+                        : "border-gray-300 bg-white text-gray-900 placeholder-gray-500"
+                    )}
                   />
                   <button
                     onClick={getWellnessAdviceHandler}
                     disabled={isLoadingAI || !wellnessPrompt.trim()}
-                    className="px-6 py-3 bg-black hover:bg-gray-800 disabled:bg-gray-300 text-white font-medium rounded-xl transition-colors"
+                    className={cn(
+                      "px-6 py-3 font-medium rounded-xl transition-colors",
+                      isDarkMode 
+                        ? "bg-white text-black hover:bg-gray-100 disabled:bg-gray-600" 
+                        : "bg-black text-white hover:bg-gray-800 disabled:bg-gray-300"
+                    )}
                   >
                     {isLoadingAI ? 'Getting advice...' : 'Get AI Advice'}
                   </button>
                   {aiResponse && (
-                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                      <p className="text-gray-900 text-sm leading-relaxed">{aiResponse.advice || 'Here\'s your personalized wellness advice!'}</p>
+                    <div className={cn(
+                      "rounded-xl p-4 border transition-colors",
+                      isDarkMode 
+                        ? "bg-gray-700 border-gray-600" 
+                        : "bg-gray-50 border-gray-200"
+                    )}>
+                      <p className={cn(
+                        "text-sm leading-relaxed transition-colors",
+                        isDarkMode ? "text-gray-200" : "text-gray-900"
+                      )}>{aiResponse.advice || 'Here\'s your personalized wellness advice!'}</p>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Quick Actions Grid */}
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">Quick Actions</h2>
+              <div className={cn(
+                "rounded-2xl p-6 border shadow-sm transition-colors",
+                isDarkMode 
+                  ? "bg-gray-800 border-gray-700" 
+                  : "bg-white border-gray-200"
+              )}>
+                <h2 className={cn(
+                  "text-xl font-semibold mb-6 transition-colors",
+                  isDarkMode ? "text-white" : "text-gray-900"
+                )}>Quick Actions</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <button className="p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 hover:from-green-100 hover:to-green-200 transition-all duration-200 text-left group">
-                    <div className="w-12 h-12 bg-green-200 rounded-xl flex items-center justify-center mb-4 group-hover:bg-green-300 transition-colors">
-                      <svg className="w-6 h-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <button 
+                    onClick={() => handleQuickAction('workout')}
+                    className={cn(
+                      "p-6 rounded-xl border transition-all duration-200 text-left group",
+                      isDarkMode 
+                        ? "bg-gray-700 border-gray-600 hover:bg-gray-600" 
+                        : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors",
+                      isDarkMode 
+                        ? "bg-gray-600 group-hover:bg-gray-500" 
+                        : "bg-gray-200 group-hover:bg-gray-300"
+                    )}>
+                      <svg className={cn(
+                        "w-6 h-6 transition-colors",
+                        isDarkMode ? "text-gray-300" : "text-gray-700"
+                      )} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                       </svg>
                     </div>
-                    <h3 className="font-semibold text-green-900 mb-2">Log Activity</h3>
-                    <p className="text-green-700 text-sm">Track your daily wellness activities and earn rewards</p>
+                    <h3 className={cn(
+                      "font-semibold mb-2 transition-colors",
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    )}>Log Workout</h3>
+                    <p className={cn(
+                      "text-sm transition-colors",
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    )}>Complete workout and earn +50 WELL</p>
                   </button>
                   
-                  <button className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200 hover:from-purple-100 hover:to-purple-200 transition-all duration-200 text-left group">
-                    <div className="w-12 h-12 bg-purple-200 rounded-xl flex items-center justify-center mb-4 group-hover:bg-purple-300 transition-colors">
-                      <svg className="w-6 h-6 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m0 0V1a1 1 0 011-1h2a1 1 0 011 1v18a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1h2a1 1 0 011-1z" />
+                  <button 
+                    onClick={() => handleQuickAction('meditation')}
+                    className={cn(
+                      "p-6 rounded-xl border transition-all duration-200 text-left group",
+                      isDarkMode 
+                        ? "bg-gray-700 border-gray-600 hover:bg-gray-600" 
+                        : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors",
+                      isDarkMode 
+                        ? "bg-gray-600 group-hover:bg-gray-500" 
+                        : "bg-gray-200 group-hover:bg-gray-300"
+                    )}>
+                      <svg className={cn(
+                        "w-6 h-6 transition-colors",
+                        isDarkMode ? "text-gray-300" : "text-gray-700"
+                      )} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                       </svg>
                     </div>
-                    <h3 className="font-semibold text-purple-900 mb-2">View NFTs</h3>
-                    <p className="text-purple-700 text-sm">Browse your wellness achievement NFTs</p>
+                    <h3 className={cn(
+                      "font-semibold mb-2 transition-colors",
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    )}>Log Meditation</h3>
+                    <p className={cn(
+                      "text-sm transition-colors",
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    )}>Complete meditation and earn +25 WELL</p>
                   </button>
                   
-                  <button className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 hover:from-blue-100 hover:to-blue-200 transition-all duration-200 text-left group">
-                    <div className="w-12 h-12 bg-blue-200 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-300 transition-colors">
-                      <svg className="w-6 h-6 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  <button 
+                    onClick={() => handleQuickAction('meal')}
+                    className={cn(
+                      "p-6 rounded-xl border transition-all duration-200 text-left group",
+                      isDarkMode 
+                        ? "bg-gray-700 border-gray-600 hover:bg-gray-600" 
+                        : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors",
+                      isDarkMode 
+                        ? "bg-gray-600 group-hover:bg-gray-500" 
+                        : "bg-gray-200 group-hover:bg-gray-300"
+                    )}>
+                      <svg className={cn(
+                        "w-6 h-6 transition-colors",
+                        isDarkMode ? "text-gray-300" : "text-gray-700"
+                      )} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m0 0V1a1 1 0 011-1h2a2a1 1 0 011 1v18a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1h2a1 1 0 011-1z" />
                       </svg>
                     </div>
-                    <h3 className="font-semibold text-blue-900 mb-2">View Analytics</h3>
-                    <p className="text-blue-700 text-sm">Deep dive into your wellness metrics</p>
+                    <h3 className={cn(
+                      "font-semibold mb-2 transition-colors",
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    )}>Log Meal</h3>
+                    <p className={cn(
+                      "text-sm transition-colors",
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    )}>Track your nutrition and earn +10 WELL</p>
                   </button>
                   
-                  <button className="p-6 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl border border-yellow-200 hover:from-yellow-100 hover:to-yellow-200 transition-all duration-200 text-left group">
-                    <div className="w-12 h-12 bg-yellow-200 rounded-xl flex items-center justify-center mb-4 group-hover:bg-yellow-300 transition-colors">
-                      <svg className="w-6 h-6 text-yellow-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                  <button 
+                    onClick={() => handleQuickAction('sleep')}
+                    className={cn(
+                      "p-6 rounded-xl border transition-all duration-200 text-left group",
+                      isDarkMode 
+                        ? "bg-gray-700 border-gray-600 hover:bg-gray-600" 
+                        : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors",
+                      isDarkMode 
+                        ? "bg-gray-600 group-hover:bg-gray-500" 
+                        : "bg-gray-200 group-hover:bg-gray-300"
+                    )}>
+                      <svg className={cn(
+                        "w-6 h-6 transition-colors",
+                        isDarkMode ? "text-gray-300" : "text-gray-700"
+                      )} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                       </svg>
                     </div>
-                    <h3 className="font-semibold text-yellow-900 mb-2">Claim Rewards</h3>
-                    <p className="text-yellow-700 text-sm">Redeem your earned $WELL tokens</p>
+                    <h3 className={cn(
+                      "font-semibold mb-2 transition-colors",
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    )}>Log Sleep</h3>
+                    <p className={cn(
+                      "text-sm transition-colors",
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    )}>Track your sleep and earn +30 WELL</p>
                   </button>
+                </div>
+              </div>
+              
+              {/* Meal Logging Section */}
+              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-semibold text-gray-900">Today's Meals</h2>
+                  <button 
+                    onClick={() => setShowMealModal(true)}
+                    className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-colors"
+                  >
+                    + Add Meal
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  {meals.length === 0 ? (
+                    <p className="text-gray-500 text-sm text-center py-4">No meals logged today. Start tracking your nutrition!</p>
+                  ) : (
+                    meals.slice(0, 3).map((meal) => (
+                      <div key={meal.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                            meal.type === 'breakfast' ? 'bg-yellow-100' :
+                            meal.type === 'lunch' ? 'bg-orange-100' :
+                            meal.type === 'dinner' ? 'bg-red-100' :
+                            'bg-green-100'
+                          }`}>
+                            <span className={`text-xs font-medium ${
+                              meal.type === 'breakfast' ? 'text-yellow-700' :
+                              meal.type === 'lunch' ? 'text-orange-700' :
+                              meal.type === 'dinner' ? 'text-red-700' :
+                              'text-green-700'
+                            }`}>
+                              {meal.type.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{meal.name}</p>
+                            <p className="text-xs text-gray-500">{formatTimeAgo(meal.timestamp)}</p>
+                          </div>
+                        </div>
+                        <span className="text-sm font-medium text-gray-600">{meal.calories} cal</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -843,44 +1421,40 @@ function LandingPageContent() {
               <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
                 <h3 className="font-semibold text-gray-900 mb-4">Recent Activity</h3>
                 <div className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                      <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                  {activities.slice(0, 5).map((activity) => (
+                    <div key={activity.id} className="flex items-center space-x-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                        activity.type === 'workout' ? 'bg-green-100' :
+                        activity.type === 'meditation' ? 'bg-blue-100' :
+                        activity.type === 'meal' ? 'bg-purple-100' :
+                        activity.type === 'sleep' ? 'bg-yellow-100' :
+                        'bg-gray-100'
+                      }`}>
+                        <svg className={`w-4 h-4 ${
+                          activity.type === 'workout' ? 'text-green-600' :
+                          activity.type === 'meditation' ? 'text-blue-600' :
+                          activity.type === 'meal' ? 'text-purple-600' :
+                          activity.type === 'sleep' ? 'text-yellow-600' :
+                          'text-gray-600'
+                        }`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">{activity.name}</p>
+                        <p className="text-xs text-gray-500">{formatTimeAgo(activity.timestamp)}</p>
+                      </div>
+                      <span className={`text-sm font-medium ${
+                        activity.type === 'workout' ? 'text-green-600' :
+                        activity.type === 'meditation' ? 'text-blue-600' :
+                        activity.type === 'meal' ? 'text-purple-600' :
+                        activity.type === 'sleep' ? 'text-yellow-600' :
+                        'text-purple-600'
+                      }`}>
+                        {typeof activity.reward === 'number' ? `+${activity.reward} WELL` : activity.reward}
+                      </span>
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">Completed workout</p>
-                      <p className="text-xs text-gray-500">2 hours ago</p>
-                    </div>
-                    <span className="text-sm font-medium text-green-600">+50 WELL</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">Logged meditation</p>
-                      <p className="text-xs text-gray-500">5 hours ago</p>
-                    </div>
-                    <span className="text-sm font-medium text-blue-600">+25 WELL</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <svg className="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">Minted new NFT</p>
-                      <p className="text-xs text-gray-500">1 day ago</p>
-                    </div>
-                    <span className="text-sm font-medium text-purple-600">NFT</span>
-                  </div>
+                  ))}
                 </div>
               </div>
 
@@ -891,30 +1465,30 @@ function LandingPageContent() {
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-sm font-medium text-gray-900">Exercise</span>
-                      <span className="text-sm text-gray-500">4/5 days</span>
+                      <span className="text-sm text-gray-500">{weeklyGoals.exercise.current}/{weeklyGoals.exercise.target} days</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-green-500 h-2 rounded-full" style={{ width: '80%' }}></div>
+                      <div className="bg-green-500 h-2 rounded-full" style={{ width: `${(weeklyGoals.exercise.current / weeklyGoals.exercise.target) * 100}%` }}></div>
                     </div>
                   </div>
                   
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-sm font-medium text-gray-900">Meditation</span>
-                      <span className="text-sm text-gray-500">3/7 days</span>
+                      <span className="text-sm text-gray-500">{weeklyGoals.meditation.current}/{weeklyGoals.meditation.target} days</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-blue-500 h-2 rounded-full" style={{ width: '43%' }}></div>
+                      <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${(weeklyGoals.meditation.current / weeklyGoals.meditation.target) * 100}%` }}></div>
                     </div>
                   </div>
                   
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-sm font-medium text-gray-900">Sleep</span>
-                      <span className="text-sm text-gray-500">6/7 nights</span>
+                      <span className="text-sm text-gray-500">{weeklyGoals.sleep.current}/{weeklyGoals.sleep.target} nights</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-purple-500 h-2 rounded-full" style={{ width: '86%' }}></div>
+                      <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${(weeklyGoals.sleep.current / weeklyGoals.sleep.target) * 100}%` }}></div>
                     </div>
                   </div>
                 </div>
@@ -922,6 +1496,79 @@ function LandingPageContent() {
             </div>
           </div>
         </main>
+        
+        {/* Meal Logging Modal */}
+        {showMealModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-gray-900">Log Your Meal</h3>
+                <button 
+                  onClick={() => setShowMealModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Meal Type</label>
+                  <select
+                    value={newMeal.type}
+                    onChange={(e) => setNewMeal(prev => ({ ...prev, type: e.target.value }))}
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="breakfast">Breakfast</option>
+                    <option value="lunch">Lunch</option>
+                    <option value="dinner">Dinner</option>
+                    <option value="snack">Snack</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Meal Description</label>
+                  <input
+                    type="text"
+                    value={newMeal.name}
+                    onChange={(e) => setNewMeal(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g., Oatmeal with berries"
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Calories</label>
+                  <input
+                    type="number"
+                    value={newMeal.calories}
+                    onChange={(e) => setNewMeal(prev => ({ ...prev, calories: e.target.value }))}
+                    placeholder="e.g., 320"
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    onClick={() => setShowMealModal(false)}
+                    className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={addMeal}
+                    disabled={!newMeal.name.trim() || !newMeal.calories.trim()}
+                    className="flex-1 px-4 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Log Meal
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1003,81 +1650,121 @@ function LandingPageContent() {
 
               {/* CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-4 lg:justify-start justify-center">
-                <button 
-                  onClick={startJourney}
-                  className={cn(
-                    "px-8 py-4 font-semibold rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg text-lg",
-                    isDarkMode 
-                      ? "bg-white text-black hover:bg-gray-100" 
-                      : "bg-black text-white hover:bg-gray-800"
-                  )}
-                >
-                  Get started
-                </button>
-                <button className={cn(
-                  "px-8 py-4 border-2 font-semibold rounded-2xl transition-all duration-300 text-lg",
-                  isDarkMode 
-                    ? "border-gray-600 text-white hover:border-gray-400" 
-                    : "border-gray-400 text-black hover:border-gray-600"
-                )}>
-                  Watch demo
-                </button>
+                {!address ? (
+                  <div className="flex flex-col sm:flex-row gap-4 lg:justify-start justify-center">
+                    <ConnectWallet />
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row gap-4 lg:justify-start justify-center">
+                    <button 
+                      onClick={startJourney}
+                      disabled={isCheckingContract}
+                      className={cn(
+                        "px-8 py-4 font-semibold rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg text-lg",
+                        isDarkMode 
+                          ? "bg-white text-black hover:bg-gray-100" 
+                          : "bg-black text-white hover:bg-gray-800",
+                        isCheckingContract ? "opacity-50 cursor-not-allowed" : ""
+                      )}
+                    >
+                      {isCheckingContract ? 'Checking...' : (isUserOnboarded ? 'Continue Journey' : 'Get started')}
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {/* Stats */}
+              {/* App Infrastructure Stats */}
               <div className="grid grid-cols-3 gap-6 pt-8">
                 <div className="text-center lg:text-left">
                   <div className={cn(
                     "text-3xl lg:text-4xl font-bold mb-1 transition-colors",
                     isDarkMode ? "text-white" : "text-black"
-                  )}>10K+</div>
+                  )}>Base</div>
                   <div className={cn(
                     "text-sm transition-colors",
                     isDarkMode ? "text-gray-400" : "text-gray-600"
-                  )}>Active users</div>
+                  )}>Layer 2 Network</div>
                 </div>
                 <div className="text-center lg:text-left">
                   <div className={cn(
                     "text-3xl lg:text-4xl font-bold mb-1 transition-colors",
                     isDarkMode ? "text-white" : "text-black"
-                  )}>500K</div>
+                  )}>AI + Web3</div>
                   <div className={cn(
                     "text-sm transition-colors",
                     isDarkMode ? "text-gray-400" : "text-gray-600"
-                  )}>$WELL earned</div>
+                  )}>Hybrid Architecture</div>
                 </div>
                 <div className="text-center lg:text-left">
                   <div className={cn(
                     "text-3xl lg:text-4xl font-bold mb-1 transition-colors",
                     isDarkMode ? "text-white" : "text-black"
-                  )}>95%</div>
+                  )}>Open</div>
                   <div className={cn(
                     "text-sm transition-colors",
                     isDarkMode ? "text-gray-400" : "text-gray-600"
-                  )}>Success rate</div>
+                  )}>Source & Transparent</div>
                 </div>
               </div>
             </div>
 
             {/* Hero Visual */}
             <div className="mt-16 lg:mt-0 relative">
-              <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl p-8 border border-gray-700 shadow-2xl">
-                <div className="bg-gray-900 rounded-2xl p-6 border border-gray-600 mb-6">
+              <div className={cn(
+                "rounded-3xl p-8 border shadow-2xl transition-colors duration-300",
+                isDarkMode 
+                  ? "bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700" 
+                  : "bg-gradient-to-br from-gray-100 to-gray-200 border-gray-300"
+              )}>
+                <div className={cn(
+                  "rounded-2xl p-6 border mb-6 transition-colors duration-300",
+                  isDarkMode 
+                    ? "bg-gray-900 border-gray-600" 
+                    : "bg-white border-gray-400"
+                )}>
                   <div className="flex items-center justify-between mb-4">
-                    <div className="text-gray-400 text-sm">Your wellness score</div>
-                    <div className="text-green-400 text-sm font-medium">+12%</div>
+                    <div className={cn(
+                      "text-sm transition-colors duration-300",
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    )}>Your wellness score</div>
+                    <div className="text-green-500 text-sm font-medium">+12%</div>
                   </div>
-                  <div className="text-white text-3xl font-bold">2,840</div>
+                  <div className={cn(
+                    "text-3xl font-bold transition-colors duration-300",
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  )}>2,840</div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-800 rounded-xl p-4 border border-gray-600">
-                    <div className="text-white text-xl font-bold mb-1">12</div>
-                    <div className="text-gray-400 text-xs">Day Streak</div>
+                  <div className={cn(
+                    "rounded-xl p-4 border transition-colors duration-300",
+                    isDarkMode 
+                      ? "bg-gray-800 border-gray-600" 
+                      : "bg-gray-50 border-gray-400"
+                  )}>
+                    <div className={cn(
+                      "text-xl font-bold mb-1 transition-colors duration-300",
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    )}>12</div>
+                    <div className={cn(
+                      "text-xs transition-colors duration-300",
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    )}>Day Streak</div>
                   </div>
-                  <div className="bg-gray-800 rounded-xl p-4 border border-gray-600">
-                    <div className="text-white text-xl font-bold mb-1">3</div>
-                    <div className="text-gray-400 text-xs">NFTs Earned</div>
+                  <div className={cn(
+                    "rounded-xl p-4 border transition-colors duration-300",
+                    isDarkMode 
+                      ? "bg-gray-800 border-gray-600" 
+                      : "bg-gray-50 border-gray-400"
+                  )}>
+                    <div className={cn(
+                      "text-xl font-bold mb-1 transition-colors duration-300",
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    )}>3</div>
+                    <div className={cn(
+                      "text-xs transition-colors duration-300",
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    )}>NFTs Earned</div>
                   </div>
                 </div>
               </div>
@@ -1109,39 +1796,276 @@ function LandingPageContent() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
             <div className="text-center group">
-              <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:bg-blue-200 transition-colors">
-                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className={cn(
+                "w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 transition-colors",
+                isDarkMode 
+                  ? "bg-gray-700 group-hover:bg-gray-600" 
+                  : "bg-gray-200 group-hover:bg-gray-300"
+              )}>
+                <svg className={cn(
+                  "w-8 h-8 transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
-              <h3 className="text-xl lg:text-2xl font-bold text-gray-900 mb-4">AI Health Insights</h3>
-              <p className="text-gray-600 leading-relaxed">
+              <h3 className={cn(
+                "text-xl lg:text-2xl font-bold mb-4 transition-colors",
+                isDarkMode ? "text-white" : "text-gray-900"
+              )}>AI Health Insights</h3>
+              <p className={cn(
+                "leading-relaxed transition-colors",
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              )}>
                 Get personalized recommendations powered by advanced AI that learns from your wellness patterns and goals.
               </p>
             </div>
 
             <div className="text-center group">
-              <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:bg-green-200 transition-colors">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className={cn(
+                "w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 transition-colors",
+                isDarkMode 
+                  ? "bg-gray-700 group-hover:bg-gray-600" 
+                  : "bg-gray-200 group-hover:bg-gray-300"
+              )}>
+                <svg className={cn(
+                  "w-8 h-8 transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m0 0V1a1 1 0 011-1h2a1 1 0 011 1v18a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1h2a1 1 0 011-1z" />
                 </svg>
               </div>
-              <h3 className="text-xl lg:text-2xl font-bold text-gray-900 mb-4">Wellness NFTs</h3>
-              <p className="text-gray-600 leading-relaxed">
+              <h3 className={cn(
+                "text-xl lg:text-2xl font-bold mb-4 transition-colors",
+                isDarkMode ? "text-white" : "text-gray-900"
+              )}>Wellness NFTs</h3>
+              <p className={cn(
+                "leading-relaxed transition-colors",
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              )}>
                 Mint unique NFTs that represent your wellness achievements and milestones on your health journey.
               </p>
             </div>
 
             <div className="text-center group">
-              <div className="w-16 h-16 bg-yellow-100 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:bg-yellow-200 transition-colors">
-                <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className={cn(
+                "w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 transition-colors",
+                isDarkMode 
+                  ? "bg-gray-700 group-hover:bg-gray-600" 
+                  : "bg-gray-200 group-hover:bg-gray-300"
+              )}>
+                <svg className={cn(
+                  "w-8 h-8 transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                 </svg>
               </div>
-              <h3 className="text-xl lg:text-2xl font-bold text-gray-900 mb-4">Earn $WELL Tokens</h3>
-              <p className="text-gray-600 leading-relaxed">
+              <h3 className={cn(
+                "text-xl lg:text-2xl font-bold mb-4 transition-colors",
+                isDarkMode ? "text-white" : "text-gray-900"
+              )}>Earn $WELL Tokens</h3>
+              <p className={cn(
+                "leading-relaxed transition-colors",
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              )}>
                 Get rewarded with $WELL tokens for completing wellness activities and maintaining healthy habits.
               </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section id="how-it-works" className={cn(
+        "py-20 lg:py-32 transition-colors duration-300",
+        isDarkMode ? "bg-gray-50" : "bg-gray-100"
+      )}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16 lg:mb-20">
+            <h2 className={cn(
+              "text-3xl lg:text-4xl xl:text-5xl font-bold mb-6 transition-colors",
+              isDarkMode ? "text-gray-900" : "text-gray-900"
+            )}>
+              How it works
+            </h2>
+            <p className={cn(
+              "text-lg lg:text-xl max-w-3xl mx-auto transition-colors",
+              isDarkMode ? "text-gray-700" : "text-gray-600"
+            )}>
+              Simple steps to start your wellness journey with AI-powered insights and blockchain rewards
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12">
+            <div className="text-center">
+              <div className={cn(
+                "w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold transition-colors",
+                isDarkMode 
+                  ? "bg-gray-800 text-white" 
+                  : "bg-gray-800 text-white"
+              )}>
+                1
+              </div>
+              <h3 className={cn(
+                "text-xl lg:text-2xl font-bold mb-4 transition-colors",
+                isDarkMode ? "text-gray-900" : "text-gray-900"
+              )}>Connect Wallet</h3>
+              <p className={cn(
+                "leading-relaxed transition-colors",
+                isDarkMode ? "text-gray-700" : "text-gray-600"
+              )}>
+                Securely connect your Web3 wallet to start earning rewards and minting wellness NFTs.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className={cn(
+                "w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold transition-colors",
+                isDarkMode 
+                  ? "bg-gray-800 text-white" 
+                  : "bg-gray-800 text-white"
+              )}>
+                2
+              </div>
+              <h3 className={cn(
+                "text-xl lg:text-2xl font-bold mb-4 transition-colors",
+                isDarkMode ? "text-gray-900" : "text-gray-900"
+              )}>Track Wellness</h3>
+              <p className={cn(
+                "leading-relaxed transition-colors",
+                isDarkMode ? "text-gray-700" : "text-gray-600"
+              )}>
+                Log your activities, get AI insights, and build healthy habits while earning $WELL tokens.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className={cn(
+                "w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold transition-colors",
+                isDarkMode 
+                  ? "bg-gray-800 text-white" 
+                  : "bg-gray-800 text-white"
+              )}>
+                3
+              </div>
+              <h3 className={cn(
+                "text-xl lg:text-2xl font-bold mb-4 transition-colors",
+                isDarkMode ? "text-gray-900" : "text-gray-900"
+              )}>Earn Rewards</h3>
+              <p className={cn(
+                "leading-relaxed transition-colors",
+                isDarkMode ? "text-gray-700" : "text-gray-600"
+              )}>
+                Mint unique NFTs for milestones and accumulate $WELL tokens for your wellness achievements.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Rewards Section */}
+      <section id="rewards" className={cn(
+        "py-20 lg:py-32 transition-colors duration-300",
+        isDarkMode ? "bg-white" : "bg-white"
+      )}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16 lg:mb-20">
+            <h2 className={cn(
+              "text-3xl lg:text-4xl xl:text-5xl font-bold mb-6 transition-colors",
+              isDarkMode ? "text-gray-900" : "text-gray-900"
+            )}>
+              Rewards & Incentives
+            </h2>
+            <p className={cn(
+              "text-lg lg:text-xl max-w-3xl mx-auto transition-colors",
+              isDarkMode ? "text-gray-700" : "text-gray-600"
+            )}>
+              Get rewarded for your wellness journey with $WELL tokens and unique NFTs
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
+            <div className="space-y-6">
+              <div className={cn(
+                "p-6 rounded-2xl border transition-colors",
+                isDarkMode 
+                  ? "bg-gray-50 border-gray-200" 
+                  : "bg-gray-50 border-gray-200"
+              )}>
+                <div className="flex items-center space-x-4 mb-4">
+                  <div className={cn(
+                    "w-12 h-12 rounded-xl flex items-center justify-center transition-colors",
+                    isDarkMode 
+                      ? "bg-gray-800" 
+                      : "bg-gray-800"
+                  )}>
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className={cn(
+                      "text-xl font-bold transition-colors",
+                      isDarkMode ? "text-gray-900" : "text-gray-900"
+                    )}>$WELL Token Rewards</h3>
+                    <p className={cn(
+                      "text-sm transition-colors",
+                      isDarkMode ? "text-gray-700" : "text-gray-600"
+                    )}>Earn tokens for every wellness activity</p>
+                  </div>
+                </div>
+                <ul className={cn(
+                  "space-y-2 text-sm transition-colors",
+                  isDarkMode ? "text-gray-700" : "text-gray-600"
+                )}>
+                  <li>• Workout completion: +50 WELL</li>
+                  <li>• Meditation session: +25 WELL</li>
+                  <li>• Meal logging: +10 WELL</li>
+                  <li>• Sleep tracking: +30 WELL</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className={cn(
+                "p-6 rounded-2xl border transition-colors",
+                isDarkMode 
+                  ? "bg-gray-50 border-gray-200" 
+                  : "bg-gray-50 border-gray-200"
+              )}>
+                <div className="flex items-center space-x-4 mb-4">
+                  <div className={cn(
+                    "w-12 h-12 rounded-xl flex items-center justify-center transition-colors",
+                    isDarkMode 
+                      ? "bg-gray-800" 
+                      : "bg-gray-800"
+                  )}>
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m0 0V1a1 1 0 011-1h2a1 1 0 011 1v18a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1h2a1 1 0 011-1z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className={cn(
+                      "text-xl font-bold transition-colors",
+                      isDarkMode ? "text-gray-900" : "text-gray-900"
+                    )}>Wellness NFTs</h3>
+                    <p className={cn(
+                      "text-sm transition-colors",
+                      isDarkMode ? "text-gray-700" : "text-gray-600"
+                    )}>Unique digital collectibles for milestones</p>
+                  </div>
+                </div>
+                <ul className={cn(
+                  "space-y-2 text-sm transition-colors",
+                  isDarkMode ? "text-gray-700" : "text-gray-600"
+                )}>
+                  <li>• 7-day streak achievement</li>
+                  <li>• Monthly wellness goals</li>
+                  <li>• Special event participation</li>
+                  <li>• Community challenges</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -1164,7 +2088,7 @@ function LandingPageContent() {
               "text-base sm:text-lg lg:text-xl mb-8 sm:mb-12 max-w-2xl mx-auto leading-relaxed transition-colors",
               isDarkMode ? "text-gray-300" : "text-gray-600"
             )}>
-              Join thousands of users who are already earning rewards for their healthy lifestyle choices.
+              Start your wellness journey today and discover the power of AI-powered insights combined with blockchain rewards.
             </p>
 
             {/* Wallet Connection Card */}
@@ -1189,11 +2113,11 @@ function LandingPageContent() {
                         <div className="text-left">
                           <Name className={cn(
                             "text-base sm:text-lg font-medium transition-colors",
-                            isDarkMode ? "text-white" : "text-gray-900"
+                            isDarkMode ? "text-white" : "text-white"
                           )} />
                           <div className={cn(
                             "text-xs sm:text-sm transition-colors",
-                            isDarkMode ? "text-gray-400" : "text-gray-500"
+                            isDarkMode ? "text-gray-400" : "text-gray-300"
                           )}>Connected</div>
                         </div>
                       </div>
@@ -1204,61 +2128,19 @@ function LandingPageContent() {
             </div>
 
             {/* CTA Button */}
-                        <button
+            <button 
               onClick={startJourney}
-              disabled={isProfileLoading}
               className={cn(
-                "w-full sm:w-auto px-8 sm:px-12 py-3 sm:py-4 font-semibold rounded-xl sm:rounded-2xl transition-all duration-300 transform shadow-lg text-base sm:text-lg",
-                isProfileLoading 
-                  ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                  : isDarkMode 
-                    ? "bg-white text-black hover:bg-gray-100 hover:scale-105" 
-                    : "bg-black text-white hover:bg-gray-800 hover:scale-105"
+                "w-full sm:w-auto px-8 sm:px-12 py-3 sm:py-4 font-semibold rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg text-base sm:text-lg",
+                isDarkMode 
+                  ? "bg-white text-black hover:bg-gray-100" 
+                  : "bg-black text-white hover:bg-gray-800"
               )}
             >
-              {isProfileLoading ? (
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                  <span>Checking profile...</span>
-                </div>
-              ) : (
-                'Get started'
-              )}
+              Get started
             </button>
 
-            {/* Trust Indicators */}
-            <div className="mt-8 sm:mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 max-w-3xl mx-auto">
-              <div className="text-center">
-                <div className={cn(
-                  "text-2xl sm:text-3xl font-bold mb-1 transition-colors",
-                  isDarkMode ? "text-white" : "text-gray-900"
-                )}>10K+</div>
-                <div className={cn(
-                  "text-sm sm:text-base transition-colors",
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                )}>Active Users</div>
-              </div>
-              <div className="text-center">
-                <div className={cn(
-                  "text-2xl sm:text-3xl font-bold mb-1 transition-colors",
-                  isDarkMode ? "text-white" : "text-gray-900"
-                )}>$500K</div>
-                <div className={cn(
-                  "text-sm sm:text-base transition-colors",
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                )}>Rewards Earned</div>
-              </div>
-              <div className="text-center">
-                <div className={cn(
-                  "text-2xl sm:text-3xl font-bold mb-1 transition-colors",
-                  isDarkMode ? "text-white" : "text-gray-900"
-                )}>95%</div>
-                <div className={cn(
-                  "text-sm sm:text-base transition-colors",
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                )}>Success Rate</div>
-              </div>
-            </div>
+
           </div>
         </div>
       </section>

@@ -5,24 +5,24 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { http, createConfig } from 'wagmi';
 import { WagmiProvider } from 'wagmi';
-import { base } from 'wagmi/chains';
+import { baseSepolia } from 'wagmi/chains';
 import { coinbaseWallet } from 'wagmi/connectors';
 
 export const config = createConfig({
-  chains: [base],
+  chains: [baseSepolia],
   transports: {
-    [base.id]: http(),
+    [baseSepolia.id]: http(),
   },
   ssr: true,
   connectors: [
     coinbaseWallet({
-      appName: 'Coinbase',
-      appLogoUrl: 'https://avatars.githubusercontent.com/u/1885080?s=200&v=4',
+      appName: 'WellSpace',
+      appLogoUrl: 'https://wellspace.app/logo.png',
       preference: 'smartWalletOnly',
     }),
     coinbaseWallet({
-      appName: 'Coinbase',
-      appLogoUrl: 'https://avatars.githubusercontent.com/u/1885080?s=200&v=4',
+      appName: 'WellSpace',
+      appLogoUrl: 'https://wellspace.app/logo.png',
       preference: 'eoaOnly',
     }),
   ],
@@ -36,7 +36,7 @@ function MintProviders({ children }: { children: ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <OnchainKitProvider
           apiKey={ENVIRONMENT_VARIABLES[ENVIRONMENT.API_KEY]}
-          chain={base}
+          chain={baseSepolia}
           config={{
             appearance: {
               mode: 'light',
