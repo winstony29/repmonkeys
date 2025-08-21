@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, createContext, useContext } from 'react';
+
+
 import {
   Avatar,
   Name,
@@ -14,8 +16,8 @@ import {
 } from '@coinbase/onchainkit/wallet';
 import { FundButton } from '@coinbase/onchainkit/fund';
 import { cn } from '@/lib/utils';
-import { useAccount, useReadContract, useBalance, useWriteContract } from 'wagmi';
-import { wellnessNFTAbi, wellTokenAbi, userProfileAbi, CONTRACT_ADDRESSES, formatTokenAmount } from '@/lib/contracts';
+import { useAccount, useReadContract, useBalance, useWriteContract, useChainId } from 'wagmi';
+import { wellnessNFTAbi, wellTokenAbi, userProfileAbi, wellnessTrackerAbi, CONTRACT_ADDRESSES, formatTokenAmount } from '@/lib/contracts';
 import { useWellnessAPI } from '@/lib/api';
 import { useSogniGeneration } from '@/lib/sogni';
 
@@ -135,6 +137,7 @@ function LandingPageContent() {
   const { isDarkMode } = useTheme();
 
   const { address } = useAccount();
+  const chainId = useChainId();
   const { getWellnessAdvice } = useWellnessAPI();
   const { generateImage } = useSogniGeneration();
   const { writeContract, isPending: isWritingContract } = useWriteContract();
@@ -143,6 +146,7 @@ function LandingPageContent() {
   const [contractError, setContractError] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [contractHealth, setContractHealth] = useState<'healthy' | 'degraded' | 'unhealthy'>('healthy');
+  const [wellnessDataInitialized, setWellnessDataInitialized] = useState(false);
 
   // Get user's WellnessNFT token ID
   const { data: tokenId } = useReadContract({
@@ -255,7 +259,7 @@ function LandingPageContent() {
   };
   
   // Activity tracking functions
-  const logActivity = (type: string, name: string, reward: number) => {
+  const logActivity = async (type: string, name: string, reward: number) => {
     const newActivity = {
       id: Date.now(),
       type,
@@ -265,9 +269,8 @@ function LandingPageContent() {
       completed: true
     };
     
+    // Update local state immediately for UI responsiveness
     setActivities(prev => [newActivity, ...prev.slice(0, 9)]); // Keep last 10 activities
-    
-    // Update score and streak
     setTotalScore(prev => prev + reward);
     setStreakCount(prev => prev + 1);
     
@@ -284,27 +287,84 @@ function LandingPageContent() {
       }));
     }
     
-    // Save updated data to localStorage
-    if (address) {
-      const localStorageKey = `wellspace_user_${address}`;
-      const existingData = localStorage.getItem(localStorageKey);
-      if (existingData) {
-        try {
-          const userData = JSON.parse(existingData);
-          userData.streakCount = streakCount + 1;
-          userData.totalScore = totalScore + reward;
-          userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
-          userData.weeklyGoals = weeklyGoals;
-          localStorage.setItem(localStorageKey, JSON.stringify(userData));
-        } catch (error) {
-          console.error('Error updating localStorage:', error);
+    // Save to smart contract if available
+    if (address && hasWellnessData && chainId === 84532) {
+      try {
+        console.log('📝 Logging activity to smart contract:', { type, name, reward });
+        await writeContract({
+          address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+          abi: wellnessTrackerAbi,
+          functionName: 'logActivity',
+          args: [type, name, BigInt(reward)],
+        });
+        console.log('✅ Activity logged to smart contract successfully');
+        
+        // Also save to localStorage as backup
+        const localStorageKey = `wellspace_user_${address}`;
+        const existingData = localStorage.getItem(localStorageKey);
+        if (existingData) {
+          try {
+            const userData = JSON.parse(existingData);
+            userData.streakCount = streakCount + 1;
+            userData.totalScore = totalScore + reward;
+            userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
+            userData.weeklyGoals = weeklyGoals;
+            localStorage.setItem(localStorageKey, JSON.stringify(userData));
+            console.log('💾 Activity also saved to localStorage backup');
+          } catch (error) {
+            console.error('Error updating localStorage:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Error logging activity to smart contract:', error);
+        console.log('🔄 Falling back to localStorage only');
+        
+        // Fallback to localStorage only
+        if (address) {
+          const localStorageKey = `wellspace_user_${address}`;
+          const existingData = localStorage.getItem(localStorageKey);
+          if (existingData) {
+            try {
+              const userData = JSON.parse(existingData);
+              userData.streakCount = streakCount + 1;
+              userData.totalScore = totalScore + reward;
+              userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
+              userData.weeklyGoals = weeklyGoals;
+              localStorage.setItem(localStorageKey, JSON.stringify(userData));
+            } catch (localError) {
+              console.error('Error updating localStorage:', localError);
+            }
+          }
+        }
+      }
+    } else {
+      // No smart contract available or wrong network, use localStorage only
+      if (chainId !== 84532) {
+        console.log('⚠️ Wrong network detected, using localStorage only');
+      } else {
+        console.log('📱 Using localStorage fallback for activity logging');
+      }
+      if (address) {
+        const localStorageKey = `wellspace_user_${address}`;
+        const existingData = localStorage.getItem(localStorageKey);
+        if (existingData) {
+          try {
+            const userData = JSON.parse(existingData);
+            userData.streakCount = streakCount + 1;
+            userData.totalScore = totalScore + reward;
+            userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
+            userData.weeklyGoals = weeklyGoals;
+            localStorage.setItem(localStorageKey, JSON.stringify(userData));
+          } catch (error) {
+            console.error('Error updating localStorage:', error);
+          }
         }
       }
     }
   };
   
   // Meal logging functions
-  const addMeal = () => {
+  const addMeal = async () => {
     if (!newMeal.name.trim() || !newMeal.calories.trim()) return;
     
     const meal = {
@@ -319,24 +379,43 @@ function LandingPageContent() {
     setNewMeal({ type: 'breakfast', name: '', calories: '' });
     setShowMealModal(false);
     
+    // Save meal to smart contract if available
+    if (address && hasWellnessData && chainId === 84532) {
+      try {
+        console.log('🍽️ Logging meal to smart contract:', { type: newMeal.type, name: newMeal.name, calories: parseInt(newMeal.calories) });
+        await writeContract({
+          address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+          abi: wellnessTrackerAbi,
+          functionName: 'logMeal',
+          args: [newMeal.type, newMeal.name, BigInt(newMeal.calories)],
+        });
+        console.log('✅ Meal logged to smart contract successfully');
+      } catch (error) {
+        console.error('Error logging meal to smart contract:', error);
+        console.log('🔄 Falling back to localStorage only');
+      }
+    } else if (chainId !== 84532) {
+      console.log('⚠️ Wrong network detected, meal logged to localStorage only');
+    }
+    
     // Give reward for logging meal
     logActivity('meal', 'Logged meal', 10);
   };
   
   // Quick action functions
-  const handleQuickAction = (action: string) => {
+  const handleQuickAction = async (action: string) => {
     switch (action) {
       case 'workout':
-        logActivity('workout', 'Completed workout', 50);
+        await logActivity('workout', 'Completed workout', 50);
         break;
       case 'meditation':
-        logActivity('meditation', 'Logged meditation', 25);
+        await logActivity('meditation', 'Logged meditation', 25);
         break;
       case 'meal':
         setShowMealModal(true);
         break;
       case 'sleep':
-        logActivity('sleep', 'Logged sleep', 30);
+        await logActivity('sleep', 'Logged sleep', 30);
         setWeeklyGoals(prev => ({
           ...prev,
           sleep: { ...prev.sleep, current: Math.min(prev.sleep.current + 1, prev.sleep.target) }
@@ -375,18 +454,60 @@ function LandingPageContent() {
     args: address ? [address] : undefined,
     query: { enabled: !!address && !!isOnboarded },
   });
+
+  // Get user wellness data from WellnessTracker contract
+  const { data: wellnessData, error: wellnessError } = useReadContract({
+    address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+    abi: wellnessTrackerAbi,
+    functionName: 'getUserWellnessData',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  // Check if user has wellness data initialized
+  const { data: hasWellnessData, error: wellnessDataError } = useReadContract({
+    address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+    abi: wellnessTrackerAbi,
+    functionName: 'hasUserWellnessData',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  // Get user's recent activities from smart contract
+  const { data: contractActivities, error: activitiesError } = useReadContract({
+    address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+    abi: wellnessTrackerAbi,
+    functionName: 'getUserRecentActivities',
+    args: address ? [address, BigInt(10)] : undefined,
+    query: { enabled: !!address && !!hasWellnessData },
+  });
+
+  // Get user's recent meals from smart contract
+  const { data: contractMeals, error: mealsError } = useReadContract({
+    address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+    abi: wellnessTrackerAbi,
+    functionName: 'getUserRecentMeals',
+    args: address ? [address, BigInt(10)] : undefined,
+    query: { enabled: !!address && !!hasWellnessData },
+  });
   
   // Debug logging
   useEffect(() => {
     if (address) {
       console.log('🔍 Debug - Wallet connected:', address);
-      console.log('🔍 Debug - Contract address:', CONTRACT_ADDRESSES.USER_PROFILE);
-      console.log('🔍 Debug - Contract error:', contractReadError);
+      console.log('🔍 Debug - User Profile Contract address:', CONTRACT_ADDRESSES.USER_PROFILE);
+      console.log('🔍 Debug - Wellness Tracker Contract address:', CONTRACT_ADDRESSES.WELLNESS_TRACKER);
+      console.log('🔍 Debug - Contract read error:', contractReadError);
       console.log('🔍 Debug - Profile error:', profileError);
+      console.log('🔍 Debug - Wellness error:', wellnessError);
       console.log('🔍 Debug - Is onboarded:', isOnboarded);
+      console.log('🔍 Debug - Has wellness data:', hasWellnessData);
       console.log('🔍 Debug - Profile data:', profileData);
+      console.log('🔍 Debug - Wellness data:', wellnessData);
+      console.log('🔍 Debug - Contract activities:', contractActivities);
+      console.log('🔍 Debug - Contract meals:', contractMeals);
     }
-  }, [address, contractReadError, profileError, isOnboarded, profileData]);
+  }, [address, contractReadError, profileError, wellnessError, isOnboarded, hasWellnessData, profileData, wellnessData, contractActivities, contractMeals]);
   
   // Update local state when contract data changes
   useEffect(() => {
@@ -412,6 +533,82 @@ function LandingPageContent() {
       setGeneratedImageUrl(profileData[8] || null);
     }
   }, [profileData]);
+
+  // Load wellness data from smart contract when available
+  useEffect(() => {
+    if (wellnessData && Array.isArray(wellnessData)) {
+      // wellnessData is an array: [streakCount, totalScore, lastActivityTimestamp, dailyStreakStart, weeklyGoals, totalActivities, totalMeals]
+      console.log('📊 Loading wellness data from smart contract:', wellnessData);
+      
+      const [contractStreakCount, contractTotalScore, lastActivityTimestamp, dailyStreakStart, contractWeeklyGoals, totalActivities, totalMeals] = wellnessData;
+      
+      // Update local state with contract data
+      setStreakCount(Number(contractStreakCount) || 0);
+      setTotalScore(Number(contractTotalScore) || 0);
+      
+      // Update weekly goals if available
+      if (contractWeeklyGoals && Array.isArray(contractWeeklyGoals)) {
+        const [exerciseCurrent, exerciseTarget, meditationCurrent, meditationTarget, sleepCurrent, sleepTarget, exerciseCompleted, meditationCompleted, sleepCompleted] = contractWeeklyGoals;
+        
+        setWeeklyGoals({
+          exercise: { 
+            current: Number(exerciseCurrent) || 0, 
+            target: Number(exerciseTarget) || 5, 
+            completed: exerciseCompleted || false 
+          },
+          meditation: { 
+            current: Number(meditationCurrent) || 0, 
+            target: Number(meditationTarget) || 7, 
+            completed: meditationCompleted || false 
+          },
+          sleep: { 
+            current: Number(sleepCurrent) || 0, 
+            target: Number(sleepTarget) || 7, 
+            completed: sleepCompleted || false 
+          }
+        });
+      }
+      
+      console.log('✅ Wellness data loaded from smart contract successfully');
+    }
+  }, [wellnessData]);
+
+  // Load activities from smart contract when available
+  useEffect(() => {
+    if (contractActivities && Array.isArray(contractActivities)) {
+      console.log('📊 Loading activities from smart contract:', contractActivities);
+      
+      const formattedActivities = contractActivities.map(activity => ({
+        id: Number(activity[0]), // id
+        type: activity[1], // activityType
+        name: activity[2], // name
+        reward: Number(activity[3]), // reward
+        timestamp: Number(activity[4]), // timestamp
+        completed: activity[5] // completed
+      }));
+      
+      setActivities(formattedActivities);
+      console.log('✅ Activities loaded from smart contract successfully');
+    }
+  }, [contractActivities]);
+
+  // Load meals from smart contract when available
+  useEffect(() => {
+    if (contractMeals && Array.isArray(contractMeals)) {
+      console.log('🍽️ Loading meals from smart contract:', contractMeals);
+      
+      const formattedMeals = contractMeals.map(meal => ({
+        id: Number(meal[0]), // id
+        type: meal[1], // mealType
+        name: meal[2], // name
+        calories: Number(meal[3]), // calories
+        timestamp: Number(meal[4]) // timestamp
+      }));
+      
+      setMeals(formattedMeals);
+      console.log('✅ Meals loaded from smart contract successfully');
+    }
+  }, [contractMeals]);
   
   // Fallback: Load from localStorage if smart contract fails
   useEffect(() => {
@@ -457,6 +654,17 @@ function LandingPageContent() {
       checkContractHealth();
     }
   }, [address]);
+
+  // Auto-hide wellness data initialization success message
+  useEffect(() => {
+    if (wellnessDataInitialized) {
+      const timer = setTimeout(() => {
+        setWellnessDataInitialized(false);
+      }, 5000); // Hide after 5 seconds
+      
+      return () => clearTimeout(timer);
+    }
+  }, [wellnessDataInitialized]);
   
   // Check contract health and accessibility
   const checkContractHealth = async () => {
@@ -498,6 +706,20 @@ function LandingPageContent() {
       
       if (contractHealth === 'unhealthy') {
         throw new Error('Smart contract is currently unavailable');
+      }
+      
+      // Initialize wellness data on WellnessTracker contract if not already done
+      if (!hasWellnessData && chainId === 84532) {
+        console.log('🚀 Initializing wellness data on smart contract...');
+        await writeContract({
+          address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+          abi: wellnessTrackerAbi,
+          functionName: 'initializeWellnessData',
+          args: [],
+        });
+        console.log('✅ Wellness data initialized on smart contract');
+      } else if (chainId !== 84532) {
+        console.log('⚠️ Wrong network detected, skipping smart contract initialization');
       }
       
       // Save user profile to smart contract
@@ -553,9 +775,101 @@ function LandingPageContent() {
         return false;
       }
     }
-  };
-  
+    };
 
+  // Initialize wellness data on smart contract
+  const initializeWellnessData = async () => {
+    if (!address) return false;
+    
+    if (chainId !== 84532) {
+      setContractError('Please switch to Base Sepolia testnet to initialize wellness data on-chain');
+      return false;
+    }
+    
+    try {
+      console.log('🚀 Initializing wellness data on smart contract...');
+      await writeContract({
+        address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+        abi: wellnessTrackerAbi,
+        functionName: 'initializeWellnessData',
+        args: [],
+      });
+      console.log('✅ Wellness data initialized on smart contract');
+      setWellnessDataInitialized(true);
+      return true;
+    } catch (error) {
+      console.error('Error initializing wellness data:', error);
+      setContractError('Failed to initialize wellness data on smart contract');
+      return false;
+    }
+  };
+
+  // Reset weekly goals on smart contract
+  const resetWeeklyGoals = async () => {
+    if (!address || !hasWellnessData) return false;
+    
+    if (chainId !== 84532) {
+      setContractError('Please switch to Base Sepolia testnet to reset weekly goals on-chain');
+      return false;
+    }
+    
+    try {
+      console.log('🔄 Resetting weekly goals on smart contract...');
+      await writeContract({
+        address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+        abi: wellnessTrackerAbi,
+        functionName: 'resetWeeklyGoals',
+        args: [],
+      });
+      console.log('✅ Weekly goals reset on smart contract');
+      
+      // Update local state
+      setWeeklyGoals({
+        exercise: { current: 0, target: 5, completed: false },
+        meditation: { current: 0, target: 7, completed: false },
+        sleep: { current: 0, target: 7, completed: false }
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error resetting weekly goals:', error);
+      setContractError('Failed to reset weekly goals on smart contract');
+      return false;
+    }
+  };
+
+  // Add Base Sepolia network to MetaMask
+  const addBaseSepoliaNetwork = async () => {
+    if (typeof window.ethereum === 'undefined') {
+      alert('MetaMask is not installed. Please install MetaMask first.');
+      return;
+    }
+
+    try {
+      await (window.ethereum as any).request({
+        method: 'wallet_addEthereumChain',
+        params: [{
+          chainId: '0x14a34', // 84532 in hex
+          chainName: 'Base Sepolia',
+          nativeCurrency: {
+            name: 'ETH',
+            symbol: 'ETH',
+            decimals: 18,
+          },
+          rpcUrls: ['https://sepolia.base.org'],
+          blockExplorerUrls: ['https://sepolia.basescan.org'],
+        }],
+      });
+      console.log('✅ Base Sepolia network added to MetaMask');
+    } catch (error: any) {
+      console.error('Error adding Base Sepolia network:', error);
+      if (error.code === 4001) {
+        alert('Network addition was rejected by user.');
+      } else {
+        alert('Failed to add Base Sepolia network. Please add it manually.');
+      }
+    }
+  };
 
   // Onboarding View
   if (currentView === 'onboarding') {
@@ -1062,6 +1376,136 @@ function LandingPageContent() {
             </div>
           )}
 
+          {/* Wellness Data Initialization Banner */}
+          {address && !hasWellnessData && (
+            <div className={cn(
+              "mb-6 p-4 rounded-xl border transition-colors",
+              isDarkMode 
+                ? "bg-blue-900/20 border-blue-700/50 text-blue-200" 
+                : "bg-blue-50 border-blue-200 text-blue-800"
+            )}>
+              <div className="flex items-center space-x-3">
+                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="font-medium">Initialize On-Chain Wellness Data</p>
+                  <p className="text-sm opacity-90">
+                    Your wellness data is currently stored locally. Initialize on-chain storage for better security and transparency.
+                  </p>
+                  <button
+                    onClick={initializeWellnessData}
+                    className={cn(
+                      "mt-2 px-4 py-2 text-sm rounded-lg transition-colors font-medium",
+                      isDarkMode 
+                        ? "bg-blue-800/50 hover:bg-blue-800/70 text-blue-200" 
+                        : "bg-blue-100 hover:bg-blue-200 text-blue-800"
+                    )}
+                  >
+                    🚀 Initialize On-Chain
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Wellness Data Success Banner */}
+          {address && hasWellnessData && (
+            <div className={cn(
+              "mb-6 p-4 rounded-xl border transition-colors",
+              isDarkMode 
+                ? "bg-green-900/20 border-green-700/50 text-green-200" 
+                : "bg-green-50 border-green-200 text-green-800"
+            )}>
+              <div className="flex items-center space-x-3">
+                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="font-medium">✅ On-Chain Wellness Data Active</p>
+                  <p className="text-sm opacity-90">
+                    Your wellness data is now stored securely on the blockchain. All activities, meals, and progress are being tracked on-chain.
+                  </p>
+                  <div className="flex space-x-2 mt-2">
+                    <span className="text-xs px-2 py-1 bg-green-200 text-green-800 rounded-full">
+                      🔗 Smart Contract Connected
+                    </span>
+                    <span className="text-xs px-2 py-1 bg-green-200 text-green-800 rounded-full">
+                      📊 Real-time Sync
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Temporary Success Message */}
+          {wellnessDataInitialized && (
+            <div className={cn(
+              "mb-6 p-4 rounded-xl border transition-colors animate-pulse",
+              isDarkMode 
+                ? "bg-green-900/20 border-green-700/50 text-green-200" 
+                : "bg-green-50 border-green-200 text-green-800"
+            )}>
+              <div className="flex items-center space-x-3">
+                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="font-medium">🎉 Wellness Data Successfully Initialized!</p>
+                  <p className="text-sm opacity-90">
+                    Your wellness data is now being stored on the blockchain. This message will disappear shortly.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Network Switch Banner */}
+          {address && chainId !== 84532 && (
+            <div className={cn(
+              "mb-6 p-4 rounded-xl border transition-colors",
+              isDarkMode 
+                ? "bg-orange-900/20 border-orange-700/50 text-orange-200" 
+                : "bg-orange-50 border-orange-200 text-orange-800"
+            )}>
+              <div className="flex items-center space-x-3">
+                <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <div>
+                  <p className="font-medium">⚠️ Wrong Network Detected</p>
+                  <p className="text-sm opacity-90">
+                    You're currently connected to {chainId === 1 ? 'Ethereum Mainnet' : `Network ID ${chainId}`}. 
+                    WellSpace requires <strong>Base Sepolia Testnet (Chain ID: 84532)</strong>.
+                  </p>
+                  <div className="mt-3 text-xs opacity-75">
+                    <p><strong>To fix this:</strong></p>
+                    <ol className="list-decimal list-inside mt-1 space-y-1">
+                      <li>Open MetaMask</li>
+                      <li>Click the network dropdown (top of MetaMask)</li>
+                      <li>Select "Base Sepolia" or add it if not listed</li>
+                      <li>If adding manually: Network Name: "Base Sepolia", RPC URL: "https://sepolia.base.org", Chain ID: "84532"</li>
+                    </ol>
+                  </div>
+                  <div className="mt-3">
+                    <button
+                      onClick={addBaseSepoliaNetwork}
+                      className={cn(
+                        "px-4 py-2 text-sm rounded-lg transition-colors font-medium",
+                        isDarkMode 
+                          ? "bg-orange-800/50 hover:bg-orange-800/70 text-orange-200" 
+                          : "bg-orange-100 hover:bg-orange-200 text-orange-800"
+                      )}
+                    >
+                      🔗 Add Base Sepolia to MetaMask
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Welcome Section */}
           <div className="mb-8">
             <h1 className={cn(
@@ -1491,6 +1935,16 @@ function LandingPageContent() {
                       <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${(weeklyGoals.sleep.current / weeklyGoals.sleep.target) * 100}%` }}></div>
                     </div>
                   </div>
+                </div>
+                
+                {/* Reset Weekly Goals Button */}
+                <div className="pt-4 border-t border-gray-200">
+                  <button
+                    onClick={resetWeeklyGoals}
+                    className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors text-sm"
+                  >
+                    🔄 Reset Weekly Goals
+                  </button>
                 </div>
               </div>
             </div>
