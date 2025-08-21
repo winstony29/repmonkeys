@@ -930,15 +930,11 @@ function LandingPageContent() {
               {/* Logo and Nav */}
               <div className="flex items-center space-x-8">
                 <div className="flex items-center space-x-3">
-                  <div className={cn(
-                    "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-                    isDarkMode ? "bg-white" : "bg-black"
-                  )}>
-                    <span className={cn(
-                      "font-bold text-sm",
-                      isDarkMode ? "text-black" : "text-white"
-                    )}>W</span>
-                  </div>
+                  <img 
+                    src="/WellSpace_logo.png" 
+                    alt="WellSpace Logo" 
+                    className="w-12 h-12 lg:w-16 lg:h-16 rounded-2xl object-cover"
+                  />
                   <span className={cn(
                     "text-xl font-bold transition-colors",
                     isDarkMode ? "text-white" : "text-gray-900"
@@ -1586,15 +1582,11 @@ function LandingPageContent() {
           {/* Header */}
           <div className="flex items-center justify-between mb-16 lg:mb-20">
             <div className="flex items-center space-x-4">
-              <div className={cn(
-                "w-12 h-12 lg:w-16 lg:h-16 rounded-2xl flex items-center justify-center transition-colors",
-                isDarkMode ? "bg-white" : "bg-black"
-              )}>
-                <span className={cn(
-                  "font-bold text-xl lg:text-2xl",
-                  isDarkMode ? "text-black" : "text-white"
-                )}>W</span>
-              </div>
+              <img 
+                src="/WellSpace_logo.png" 
+                alt="WellSpace Logo" 
+                className="w-12 h-12 lg:w-16 lg:h-16 rounded-2xl object-cover"
+              />
               <div>
                 <h1 className={cn(
                   "font-bold text-2xl lg:text-3xl transition-colors",
