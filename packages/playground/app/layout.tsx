@@ -9,6 +9,11 @@ export const metadata: Metadata = {
   authors: [{ name: 'WellSpace Team' }],
   robots: 'index, follow',
   metadataBase: new URL('https://wellspace.app'),
+  icons: {
+    icon: '/WellSpace_logo.png',
+    shortcut: '/WellSpace_logo.png',
+    apple: '/WellSpace_logo.png',
+  },
   openGraph: {
     title: 'WellSpace - Transform Your Wellness Journey',
     description: 'AI-powered wellness tracking with blockchain rewards',
@@ -45,6 +50,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <head>
+        <link rel="icon" type="image/png" sizes="32x32" href="/WellSpace_logo.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/WellSpace_logo.png" />
+        <link rel="shortcut icon" href="/WellSpace_logo.png" />
+        <link rel="apple-touch-icon" href="/WellSpace_logo.png" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
