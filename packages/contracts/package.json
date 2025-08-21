@@ -10,6 +10,20 @@
     "deploy:goerli": "forge script script/Deploy.s.sol:DeployScript --rpc-url base_goerli --broadcast --verify",
     "deploy:mainnet": "forge script script/Deploy.s.sol:DeployScript --rpc-url base_mainnet --broadcast --verify"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "@openzeppelin/contracts": "^5.4.0",
+    "hardhat": "^3.0.0"
+  },
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "hardhat": {
+    "config": "hardhat.config.cjs"
+  },
+  "type": "module"
 }
-
