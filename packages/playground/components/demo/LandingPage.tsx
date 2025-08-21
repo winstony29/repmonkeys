@@ -561,15 +561,33 @@ function LandingPageContent() {
   
   // Utility function to format timestamps
   const formatTimeAgo = (timestamp: number) => {
-    const now = Date.now();
-    const diff = now - timestamp;
-    const minutes = Math.floor(diff / (1000 * 60));
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    // Handle invalid timestamps
+    if (!timestamp || isNaN(timestamp) || timestamp <= 0) {
+      console.warn('⚠️ Invalid timestamp received:', timestamp);
+      return 'Just now';
+    }
     
-    if (minutes < 60) return `${minutes} minutes ago`;
-    if (hours < 24) return `${hours} hours ago`;
-    return `${days} days ago`;
+    try {
+      const now = Date.now();
+      const diff = now - timestamp;
+      
+      // Handle future timestamps (shouldn't happen but just in case)
+      if (diff < 0) {
+        console.warn('⚠️ Future timestamp detected:', timestamp);
+        return 'Just now';
+      }
+      
+      const minutes = Math.floor(diff / (1000 * 60));
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      
+      if (minutes < 60) return `${minutes} minutes ago`;
+      if (hours < 24) return `${hours} hours ago`;
+      return `${days} days ago`;
+    } catch (error) {
+      console.error('❌ Error formatting timestamp:', error, 'timestamp:', timestamp);
+      return 'Just now';
+    }
   };
   
   // Get user onboarding status from smart contract
@@ -813,38 +831,200 @@ function LandingPageContent() {
   useEffect(() => {
     if (contractActivities && Array.isArray(contractActivities)) {
       console.log('📊 Loading activities from smart contract:', contractActivities);
+      console.log('🔍 Raw activity data structure:', contractActivities[0]);
+      console.log('🔍 Activity data type:', typeof contractActivities[0]);
+      console.log('🔍 Activity data keys:', Object.keys(contractActivities[0] || {}));
+      console.log('🔍 Activity data length:', contractActivities[0]?.length);
       
-      const formattedActivities = contractActivities.map(activity => ({
-        id: Number(activity[0]), // id
-        type: activity[1], // activityType
-        name: activity[2], // name
-        reward: Number(activity[3]), // reward
-        timestamp: Number(activity[4]), // timestamp
-        completed: activity[5] // completed
-      }));
+      // Check if contract data is valid
+      const hasValidData = contractActivities.length > 0 && 
+        contractActivities[0] && 
+        (contractActivities[0][0] !== undefined || contractActivities[0].id !== undefined);
       
-      setActivities(formattedActivities);
-      console.log('✅ Activities loaded from smart contract successfully');
+      console.log('🔍 Has valid data:', hasValidData);
+      
+      if (hasValidData) {
+        const formattedActivities = contractActivities.map((activity, index) => {
+          console.log(`🔍 Processing activity ${index}:`, activity);
+          console.log(`🔍 Activity type:`, typeof activity);
+          console.log(`🔍 Activity keys:`, Object.keys(activity || {}));
+          
+          // Handle both array format [0,1,2,3,4,5] and object format {id, type, name, etc}
+          let formatted;
+          if (Array.isArray(activity)) {
+            console.log(`🔍 Activity is array format`);
+            // Convert timestamp from seconds to milliseconds if it's a reasonable value
+            let timestamp = Number(activity[4]) || Date.now();
+            if (timestamp > 1000000000 && timestamp < 10000000000) {
+              // If timestamp is in seconds (10 digits), convert to milliseconds
+              timestamp = timestamp * 1000;
+              console.log(`🔍 Converting timestamp from seconds to milliseconds: ${Number(activity[4])} -> ${timestamp}`);
+            }
+            
+            formatted = {
+              id: Number(activity[0]) || 0, // id
+              type: activity[1] || 'unknown', // activityType
+              name: activity[2] || 'Unknown Activity', // name
+              reward: Number(activity[3]) || 0, // reward
+              timestamp: timestamp, // timestamp (converted if needed)
+              completed: activity[5] || false // completed
+            };
+          } else if (typeof activity === 'object' && activity !== null) {
+            console.log(`🔍 Activity is object format`);
+            // Convert timestamp from seconds to milliseconds if it's a reasonable value
+            let timestamp = Number(activity.timestamp) || Date.now();
+            if (timestamp > 1000000000 && timestamp < 10000000000) {
+              // If timestamp is in seconds (10 digits), convert to milliseconds
+              timestamp = timestamp * 1000;
+              console.log(`🔍 Converting timestamp from seconds to milliseconds: ${Number(activity.timestamp)} -> ${timestamp}`);
+            }
+            
+            formatted = {
+              id: Number(activity.id) || 0,
+              type: activity.activityType || activity.type || 'unknown',
+              name: activity.name || 'Unknown Activity',
+              reward: Number(activity.reward) || 0,
+              timestamp: timestamp, // timestamp (converted if needed)
+              completed: activity.completed || false
+            };
+          } else {
+            console.log(`🔍 Activity is unknown format:`, activity);
+            formatted = {
+              id: 0,
+              type: 'unknown',
+              name: 'Unknown Activity',
+              reward: 0,
+              timestamp: Date.now(),
+              completed: false
+            };
+          }
+          
+          console.log(`🔍 Formatted activity ${index}:`, formatted);
+          return formatted;
+        });
+        
+        setActivities(formattedActivities);
+        console.log('✅ Activities loaded from smart contract successfully');
+        console.log('🔍 Final formatted activities:', formattedActivities);
+      } else {
+        console.log('⚠️ Contract activities data incomplete, falling back to localStorage');
+        // Fallback to localStorage
+        if (address) {
+          const localStorageKey = `wellspace_user_${address}`;
+          const savedData = localStorage.getItem(localStorageKey);
+          if (savedData) {
+            try {
+              const userData = JSON.parse(savedData);
+              if (userData.activities && Array.isArray(userData.activities)) {
+                setActivities(userData.activities);
+                console.log('📱 Activities loaded from localStorage fallback');
+              }
+            } catch (error) {
+              console.error('Error loading activities from localStorage:', error);
+            }
+          }
+        }
+      }
     }
-  }, [contractActivities]);
+  }, [contractActivities, address]);
 
   // Load meals from smart contract when available
   useEffect(() => {
     if (contractMeals && Array.isArray(contractMeals)) {
       console.log('🍽️ Loading meals from smart contract:', contractMeals);
+      console.log('🔍 Raw meal data structure:', contractMeals[0]);
+      console.log('🔍 Meal data type:', typeof contractMeals[0]);
+      console.log('🔍 Meal data keys:', Object.keys(contractMeals[0] || {}));
+      console.log('🔍 Meal data length:', contractMeals[0]?.length);
       
-      const formattedMeals = contractMeals.map(meal => ({
-        id: Number(meal[0]), // id
-        type: meal[1], // mealType
-        name: meal[2], // name
-        calories: Number(meal[3]), // calories
-        timestamp: Number(meal[4]) // timestamp
-      }));
+      // Check if contract data is valid
+      const hasValidData = contractMeals.length > 0 && 
+        contractMeals[0] && 
+        (contractMeals[0][0] !== undefined || contractMeals[0].id !== undefined);
       
-      setMeals(formattedMeals);
-      console.log('✅ Meals loaded from smart contract successfully');
+      console.log('🔍 Has valid meal data:', hasValidData);
+      
+      if (hasValidData) {
+        const formattedMeals = contractMeals.map((meal, index) => {
+          console.log(`🔍 Processing meal ${index}:`, meal);
+          console.log(`🔍 Meal type:`, typeof meal);
+          console.log(`🔍 Meal keys:`, Object.keys(meal || {}));
+          
+          // Handle both array format [0,1,2,3,4] and object format {id, type, name, etc}
+          let formatted;
+          if (Array.isArray(meal)) {
+            console.log(`🔍 Meal is array format`);
+            // Convert timestamp from seconds to milliseconds if it's a reasonable value
+            let timestamp = Number(meal[4]) || Date.now();
+            if (timestamp > 1000000000 && timestamp < 10000000000) {
+              // If timestamp is in seconds (10 digits), convert to milliseconds
+              timestamp = timestamp * 1000;
+              console.log(`🔍 Converting meal timestamp from seconds to milliseconds: ${Number(meal[4])} -> ${timestamp}`);
+            }
+            
+            formatted = {
+              id: Number(meal[0]) || 0, // id
+              type: meal[1] || 'breakfast', // mealType
+              name: meal[2] || 'Unknown Meal', // name
+              calories: Number(meal[3]) || 0, // calories
+              timestamp: timestamp // timestamp (converted if needed)
+            };
+          } else if (typeof meal === 'object' && meal !== null) {
+            console.log(`🔍 Meal is object format`);
+            // Convert timestamp from seconds to milliseconds if it's a reasonable value
+            let timestamp = Number(meal.timestamp) || Date.now();
+            if (timestamp > 1000000000 && timestamp < 10000000000) {
+              // If timestamp is in seconds (10 digits), convert to milliseconds
+              timestamp = timestamp * 1000;
+              console.log(`🔍 Converting meal timestamp from seconds to milliseconds: ${Number(meal.timestamp)} -> ${timestamp}`);
+            }
+            
+            formatted = {
+              id: Number(meal.id) || 0,
+              type: meal.mealType || meal.type || 'breakfast',
+              name: meal.name || 'Unknown Meal',
+              calories: Number(meal.calories) || 0,
+              timestamp: timestamp // timestamp (converted if needed)
+            };
+          } else {
+            console.log(`🔍 Meal is unknown format:`, meal);
+            formatted = {
+              id: 0,
+              type: 'breakfast',
+              name: 'Unknown Meal',
+              calories: 0,
+              timestamp: Date.now()
+            };
+          }
+          
+          console.log(`🔍 Formatted meal ${index}:`, formatted);
+          return formatted;
+        });
+        
+        setMeals(formattedMeals);
+        console.log('✅ Meals loaded from smart contract successfully');
+        console.log('🔍 Final formatted meals:', formattedMeals);
+      } else {
+        console.log('⚠️ Contract meals data incomplete, falling back to localStorage');
+        // Fallback to localStorage
+        if (address) {
+          const localStorageKey = `wellspace_user_${address}`;
+          const savedData = localStorage.getItem(localStorageKey);
+          if (savedData) {
+            try {
+              const userData = JSON.parse(savedData);
+              if (userData.meals && Array.isArray(userData.meals)) {
+                setMeals(userData.meals);
+                console.log('📱 Meals loaded from localStorage fallback');
+              }
+            } catch (error) {
+              console.error('Error loading meals from localStorage:', error);
+            }
+          }
+        }
+      }
     }
-  }, [contractMeals]);
+  }, [contractMeals, address]);
   
   // Fallback: Load from localStorage if smart contract fails
   useEffect(() => {
@@ -1972,6 +2152,8 @@ function LandingPageContent() {
               )}
             </div>
           )}
+
+
 
           {/* Welcome Section */}
           <div className="mb-8">
