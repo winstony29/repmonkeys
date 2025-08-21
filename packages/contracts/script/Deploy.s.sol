@@ -13,12 +13,10 @@ import "../src/UserProfile.sol";
  */
 contract DeployScript is Script {
     function run() external {
-        // Use your Base App wallet address (can be set via environment variable)
-        address deployer = vm.envAddress("DEPLOYER_ADDRESS") != address(0) 
-            ? vm.envAddress("DEPLOYER_ADDRESS") 
-            : 0xFbD2D9c51045fB5f3a95F617d440622D9377BE0D;
+        // Use private key for deployment (can be set via environment variable)
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         
-        vm.startBroadcast(deployer);
+        vm.startBroadcast(deployerPrivateKey);
         
         // Deploy WellToken first
         WellToken wellToken = new WellToken();
