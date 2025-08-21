@@ -24,6 +24,37 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAccount, useReadContract, useBalance } from 'wagmi';
+import { wellnessTrackerAbi, CONTRACT_ADDRESSES } from '@/lib/contracts';
+import { http, createConfig } from 'wagmi';
+import { WagmiProvider } from 'wagmi';
+import { baseSepolia } from 'wagmi/chains';
+import { coinbaseWallet } from 'wagmi/connectors';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// Wagmi configuration for standalone Farcaster page
+const wagmiConfig = createConfig({
+  chains: [baseSepolia],
+  transports: {
+    [baseSepolia.id]: http(),
+  },
+  ssr: true,
+  connectors: [
+    coinbaseWallet({
+      appName: 'WellSpace',
+      appLogoUrl: 'https://wellspace.app/logo.png',
+      preference: 'smartWalletOnly',
+    }),
+    coinbaseWallet({
+      appName: 'WellSpace',
+      appLogoUrl: 'https://wellspace.app/logo.png', 
+      preference: 'eoaOnly',
+    }),
+  ],
+});
+
+// Create QueryClient instance
+const queryClient = new QueryClient();
 
 // Farcaster User Context
 const FarcasterContext = createContext<{
@@ -125,112 +156,6 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Mock wallet state for standalone functionality
-function useMockWallet() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [address, setAddress] = useState('');
-
-  const connectWallet = () => {
-    // Simulate wallet connection
-    setIsConnected(true);
-    setAddress('0x1234...5678');
-  };
-
-  const disconnectWallet = () => {
-    setIsConnected(false);
-    setAddress('');
-  };
-
-  return {
-    isConnected,
-    address,
-    connectWallet,
-    disconnectWallet
-  };
-}
-
-// Wellness Data Context - This will sync with your main page
-const WellnessContext = createContext<{
-  wellnessData: any;
-  updateWellnessData: (data: any) => void;
-}>({
-  wellnessData: null,
-  updateWellnessData: () => {},
-});
-
-const useWellness = () => useContext(WellnessContext);
-
-// Wellness Provider Component
-function WellnessProvider({ children }: { children: React.ReactNode }) {
-  const [wellnessData, setWellnessData] = useState({
-    streak: 0,
-    score: 0,
-    activities: 0,
-    meals: 0,
-    wellBalance: 0.00
-  });
-
-  // Try to sync with main page data
-  useEffect(() => {
-    const syncWithMainPage = () => {
-      // Check if main page has wellness data
-      const mainPageData = localStorage.getItem('wellness_data_main');
-      if (mainPageData) {
-        try {
-          const parsed = JSON.parse(mainPageData);
-          setWellnessData(prev => ({
-            ...prev,
-            ...parsed
-          }));
-        } catch (error) {
-          console.log('Could not parse main page wellness data');
-        }
-      }
-
-      // Also check for any other wellness data keys
-      const keys = ['wellness_data', 'wellspace_user_data', 'farcaster_wellness'];
-      keys.forEach(key => {
-        const data = localStorage.getItem(key);
-        if (data) {
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.score || parsed.streak || parsed.activities) {
-              setWellnessData(prev => ({
-                ...prev,
-                ...parsed
-              }));
-            }
-          } catch (error) {
-            // Ignore parsing errors
-          }
-        }
-      });
-    };
-
-    // Sync immediately and set up interval
-    syncWithMainPage();
-    const interval = setInterval(syncWithMainPage, 2000); // Sync every 2 seconds
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const updateWellnessData = (data: any) => {
-    setWellnessData(prev => ({
-      ...prev,
-      ...data
-    }));
-  };
-
-  return (
-    <WellnessContext.Provider value={{
-      wellnessData,
-      updateWellnessData
-    }}>
-      {children}
-    </WellnessContext.Provider>
-  );
-}
-
 // Farcaster User Connection Modal
 function FarcasterConnectionModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [handle, setHandle] = useState('');
@@ -317,7 +242,7 @@ function FarcasterConnectionModal({ isOpen, onClose }: { isOpen: boolean; onClos
 function MobileNavigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { isDarkMode, toggleTheme } = useTheme();
-  const { isConnected, address, connectWallet, disconnectWallet } = useMockWallet();
+  const { address, isConnected } = useAccount();
   const { userHandle, isConnected: isFarcasterConnected, disconnectUser } = useFarcaster();
 
   return (
@@ -325,14 +250,12 @@ function MobileNavigation() {
       <div className="flex items-center justify-between px-4 py-3">
         {/* Logo and Brand */}
         <div className="flex items-center space-x-3">
-          <div className={cn(
-            "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
-            isDarkMode ? "bg-white" : "bg-black"
-          )}>
-            <span className={cn(
-              "font-bold text-lg",
-              isDarkMode ? "text-black" : "text-white"
-            )}>W</span>
+          <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center">
+            <img 
+              src="/WellSpace_logo.png" 
+              alt="WellSpace Logo" 
+              className="w-full h-full object-cover"
+            />
           </div>
           <div>
             <h1 className={cn(
@@ -450,7 +373,7 @@ function MobileNavigation() {
                   "font-mono transition-colors",
                   isDarkMode ? "text-white" : "text-black"
                 )}>
-                  {address}
+                  {address.slice(0, 6)}...{address.slice(-4)}
                 </span>
               </div>
             )}
@@ -473,24 +396,6 @@ function MobileNavigation() {
                   Disconnect Farcaster
                 </Button>
               )}
-              
-              {isConnected ? (
-                <Button 
-                  onClick={disconnectWallet}
-                  variant="outline"
-                  className="w-full"
-                >
-                  Disconnect Wallet
-                </Button>
-              ) : (
-                <Button 
-                  onClick={connectWallet}
-                  className="w-full"
-                >
-                  <Wallet className="w-4 h-4 mr-2" />
-                  Connect Wallet
-                </Button>
-              )}
             </div>
           </div>
         </div>
@@ -502,544 +407,628 @@ function MobileNavigation() {
 // Main Mobile Dashboard
 function MobileDashboard() {
   const { isDarkMode } = useTheme();
-  const { address, isConnected } = useMockWallet();
+  const { address, isConnected } = useAccount();
   const { userHandle, isConnected: isFarcasterConnected } = useFarcaster();
-  const { wellnessData, updateWellnessData } = useWellness();
   const [currentView, setCurrentView] = useState<'dashboard' | 'activity' | 'meals' | 'goals' | 'rewards'>('dashboard');
   
-  // Mock data for recent activities and meals
-  const mockActivities = [
-    { id: 1, type: 'sleep', name: 'Logged sleep', reward: 30, timestamp: Date.now() - 3600000, completed: true },
-    { id: 2, type: 'activity', name: 'Completed workout', reward: 50, timestamp: Date.now() - 300000, completed: true },
-    { id: 3, type: 'activity', name: 'Weight Training', reward: 40, timestamp: Date.now() - 1800000, completed: true },
-    { id: 4, type: 'activity', name: 'Yoga Session', reward: 45, timestamp: Date.now() - 1200000, completed: true },
-    { id: 5, type: 'activity', name: 'Cycling', reward: 35, timestamp: Date.now() - 600000, completed: true },
-  ];
+  // Get user wellness data from WellnessTracker contract (same as main page)
+  const { data: wellnessData, error: wellnessError } = useReadContract({
+    address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+    abi: wellnessTrackerAbi,
+    functionName: 'getUserWellnessData',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
 
-  const mockMeals = [
-    { id: 1, type: 'breakfast', name: 'Breakfast', calories: 400, timestamp: Date.now() - 3600000 },
-    { id: 2, type: 'lunch', name: 'Lunch', calories: 600, timestamp: Date.now() - 2400000 },
-    { id: 3, type: 'dinner', name: 'Dinner', calories: 800, timestamp: Date.now() - 1200000 },
-    { id: 4, type: 'snack', name: 'Snack', calories: 200, timestamp: Date.now() - 600000 },
-  ];
+  // Get user's $WELL token balance (same as main page)
+  const { data: wellBalance } = useBalance({
+    address,
+    token: CONTRACT_ADDRESSES.WELL_TOKEN,
+  });
 
-  // Update wellness data from mock activities and meals
+  // Get user's recent activities from smart contract
+  const { data: contractActivities, error: activitiesError } = useReadContract({
+    address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+    abi: wellnessTrackerAbi,
+    functionName: 'getUserRecentActivities',
+    args: address ? [address, BigInt(10)] : undefined,
+    query: { enabled: !!address },
+  });
+
+  // Get user's recent meals from smart contract
+  const { data: contractMeals, error: mealsError } = useReadContract({
+    address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+    abi: wellnessTrackerAbi,
+    functionName: 'getUserRecentMeals',
+    args: address ? [address, BigInt(10)] : undefined,
+    query: { enabled: !!address },
+  });
+
+  // Parse wellness data from smart contract
+  const parsedWellnessData = wellnessData && Array.isArray(wellnessData) ? {
+    streak: Number(wellnessData[0]) || 0,           // streakCount
+    score: Number(wellnessData[1]) || 0,            // totalScore
+    lastActivityTimestamp: Number(wellnessData[2]) || 0,
+    dailyStreakStart: Number(wellnessData[3]) || 0,
+    weeklyGoals: wellnessData[4] || null,
+    activities: Number(wellnessData[5]) || 0,       // totalActivities
+    meals: Number(wellnessData[6]) || 0,            // totalMeals
+    wellBalance: wellBalance ? Number(wellBalance.formatted) : 0.00 // Real WELL balance from contract
+  } : {
+    streak: 0,
+    score: 0,
+    lastActivityTimestamp: 0,
+    dailyStreakStart: 0,
+    weeklyGoals: null,
+    activities: 0,
+    meals: 0,
+    wellBalance: wellBalance ? Number(wellBalance.formatted) : 0.00 // Real WELL balance from contract
+  };
+
+  // Parse recent activities from smart contract
+  const recentActivities = contractActivities && Array.isArray(contractActivities) ? 
+    contractActivities.map((activity: any) => ({
+      id: Number(activity[0]),
+      type: activity[1],
+      name: activity[2],
+      reward: Number(activity[3]),
+      timestamp: Number(activity[4]),
+      completed: activity[5]
+    })) : [];
+
+  // Parse recent meals from smart contract
+  const recentMeals = contractMeals && Array.isArray(contractMeals) ? 
+    contractMeals.map((meal: any) => ({
+      id: Number(meal[0]),
+      type: meal[1],
+      name: meal[2],
+      calories: Number(meal[3]),
+      timestamp: Number(meal[4])
+    })) : [];
+
+  const handleLogActivity = () => {
+    // In a real implementation, this would call the smart contract
+    console.log('Logging activity - would call smart contract');
+  };
+
+  const handleLogMeal = () => {
+    // In a real implementation, this would call the smart contract
+    console.log('Logging meal - would call smart contract');
+  };
+
+  const handleLogSleep = () => {
+    // In a real implementation, this would call the smart contract
+    console.log('Logging sleep - would call smart contract');
+  };
+
+  // Debug logging to see what data we're getting
   useEffect(() => {
-    const newWellnessData = {
-      streak: wellnessData.streak,
-      score: wellnessData.score,
-      lastActivityTimestamp: wellnessData.lastActivityTimestamp,
-      dailyStreakStart: wellnessData.dailyStreakStart,
-      weeklyGoals: wellnessData.weeklyGoals,
-      activities: wellnessData.activities,
-      meals: wellnessData.meals,
-      wellBalance: wellnessData.wellBalance,
-    };
+    console.log('Farcaster Page - Wellness Data:', wellnessData);
+    console.log('Farcaster Page - WELL Balance:', wellBalance);
+    console.log('Farcaster Page - Contract Activities:', contractActivities);
+    console.log('Farcaster Page - Contract Meals:', contractMeals);
+    console.log('Farcaster Page - Parsed Data:', parsedWellnessData);
+  }, [wellnessData, wellBalance, contractActivities, contractMeals, parsedWellnessData]);
 
-    // Simulate streak and score updates
-    const now = Date.now();
-    const lastActivityTimestamp = newWellnessData.lastActivityTimestamp;
-    const dailyStreakStart = newWellnessData.dailyStreakStart;
-
-    if (lastActivityTimestamp && dailyStreakStart) {
-      const lastActivityTime = new Date(lastActivityTimestamp).getTime();
-      const dailyStreakStartTime = new Date(dailyStreakStart).getTime();
-
-      if (now - lastActivityTime < 24 * 60 * 60 * 1000) {
-        newWellnessData.streak = wellnessData.streak + 1;
-      } else {
-        newWellnessData.streak = 0;
-      }
-
-      if (now - dailyStreakStartTime < 7 * 24 * 60 * 60 * 1000) {
-        newWellnessData.score = wellnessData.score + 1;
-      } else {
-        newWellnessData.score = 0;
-      }
-    }
-
-    // Simulate activity and meal counts
-    newWellnessData.activities = mockActivities.filter(act => act.timestamp > now - 7 * 24 * 60 * 60 * 1000).length;
-    newWellnessData.meals = mockMeals.filter(meal => meal.timestamp > now - 7 * 24 * 60 * 60 * 1000).length;
-
-    // Simulate well balance updates
-    newWellnessData.wellBalance = wellnessData.wellBalance + (Math.random() * 10 - 5); // Random fluctuation
-
-    updateWellnessData(newWellnessData);
-  }, [mockActivities, mockMeals, wellnessData, updateWellnessData]);
-
-  const renderDashboard = () => (
-    <div className="space-y-6">
-      {/* Welcome Section */}
-      <div className="text-center">
-        <h2 className={cn(
-          "text-2xl font-bold mb-2 transition-colors",
-          isDarkMode ? "text-white" : "text-black"
-        )}>
-          Welcome back!
-        </h2>
-        <p className={cn(
-          "text-sm transition-colors",
-          isDarkMode ? "text-gray-400" : "text-gray-600"
-        )}>
-          Track your wellness journey and earn rewards
-        </p>
-        {isFarcasterConnected && userHandle && (
-          <div className="mt-2 flex items-center justify-center space-x-2">
-            <CheckCircle className="w-4 h-4 text-green-500" />
-            <span className={cn(
-              "text-sm font-medium transition-colors",
-              isDarkMode ? "text-green-400" : "text-green-600"
-            )}>
-              Connected as {userHandle}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Wellness Score Card */}
-      <Card className={cn(
-        "transition-colors duration-300",
-        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-      )}>
-        <CardHeader className="pb-3">
-          <CardTitle className={cn(
-            "text-center text-lg transition-colors",
-            isDarkMode ? "text-white" : "text-black"
-          )}>
-            Your Wellness Score
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="text-center">
-            <div className={cn(
-              "text-4xl font-bold mb-2 transition-colors",
-              isDarkMode ? "text-white" : "text-black"
-            )}>
-              {wellnessData.score}
-            </div>
-            <div className="text-green-500 text-sm font-medium">+12% this week</div>
-          </div>
-          
-          <div className="grid grid-cols-3 gap-3">
-            <div className="text-center">
-              <div className={cn(
-                "text-xl font-bold transition-colors",
-                isDarkMode ? "text-white" : "text-black"
-              )}>
-                {wellnessData.streak}
-              </div>
-              <div className={cn(
-                "text-xs transition-colors",
-                isDarkMode ? "text-gray-400" : "text-gray-600"
-              )}>
-                Day Streak
-              </div>
-            </div>
-            <div className="text-center">
-              <div className={cn(
-                "text-xl font-bold transition-colors",
-                isDarkMode ? "text-white" : "text-black"
-              )}>
-                3
-              </div>
-              <div className={cn(
-                "text-xs transition-colors",
-                isDarkMode ? "text-gray-400" : "text-gray-600"
-              )}>
-                NFTs Earned
-              </div>
-            </div>
-            <div className="text-center">
-              <div className={cn(
-                "text-xl font-bold transition-colors",
-                isDarkMode ? "text-white" : "text-black"
-              )}>
-                ${wellnessData.wellBalance}
-              </div>
-              <div className={cn(
-                "text-xs transition-colors",
-                isDarkMode ? "text-gray-400" : "text-gray-600"
-              )}>
-                $WELL Balance
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Quick Actions */}
-      <div className="space-y-3">
-        <Button 
-          onClick={() => setCurrentView('activity')}
-          variant="outline"
-          className="w-full h-12"
-        >
-          Log Activity
-        </Button>
-        <Button 
-          onClick={() => setCurrentView('meals')}
-          variant="outline"
-          className="w-full h-12"
-        >
-          Log Meal
-        </Button>
-        <Button 
-          onClick={() => setCurrentView('goals')}
-          variant="outline"
-          className="w-full h-12"
-        >
-          View Goals
-        </Button>
-        <Button 
-          onClick={() => setCurrentView('rewards')}
-          variant="outline"
-          className="w-full h-12"
-        >
-          Rewards & NFTs
-        </Button>
-      </div>
-
-      {/* Recent Activity */}
-      <Card className={cn(
-        "transition-colors duration-300",
-        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-      )}>
-        <CardHeader className="pb-3">
-          <CardTitle className={cn(
-            "text-lg transition-colors",
-            isDarkMode ? "text-white" : "text-black"
-          )}>
-            Recent Activity
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {mockActivities.map(activity => (
-            <div key={activity.id} className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className={cn(
-                  "text-sm transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  {activity.name}
-                </span>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-gray-500">{(Date.now() - activity.timestamp) / 1000 / 60} min ago</div>
-                <div className="text-sm font-medium text-green-500">+{activity.reward} WELL</div>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    </div>
-  );
-
-  const renderActivity = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={() => setCurrentView('dashboard')}
-          className={cn(
-            "transition-colors",
-            isDarkMode ? "text-white hover:bg-gray-800" : "text-black hover:bg-gray-100"
-          )}
-        >
-          ← Back
-        </Button>
-        <h2 className={cn(
-          "text-xl font-bold transition-colors",
-          isDarkMode ? "text-white" : "text-black"
-        )}>
-          Log Activity
-        </h2>
-        <div></div>
-      </div>
-      
-      <div className="space-y-3">
-        <Button 
-          onClick={() => {
-            // Simulate logging sleep
-            updateWellnessData({ lastActivityTimestamp: Date.now() });
-          }}
-          variant="outline"
-          className="w-full h-12"
-        >
-          <Bed className="w-4 h-4 mr-2" />
-          Log Sleep
-        </Button>
-        <Button 
-          onClick={() => {
-            // Simulate logging a workout
-            updateWellnessData({ lastActivityTimestamp: Date.now() });
-          }}
-          variant="outline"
-          className="w-full h-12"
-        >
-          Running (30 min)
-        </Button>
-        <Button 
-          onClick={() => {
-            // Simulate logging a workout
-            updateWellnessData({ lastActivityTimestamp: Date.now() });
-          }}
-          variant="outline"
-          className="w-full h-12"
-        >
-          Weight Training
-        </Button>
-        <Button 
-          onClick={() => {
-            // Simulate logging a workout
-            updateWellnessData({ lastActivityTimestamp: Date.now() });
-          }}
-          variant="outline"
-          className="w-full h-12"
-        >
-          Yoga Session
-        </Button>
-        <Button 
-          onClick={() => {
-            // Simulate logging a workout
-            updateWellnessData({ lastActivityTimestamp: Date.now() });
-          }}
-          variant="outline"
-          className="w-full h-12"
-        >
-          Cycling
-        </Button>
-      </div>
-    </div>
-  );
-
-  const renderMeals = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={() => setCurrentView('dashboard')}
-          className={cn(
-            "transition-colors",
-            isDarkMode ? "text-white hover:bg-gray-800" : "text-black hover:bg-gray-100"
-          )}
-        >
-          ← Back
-        </Button>
-        <h2 className={cn(
-          "text-xl font-bold transition-colors",
-          isDarkMode ? "text-white" : "text-black"
-        )}>
-          Log Meal
-        </h2>
-        <div></div>
-      </div>
-      
-      <div className="space-y-3">
-        <Button 
-          onClick={() => {
-            // Simulate logging a meal
-            updateWellnessData({ lastActivityTimestamp: Date.now() });
-          }}
-          variant="outline"
-          className="w-full h-12"
-        >
-          Breakfast
-        </Button>
-        <Button 
-          onClick={() => {
-            // Simulate logging a meal
-            updateWellnessData({ lastActivityTimestamp: Date.now() });
-          }}
-          variant="outline"
-          className="w-full h-12"
-        >
-          Lunch
-        </Button>
-        <Button 
-          onClick={() => {
-            // Simulate logging a meal
-            updateWellnessData({ lastActivityTimestamp: Date.now() });
-          }}
-          variant="outline"
-          className="w-full h-12"
-        >
-          Dinner
-        </Button>
-        <Button 
-          onClick={() => {
-            // Simulate logging a meal
-            updateWellnessData({ lastActivityTimestamp: Date.now() });
-          }}
-          variant="outline"
-          className="w-full h-12"
-        >
-          Snack
-        </Button>
-      </div>
-    </div>
-  );
-
-  const renderGoals = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={() => setCurrentView('dashboard')}
-          className={cn(
-            "transition-colors",
-            isDarkMode ? "text-white hover:bg-gray-800" : "text-black hover:bg-gray-100"
-          )}
-        >
-          ← Back
-        </Button>
-        <h2 className={cn(
-          "text-xl font-bold transition-colors",
-          isDarkMode ? "text-white" : "text-black"
-        )}>
-          Weekly Goals
-        </h2>
-        <div></div>
-      </div>
-      
-      <div className="space-y-3">
-        <div className={cn(
-          "flex items-center justify-between p-4 rounded-lg transition-colors",
-          isDarkMode ? "bg-gray-800" : "bg-gray-50"
-        )}>
-          <span className={cn(
-            "transition-colors",
-            isDarkMode ? "text-gray-300" : "text-gray-700"
-          )}>
-            Exercise 5x/week
-          </span>
-          <Badge variant={wellnessData.activities >= 5 ? "default" : "secondary"}>
-            {wellnessData.activities}/5
-          </Badge>
-        </div>
-        
-        <div className={cn(
-          "flex items-center justify-between p-4 rounded-lg transition-colors",
-          isDarkMode ? "bg-gray-800" : "bg-gray-50"
-        )}>
-          <span className={cn(
-            "transition-colors",
-            isDarkMode ? "text-gray-300" : "text-gray-700"
-          )}>
-            Log 3 meals/day
-          </span>
-          <Badge variant={wellnessData.meals >= 21 ? "default" : "secondary"}>
-            {wellnessData.meals}/21
-          </Badge>
-        </div>
-        
-        <div className={cn(
-          "flex items-center justify-between p-4 rounded-lg transition-colors",
-          isDarkMode ? "bg-gray-800" : "bg-gray-50"
-        )}>
-          <span className={cn(
-            "transition-colors",
-            isDarkMode ? "text-gray-300" : "text-gray-700"
-          )}>
-            Maintain streak
-          </span>
-          <Badge variant={wellnessData.streak >= 7 ? "default" : "secondary"}>
-            {wellnessData.streak} days
-          </Badge>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderRewards = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={() => setCurrentView('dashboard')}
-          className={cn(
-            "transition-colors",
-            isDarkMode ? "text-white hover:bg-gray-800" : "text-black hover:bg-gray-100"
-          )}
-        >
-          ← Back
-        </Button>
-        <h2 className={cn(
-          "text-xl font-bold transition-colors",
-          isDarkMode ? "text-white" : "text-black"
-        )}>
-          Rewards & NFTs
-        </h2>
-        <div></div>
-      </div>
-      
-      <div className="space-y-4">
-        <Card className={cn(
-          "transition-colors duration-300",
-          isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-        )}>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <h3 className={cn(
-                "font-bold mb-2 transition-colors",
-                isDarkMode ? "text-white" : "text-black"
-              )}>
-                Earn $WELL Tokens
-              </h3>
-              <p className={cn(
-                "text-sm mb-3 transition-colors",
-                isDarkMode ? "text-gray-400" : "text-gray-600"
-              )}>
-                Complete wellness activities to earn tokens
-              </p>
-              <Button variant="outline" className="w-full">
-                Claim Rewards
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className={cn(
-          "transition-colors duration-300",
-          isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-        )}>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <h3 className={cn(
-                "font-bold mb-2 transition-colors",
-                isDarkMode ? "text-white" : "text-black"
-              )}>
-                Mint Wellness NFTs
-              </h3>
-              <p className={cn(
-                "text-sm mb-3 transition-colors",
-                isDarkMode ? "text-gray-400" : "text-gray-600"
-              )}>
-                Unlock achievements as unique NFTs
-              </p>
-              <Button variant="outline" className="w-full">
-                View Collection
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
+  // Debug logging to see what data we're getting
+  useEffect(() => {
+    console.log('Farcaster Page - Wellness Data:', wellnessData);
+    console.log('Farcaster Page - WELL Balance:', wellBalance);
+    console.log('Farcaster Page - Contract Activities:', contractActivities);
+    console.log('Farcaster Page - Contract Meals:', contractMeals);
+    console.log('Farcaster Page - Parsed Data:', parsedWellnessData);
+  }, [wellnessData, wellBalance, contractActivities, contractMeals, parsedWellnessData]);
 
   return (
     <div className="pt-20 pb-6 px-4 min-h-screen transition-colors duration-300">
       <div className="max-w-md mx-auto">
-        {currentView === 'dashboard' && renderDashboard()}
-        {currentView === 'activity' && renderActivity()}
-        {currentView === 'meals' && renderMeals()}
-        {currentView === 'goals' && renderGoals()}
-        {currentView === 'rewards' && renderRewards()}
+        {currentView === 'dashboard' && (
+          <div className="space-y-6">
+            {/* Welcome Section */}
+            <div className="text-center">
+              <h2 className={cn(
+                "text-2xl font-bold mb-2 transition-colors",
+                isDarkMode ? "text-white" : "text-black"
+              )}>
+                Welcome back!
+              </h2>
+              <p className={cn(
+                "text-sm transition-colors",
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              )}>
+                Track your wellness journey and earn rewards
+              </p>
+              {isFarcasterConnected && userHandle && (
+                <div className="mt-2 flex items-center justify-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className={cn(
+                    "text-sm font-medium transition-colors",
+                    isDarkMode ? "text-green-400" : "text-green-600"
+                  )}>
+                    Connected as {userHandle}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Wellness Score Card */}
+            <Card className={cn(
+              "transition-colors duration-300",
+              isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+            )}>
+              <CardHeader className="pb-3">
+                <CardTitle className={cn(
+                  "text-center text-lg transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  Your Wellness Score
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-center">
+                  <div className={cn(
+                    "text-4xl font-bold mb-2 transition-colors",
+                    isDarkMode ? "text-white" : "text-black"
+                  )}>
+                    {parsedWellnessData.score}
+                  </div>
+                  <div className="text-green-500 text-sm font-medium">+12% this week</div>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="text-center">
+                    <div className={cn(
+                      "text-xl font-bold transition-colors",
+                      isDarkMode ? "text-white" : "text-black"
+                    )}>
+                      {parsedWellnessData.streak}
+                    </div>
+                    <div className={cn(
+                      "text-xs transition-colors",
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    )}>
+                      Day Streak
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className={cn(
+                      "text-xl font-bold transition-colors",
+                      isDarkMode ? "text-white" : "text-black"
+                    )}>
+                      3
+                    </div>
+                    <div className={cn(
+                      "text-xs transition-colors",
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    )}>
+                      NFTs Earned
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className={cn(
+                      "text-xl font-bold transition-colors",
+                      isDarkMode ? "text-white" : "text-black"
+                    )}>
+                      ${parsedWellnessData.wellBalance}
+                    </div>
+                    <div className={cn(
+                      "text-xs transition-colors",
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    )}>
+                      $WELL Balance
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quick Actions */}
+            <div className="space-y-3">
+              <Button 
+                onClick={() => setCurrentView('activity')}
+                variant="outline"
+                className="w-full h-12"
+              >
+                Log Activity
+              </Button>
+              <Button 
+                onClick={() => setCurrentView('meals')}
+                variant="outline"
+                className="w-full h-12"
+              >
+                Log Meal
+              </Button>
+              <Button 
+                onClick={() => setCurrentView('goals')}
+                variant="outline"
+                className="w-full h-12"
+              >
+                View Goals
+              </Button>
+              <Button 
+                onClick={() => setCurrentView('rewards')}
+                variant="outline"
+                className="w-full h-12"
+              >
+                Rewards & NFTs
+              </Button>
+            </div>
+
+            {/* Recent Activity */}
+            <Card className={cn(
+              "transition-colors duration-300",
+              isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+            )}>
+              <CardHeader className="pb-3">
+                <CardTitle className={cn(
+                  "text-lg transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  Recent Activity
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {recentActivities.length > 0 ? (
+                  recentActivities.map(activity => (
+                    <div key={activity.id} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className={cn(
+                          "text-sm transition-colors",
+                          isDarkMode ? "text-gray-300" : "text-gray-700"
+                        )}>
+                          {activity.name}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-gray-500">{(Date.now() - activity.timestamp) / 1000 / 60} min ago</div>
+                        <div className="text-sm font-medium text-green-500">+{activity.reward} WELL</div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4">
+                    <p className={cn(
+                      "text-sm transition-colors",
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    )}>
+                      No recent activities. Start logging your wellness activities!
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Debug Info - Remove this in production */}
+            <Card className={cn(
+              "transition-colors duration-300",
+              isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+            )}>
+              <CardHeader className="pb-3">
+                <CardTitle className={cn(
+                  "text-sm transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  Debug Info (Contract Data)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-xs">
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Raw Wellness Data:</strong> {JSON.stringify(wellnessData)}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>WELL Balance:</strong> {JSON.stringify(wellBalance)}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Contract Activities:</strong> {JSON.stringify(contractActivities)}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Contract Meals:</strong> {JSON.stringify(contractMeals)}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Parsed Data:</strong> {JSON.stringify(parsedWellnessData)}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Wallet Connected:</strong> {isConnected ? 'Yes' : 'No'}
+                </div>
+                <div className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  <strong>Wallet Address:</strong> {address || 'None'}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* ... rest of the views remain the same ... */}
+        {currentView === 'activity' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setCurrentView('dashboard')}
+                className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-white hover:bg-gray-800" : "text-black hover:bg-gray-100"
+                )}
+              >
+                ← Back
+              </Button>
+              <h2 className={cn(
+                "text-xl font-bold transition-colors",
+                isDarkMode ? "text-white" : "text-black"
+              )}>
+                Log Activity
+              </h2>
+              <div></div>
+            </div>
+            
+            <div className="space-y-3">
+              <Button 
+                onClick={handleLogSleep}
+                variant="outline"
+                className="w-full h-12"
+              >
+                <Bed className="w-4 h-4 mr-2" />
+                Log Sleep
+              </Button>
+              <Button 
+                onClick={handleLogActivity}
+                variant="outline"
+                className="w-full h-12"
+              >
+                Running (30 min)
+              </Button>
+              <Button 
+                onClick={handleLogActivity}
+                variant="outline"
+                className="w-full h-12"
+              >
+                Weight Training
+              </Button>
+              <Button 
+                onClick={handleLogActivity}
+                variant="outline"
+                className="w-full h-12"
+              >
+                Yoga Session
+              </Button>
+              <Button 
+                onClick={handleLogActivity}
+                variant="outline"
+                className="w-full h-12"
+              >
+                Cycling
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {currentView === 'meals' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setCurrentView('dashboard')}
+                className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-white hover:bg-gray-800" : "text-black hover:bg-gray-100"
+                )}
+              >
+                ← Back
+              </Button>
+              <h2 className={cn(
+                "text-xl font-bold transition-colors",
+                isDarkMode ? "text-white" : "text-black"
+              )}>
+                Log Meal
+              </h2>
+              <div></div>
+            </div>
+            
+            <div className="space-y-3">
+              <Button 
+                onClick={handleLogMeal}
+                variant="outline"
+                className="w-full h-12"
+              >
+                Breakfast
+              </Button>
+              <Button 
+                onClick={handleLogMeal}
+                variant="outline"
+                className="w-full h-12"
+              >
+                Lunch
+              </Button>
+              <Button 
+                onClick={handleLogMeal}
+                variant="outline"
+                className="w-full h-12"
+              >
+                Dinner
+              </Button>
+              <Button 
+                onClick={handleLogMeal}
+                variant="outline"
+                className="w-full h-12"
+              >
+                Snack
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {currentView === 'goals' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setCurrentView('dashboard')}
+                className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-white hover:bg-gray-800" : "text-black hover:bg-gray-100"
+                )}
+              >
+                ← Back
+              </Button>
+              <h2 className={cn(
+                "text-xl font-bold transition-colors",
+                isDarkMode ? "text-white" : "text-black"
+              )}>
+                Weekly Goals
+              </h2>
+              <div></div>
+            </div>
+            
+            <div className="space-y-3">
+              <div className={cn(
+                "flex items-center justify-between p-4 rounded-lg transition-colors",
+                isDarkMode ? "bg-gray-800" : "bg-gray-50"
+              )}>
+                <span className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  Exercise 5x/week
+                </span>
+                <Badge variant={parsedWellnessData.activities >= 5 ? "default" : "secondary"}>
+                  {parsedWellnessData.activities}/5
+                </Badge>
+              </div>
+              
+              <div className={cn(
+                "flex items-center justify-between p-4 rounded-lg transition-colors",
+                isDarkMode ? "bg-gray-800" : "bg-gray-50"
+              )}>
+                <span className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  Log 3 meals/day
+                </span>
+                <Badge variant={parsedWellnessData.meals >= 21 ? "default" : "secondary"}>
+                  {parsedWellnessData.meals}/21
+                </Badge>
+              </div>
+              
+              <div className={cn(
+                "flex items-center justify-between p-4 rounded-lg transition-colors",
+                isDarkMode ? "bg-gray-800" : "bg-gray-50"
+              )}>
+                <span className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                )}>
+                  Maintain streak
+                </span>
+                <Badge variant={parsedWellnessData.streak >= 7 ? "default" : "secondary"}>
+                  {parsedWellnessData.streak} days
+                </Badge>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {currentView === 'rewards' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setCurrentView('dashboard')}
+                className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-white hover:bg-gray-800" : "text-black hover:bg-gray-100"
+                )}
+              >
+                ← Back
+              </Button>
+              <h2 className={cn(
+                "text-xl font-bold transition-colors",
+                isDarkMode ? "text-white" : "text-black"
+              )}>
+                Rewards & NFTs
+              </h2>
+              <div></div>
+            </div>
+            
+            <div className="space-y-4">
+              <Card className={cn(
+                "transition-colors duration-300",
+                isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+              )}>
+                <CardContent className="p-4">
+                  <div className="text-center">
+                    <h3 className={cn(
+                      "font-bold mb-2 transition-colors",
+                      isDarkMode ? "text-white" : "text-black"
+                    )}>
+                      Earn $WELL Tokens
+                    </h3>
+                    <p className={cn(
+                      "text-sm mb-3 transition-colors",
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    )}>
+                      Complete wellness activities to earn tokens
+                    </p>
+                    <Button variant="outline" className="w-full">
+                      Claim Rewards
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className={cn(
+                "transition-colors duration-300",
+                isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+              )}>
+                <CardContent className="p-4">
+                  <div className="text-center">
+                    <h3 className={cn(
+                      "font-bold mb-2 transition-colors",
+                      isDarkMode ? "text-white" : "text-black"
+                    )}>
+                      Mint Wellness NFTs
+                    </h3>
+                    <p className={cn(
+                      "text-sm mb-3 transition-colors",
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    )}>
+                      Unlock achievements as unique NFTs
+                    </p>
+                    <Button variant="outline" className="w-full">
+                      View Collection
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1073,15 +1062,17 @@ function FarcasterPageContent() {
   );
 }
 
-// Main export with Theme Provider and Farcaster Provider
+// Main export with standalone providers
 export default function FarcasterPage() {
   return (
-    <ThemeProvider>
-      <FarcasterProvider>
-        <WellnessProvider>
-          <FarcasterPageContent />
-        </WellnessProvider>
-      </FarcasterProvider>
-    </ThemeProvider>
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <FarcasterProvider>
+            <FarcasterPageContent />
+          </FarcasterProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
   );
 }
