@@ -4,7 +4,7 @@ import {
   Signature,
 } from '@coinbase/onchainkit/signature';
 import { encodeAbiParameters } from 'viem';
-import { base } from 'viem/chains';
+import { baseSepolia } from 'viem/chains';
 
 const SCHEMA_UID =
   '0xf58b8b212ef75ee8cd7e8d803c37c03e0519890502d5e99ee2412aae1456cafe';
@@ -14,7 +14,7 @@ export default function Transaction() {
   const domain = {
     name: 'EAS Attestation',
     version: '1.0.0',
-    chainId: base.id,
+    chainId: baseSepolia.id,
     verifyingContract: EAS_CONTRACT,
   } as const;
 
