@@ -4,6 +4,7 @@ import { useState, useEffect, createContext, useContext } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { WalletStatus } from '@/components/WalletStatus';
 import { 
   Activity, 
   Utensils, 
@@ -21,12 +22,14 @@ import {
   Wallet,
   Bed,
   User,
-  CheckCircle
+  CheckCircle,
+  MessageSquare,
+  Brain
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAccount, useReadContract, useBalance } from 'wagmi';
+import { useAccount, useReadContract, useBalance, useWriteContract, useChainId } from 'wagmi';
 import { wellnessTrackerAbi, CONTRACT_ADDRESSES } from '@/lib/contracts';
-import { http, createConfig } from 'wagmi';
+import { http, createConfig, createStorage } from 'wagmi';
 import { WagmiProvider } from 'wagmi';
 import { baseSepolia } from 'wagmi/chains';
 import { coinbaseWallet } from 'wagmi/connectors';
@@ -42,15 +45,24 @@ const wagmiConfig = createConfig({
   connectors: [
     coinbaseWallet({
       appName: 'WellSpace',
-      appLogoUrl: 'https://wellspace.app/logo.png',
+      appLogoUrl: '/WellSpace_logo.png',
       preference: 'smartWalletOnly',
     }),
     coinbaseWallet({
       appName: 'WellSpace',
-      appLogoUrl: 'https://wellspace.app/logo.png', 
+      appLogoUrl: '/WellSpace_logo.png', 
       preference: 'eoaOnly',
     }),
   ],
+  // Add wallet persistence and stability
+  storage: createStorage({
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+  }),
+  // Add connection stability
+  pollingInterval: 4000,
+  batch: {
+    multicall: true,
+  },
 });
 
 // Create QueryClient instance
@@ -409,7 +421,24 @@ function MobileDashboard() {
   const { isDarkMode } = useTheme();
   const { address, isConnected } = useAccount();
   const { userHandle, isConnected: isFarcasterConnected } = useFarcaster();
-  const [currentView, setCurrentView] = useState<'dashboard' | 'activity' | 'meals' | 'goals' | 'rewards'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'activity' | 'meals' | 'goals' | 'rewards' | 'ai-chat'>('dashboard');
+  
+  // Smart contract interaction
+  const { writeContract, isPending: isWritingContract } = useWriteContract();
+  const chainId = useChainId();
+  
+  // AI Chat state
+  const [wellnessPrompt, setWellnessPrompt] = useState('');
+  const [aiResponse, setAiResponse] = useState<string>('');
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
+  
+  // Meal logging state
+  const [showMealModal, setShowMealModal] = useState(false);
+  const [newMeal, setNewMeal] = useState({ type: 'breakfast', name: '', calories: '' });
+  
+  // Activity and meal data
+  const [activities, setActivities] = useState<any[]>([]);
+  const [meals, setMeals] = useState<any[]>([]);
   
   // Get user wellness data from WellnessTracker contract (same as main page)
   const { data: wellnessData, error: wellnessError } = useReadContract({
@@ -486,29 +515,129 @@ function MobileDashboard() {
       timestamp: Number(meal[4])
     })) : [];
 
-  const handleLogActivity = () => {
-    // In a real implementation, this would call the smart contract
-    console.log('Logging activity - would call smart contract');
+  // Functional activity logging with smart contract integration
+  const handleLogActivity = async (type: string, name: string, reward: number) => {
+    const newActivity = {
+      id: Date.now(),
+      type,
+      name,
+      timestamp: Date.now(),
+      reward,
+      completed: true
+    };
+    
+    // Update local state immediately
+    setActivities(prev => [newActivity, ...prev.slice(0, 9)]);
+    
+    // Save to smart contract if available
+    if (address && chainId === 84532) {
+      try {
+        await writeContract({
+          address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+          abi: wellnessTrackerAbi,
+          functionName: 'logActivity',
+          args: [type, name, BigInt(reward)],
+        });
+        console.log('✅ Activity logged to smart contract');
+      } catch (error) {
+        console.log('🔄 Falling back to localStorage only');
+      }
+    }
+    
+    // Always save to localStorage as backup
+    if (address) {
+      const localStorageKey = `wellspace_user_${address}`;
+      const existingData = localStorage.getItem(localStorageKey);
+      if (existingData) {
+        try {
+          const userData = JSON.parse(existingData);
+          userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
+          localStorage.setItem(localStorageKey, JSON.stringify(userData));
+        } catch (error) {
+          console.error('Error updating localStorage:', error);
+        }
+      }
+    }
   };
 
-  const handleLogMeal = () => {
-    // In a real implementation, this would call the smart contract
-    console.log('Logging meal - would call smart contract');
+  // Functional meal logging with smart contract integration
+  const handleLogMeal = async () => {
+    if (!newMeal.name.trim() || !newMeal.calories.trim()) return;
+    
+    const meal = {
+      id: Date.now(),
+      type: newMeal.type,
+      name: newMeal.name,
+      calories: parseInt(newMeal.calories),
+      timestamp: Date.now()
+    };
+    
+    setMeals(prev => [meal, ...prev.slice(0, 9)]);
+    setNewMeal({ type: 'breakfast', name: '', calories: '' });
+    setShowMealModal(false);
+    
+    // Save to smart contract if available
+    if (address && chainId === 84532) {
+      try {
+        await writeContract({
+          address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+          abi: wellnessTrackerAbi,
+          functionName: 'logMeal',
+          args: [meal.type, meal.name, BigInt(meal.calories)],
+        });
+        console.log('✅ Meal logged to smart contract');
+      } catch (error) {
+        console.log('🔄 Falling back to localStorage only');
+      }
+    }
+    
+    // Always save to localStorage as backup
+    if (address) {
+      const localStorageKey = `wellspace_user_${address}`;
+      const existingData = localStorage.getItem(localStorageKey);
+      if (existingData) {
+        try {
+          const userData = JSON.parse(existingData);
+          userData.meals = [meal, ...(userData.meals || []).slice(0, 9)];
+          localStorage.setItem(localStorageKey, JSON.stringify(userData));
+        } catch (error) {
+          console.error('Error updating localStorage:', error);
+        }
+      }
+    }
   };
 
-  const handleLogSleep = () => {
-    // In a real implementation, this would call the smart contract
-    console.log('Logging sleep - would call smart contract');
+  // Functional sleep logging with smart contract integration
+  const handleLogSleep = async () => {
+    await handleLogActivity('sleep', 'Logged sleep', 30);
   };
 
-  // Debug logging to see what data we're getting
-  useEffect(() => {
-    console.log('Farcaster Page - Wellness Data:', wellnessData);
-    console.log('Farcaster Page - WELL Balance:', wellBalance);
-    console.log('Farcaster Page - Contract Activities:', contractActivities);
-    console.log('Farcaster Page - Contract Meals:', contractMeals);
-    console.log('Farcaster Page - Parsed Data:', parsedWellnessData);
-  }, [wellnessData, wellBalance, contractActivities, contractMeals, parsedWellnessData]);
+  // AI Chat functionality (placeholder)
+  const handleGetAIAdvice = async () => {
+    if (!wellnessPrompt.trim()) return;
+    
+    setIsLoadingAI(true);
+    try {
+      // Simulate AI response (placeholder)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setAiResponse('This is a placeholder AI response. In the full version, this would connect to your wellness AI service.');
+    } catch (error) {
+      console.error('Failed to get AI advice:', error);
+    } finally {
+      setIsLoadingAI(false);
+    }
+  };
+
+  // Safe JSON serialization function that handles BigInt
+  const safeStringify = (obj: any) => {
+    try {
+      return JSON.stringify(obj, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+      );
+    } catch (error) {
+      return 'Error serializing data';
+    }
+  };
 
   // Debug logging to see what data we're getting
   useEffect(() => {
@@ -646,6 +775,14 @@ function MobileDashboard() {
                 View Goals
               </Button>
               <Button 
+                onClick={() => setCurrentView('ai-chat')}
+                variant="outline"
+                className="w-full h-12"
+              >
+                <Brain className="w-4 h-4 mr-2" />
+                AI Wellness Chat
+              </Button>
+              <Button 
                 onClick={() => setCurrentView('rewards')}
                 variant="outline"
                 className="w-full h-12"
@@ -699,6 +836,9 @@ function MobileDashboard() {
               </CardContent>
             </Card>
 
+            {/* Wallet Status - Keep this for debugging connection issues */}
+            <WalletStatus />
+            
             {/* Debug Info - Remove this in production */}
             <Card className={cn(
               "transition-colors duration-300",
@@ -717,31 +857,31 @@ function MobileDashboard() {
                   "transition-colors",
                   isDarkMode ? "text-gray-300" : "text-gray-700"
                 )}>
-                  <strong>Raw Wellness Data:</strong> {JSON.stringify(wellnessData)}
+                  <strong>Raw Wellness Data:</strong> {safeStringify(wellnessData)}
                 </div>
                 <div className={cn(
                   "transition-colors",
                   isDarkMode ? "text-gray-300" : "text-gray-700"
                 )}>
-                  <strong>WELL Balance:</strong> {JSON.stringify(wellBalance)}
+                  <strong>WELL Balance:</strong> {safeStringify(wellBalance)}
                 </div>
                 <div className={cn(
                   "transition-colors",
                   isDarkMode ? "text-gray-300" : "text-gray-700"
                 )}>
-                  <strong>Contract Activities:</strong> {JSON.stringify(contractActivities)}
+                  <strong>Contract Activities:</strong> {safeStringify(contractActivities)}
                 </div>
                 <div className={cn(
                   "transition-colors",
                   isDarkMode ? "text-gray-300" : "text-gray-700"
                 )}>
-                  <strong>Contract Meals:</strong> {JSON.stringify(contractMeals)}
+                  <strong>Contract Meals:</strong> {safeStringify(contractMeals)}
                 </div>
                 <div className={cn(
                   "transition-colors",
                   isDarkMode ? "text-gray-300" : "text-gray-700"
                 )}>
-                  <strong>Parsed Data:</strong> {JSON.stringify(parsedWellnessData)}
+                  <strong>Parsed Data:</strong> {safeStringify(parsedWellnessData)}
                 </div>
                 <div className={cn(
                   "transition-colors",
@@ -794,28 +934,28 @@ function MobileDashboard() {
                 Log Sleep
               </Button>
               <Button 
-                onClick={handleLogActivity}
+                onClick={() => handleLogActivity('running', 'Running (30 min)', 35)}
                 variant="outline"
                 className="w-full h-12"
               >
                 Running (30 min)
               </Button>
               <Button 
-                onClick={handleLogActivity}
+                onClick={() => handleLogActivity('weight-training', 'Weight Training', 40)}
                 variant="outline"
                 className="w-full h-12"
               >
                 Weight Training
               </Button>
               <Button 
-                onClick={handleLogActivity}
+                onClick={() => handleLogActivity('yoga', 'Yoga Session', 45)}
                 variant="outline"
                 className="w-full h-12"
               >
                 Yoga Session
               </Button>
               <Button 
-                onClick={handleLogActivity}
+                onClick={() => handleLogActivity('cycling', 'Cycling', 30)}
                 variant="outline"
                 className="w-full h-12"
               >
@@ -1026,6 +1166,201 @@ function MobileDashboard() {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+          </div>
+        )}
+
+        {/* AI Chat View */}
+        {currentView === 'ai-chat' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setCurrentView('dashboard')}
+                className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-white hover:bg-gray-800" : "text-black hover:bg-gray-100"
+                )}
+              >
+                ← Back
+              </Button>
+              <h2 className={cn(
+                "text-xl font-bold transition-colors",
+                isDarkMode ? "text-white" : "text-black"
+              )}>
+                AI Wellness Assistant
+              </h2>
+              <div></div>
+            </div>
+            
+            <Card className={cn(
+              "transition-colors duration-300",
+              isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+            )}>
+              <CardContent className="p-6">
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className={cn(
+                    "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
+                    isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                  )}>
+                    <Brain className={cn(
+                      "w-5 h-5 transition-colors",
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    )} />
+                  </div>
+                  <h3 className={cn(
+                    "text-lg font-semibold transition-colors",
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  )}>AI Wellness Assistant</h3>
+                </div>
+                
+                <div className="space-y-4">
+                  <textarea
+                    value={wellnessPrompt}
+                    onChange={(e) => setWellnessPrompt(e.target.value)}
+                    placeholder="Ask me about your wellness goals, nutrition, exercise, or any health-related questions..."
+                    className={cn(
+                      "w-full p-4 border rounded-xl text-sm resize-none h-24 focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-colors",
+                      isDarkMode 
+                        ? "border-gray-600 bg-gray-700 text-white placeholder-gray-400" 
+                        : "border-gray-300 bg-white text-gray-900 placeholder-gray-500"
+                    )}
+                  />
+                  <Button
+                    onClick={handleGetAIAdvice}
+                    disabled={isLoadingAI || !wellnessPrompt.trim()}
+                    className="w-full"
+                  >
+                    {isLoadingAI ? 'Getting advice...' : 'Get AI Advice'}
+                  </Button>
+                  {aiResponse && (
+                    <div className={cn(
+                      "rounded-xl p-4 border transition-colors",
+                      isDarkMode 
+                        ? "bg-gray-700 border-gray-600" 
+                        : "bg-gray-50 border-gray-200"
+                    )}>
+                      <p className={cn(
+                        "text-sm leading-relaxed transition-colors",
+                        isDarkMode ? "text-gray-200" : "text-gray-900"
+                      )}>{aiResponse}</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Meal Logging Modal */}
+        {showMealModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className={cn(
+              "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+              isDarkMode ? "bg-gray-900 border border-gray-700" : "bg-white border border-gray-200"
+            )}>
+              <div className="text-center mb-6">
+                <h3 className={cn(
+                  "text-xl font-bold mb-2 transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  Log Your Meal
+                </h3>
+                <p className={cn(
+                  "text-sm transition-colors",
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                )}>
+                  Track your nutrition to maintain a healthy lifestyle
+                </p>
+              </div>
+
+              <form onSubmit={(e) => { e.preventDefault(); handleLogMeal(); }} className="space-y-4">
+                <div>
+                  <label className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Meal Type
+                  </label>
+                  <select
+                    value={newMeal.type}
+                    onChange={(e) => setNewMeal(prev => ({ ...prev, type: e.target.value }))}
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  >
+                    <option value="breakfast">Breakfast</option>
+                    <option value="lunch">Lunch</option>
+                    <option value="dinner">Dinner</option>
+                    <option value="snack">Snack</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Meal Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newMeal.name}
+                    onChange={(e) => setNewMeal(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g., Grilled chicken salad"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white placeholder-gray-400 focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black placeholder-gray-500 focus:border-gray-400"
+                    )}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Calories
+                  </label>
+                  <input
+                    type="number"
+                    value={newMeal.calories}
+                    onChange={(e) => setNewMeal(prev => ({ ...prev, calories: e.target.value }))}
+                    placeholder="e.g., 450"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white placeholder-gray-400 focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black placeholder-gray-500 focus:border-gray-400"
+                    )}
+                    required
+                  />
+                </div>
+
+                <div className="flex space-x-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowMealModal(false)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1"
+                  >
+                    Log Meal
+                  </Button>
+                </div>
+              </form>
             </div>
           </div>
         )}

@@ -14,7 +14,7 @@ import { OnchainKitProvider } from '@coinbase/onchainkit';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type React from 'react';
 import { createContext, useEffect, useState } from 'react';
-import { http, createConfig } from 'wagmi';
+import { http, createConfig, createStorage } from 'wagmi';
 import { WagmiProvider } from 'wagmi';
 import type { Address } from 'viem';
 import { base, baseSepolia } from 'wagmi/chains';
@@ -75,15 +75,24 @@ const wagmiConfig = createConfig({
   connectors: [
     coinbaseWallet({
       appName: 'WellSpace',
-      appLogoUrl: 'https://wellspace.app/logo.png',
+      appLogoUrl: '/WellSpace_logo.png',
       preference: 'smartWalletOnly',
     }),
     coinbaseWallet({
       appName: 'WellSpace',
-      appLogoUrl: 'https://wellspace.app/logo.png', 
+      appLogoUrl: '/WellSpace_logo.png', 
       preference: 'eoaOnly',
     }),
   ],
+  // Add wallet persistence and stability
+  storage: createStorage({
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+  }),
+  // Add connection stability
+  pollingInterval: 4000,
+  batch: {
+    multicall: true,
+  },
 });
 
 // Create QueryClient instance
@@ -220,7 +229,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             config={{
               appearance: {
                 name: 'WellSpace',
-                logo: 'https://wellspace.app/logo.png',
+                logo: '/WellSpace_logo.png',
                 mode: componentMode,
                 theme: componentTheme === 'none' ? undefined : componentTheme,
               },
@@ -235,6 +244,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                   trust: false,
                   frame: false,
                 },
+                // Add auto-connect and persistence
+                autoConnect: true,
+                reconnect: true,
               },
             }}
             projectId={ENVIRONMENT_VARIABLES[ENVIRONMENT.PROJECT_ID] || ''}
