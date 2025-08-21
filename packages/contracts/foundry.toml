@@ -25,4 +25,5 @@ base_sepolia = "https://sepolia.base.org"
 [etherscan]
 base_goerli = { key = "", url = "https://goerli.basescan.org" }
 base_mainnet = { key = "", url = "https://basescan.org" }
+base_sepolia = { key = "", url = "https://sepolia.basescan.org" }
 

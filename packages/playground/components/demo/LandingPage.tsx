@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, createContext, useContext } from 'react';
+
+
 import {
   Avatar,
   Name,
@@ -14,8 +16,8 @@ import {
 } from '@coinbase/onchainkit/wallet';
 import { FundButton } from '@coinbase/onchainkit/fund';
 import { cn } from '@/lib/utils';
-import { useAccount, useReadContract, useBalance, useWriteContract } from 'wagmi';
-import { wellnessNFTAbi, wellTokenAbi, userProfileAbi, CONTRACT_ADDRESSES, formatTokenAmount } from '@/lib/contracts';
+import { useAccount, useReadContract, useBalance, useWriteContract, useChainId } from 'wagmi';
+import { wellnessNFTAbi, wellTokenAbi, userProfileAbi, wellnessTrackerAbi, CONTRACT_ADDRESSES, formatTokenAmount } from '@/lib/contracts';
 import { useWellnessAPI } from '@/lib/api';
 import { useSogniGeneration } from '@/lib/sogni';
 
@@ -104,6 +106,10 @@ function LandingPageContent() {
   const [streakCount, setStreakCount] = useState(12);
   const [totalScore, setTotalScore] = useState(2840);
   
+  // Network switching state
+  const [isNetworkSwitching, setIsNetworkSwitching] = useState(false);
+  const [networkSwitchAttempts, setNetworkSwitchAttempts] = useState(0);
+  
   // Activity tracking state
   const [activities, setActivities] = useState([
     { id: 1, type: 'workout', name: 'Completed workout', timestamp: Date.now() - 2 * 60 * 60 * 1000, reward: 50, completed: true },
@@ -135,6 +141,7 @@ function LandingPageContent() {
   const { isDarkMode } = useTheme();
 
   const { address } = useAccount();
+  const chainId = useChainId();
   const { getWellnessAdvice } = useWellnessAPI();
   const { generateImage } = useSogniGeneration();
   const { writeContract, isPending: isWritingContract } = useWriteContract();
@@ -143,6 +150,7 @@ function LandingPageContent() {
   const [contractError, setContractError] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [contractHealth, setContractHealth] = useState<'healthy' | 'degraded' | 'unhealthy'>('healthy');
+  const [wellnessDataInitialized, setWellnessDataInitialized] = useState(false);
 
   // Get user's WellnessNFT token ID
   const { data: tokenId } = useReadContract({
@@ -255,7 +263,7 @@ function LandingPageContent() {
   };
   
   // Activity tracking functions
-  const logActivity = (type: string, name: string, reward: number) => {
+  const logActivity = async (type: string, name: string, reward: number) => {
     const newActivity = {
       id: Date.now(),
       type,
@@ -265,9 +273,8 @@ function LandingPageContent() {
       completed: true
     };
     
+    // Update local state immediately for UI responsiveness
     setActivities(prev => [newActivity, ...prev.slice(0, 9)]); // Keep last 10 activities
-    
-    // Update score and streak
     setTotalScore(prev => prev + reward);
     setStreakCount(prev => prev + 1);
     
@@ -284,27 +291,175 @@ function LandingPageContent() {
       }));
     }
     
-    // Save updated data to localStorage
-    if (address) {
-      const localStorageKey = `wellspace_user_${address}`;
-      const existingData = localStorage.getItem(localStorageKey);
-      if (existingData) {
+    // Save to smart contract if available
+    if (address && hasWellnessData) {
+      // Force network switch to Base Sepolia if not already connected
+      if (chainId !== 84532) {
+        console.log('🔄 Switching to Base Sepolia testnet for activity logging...');
         try {
-          const userData = JSON.parse(existingData);
-          userData.streakCount = streakCount + 1;
-          userData.totalScore = totalScore + reward;
-          userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
-          userData.weeklyGoals = weeklyGoals;
-          localStorage.setItem(localStorageKey, JSON.stringify(userData));
-        } catch (error) {
-          console.error('Error updating localStorage:', error);
+          await (window.ethereum as any).request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x14a34' }], // 84532 in hex
+          });
+          console.log('✅ Switched to Base Sepolia testnet');
+          
+          // Wait a moment for the switch to complete
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Check if switch was successful
+          const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
+          if (newChainId !== '0x14a34') {
+            console.log('⚠️ Network switch failed, using localStorage only');
+            // Fallback to localStorage
+            if (address) {
+              const localStorageKey = `wellspace_user_${address}`;
+              const existingData = localStorage.getItem(localStorageKey);
+              if (existingData) {
+                try {
+                  const userData = JSON.parse(existingData);
+                  userData.streakCount = streakCount + 1;
+                  userData.totalScore = totalScore + reward;
+                  userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
+                  userData.weeklyGoals = weeklyGoals;
+                  localStorage.setItem(localStorageKey, JSON.stringify(userData));
+                } catch (error) {
+                  console.error('Error updating localStorage:', error);
+                }
+              }
+            }
+            return;
+          }
+        } catch (error: any) {
+          console.error('Error switching to Base Sepolia:', error);
+          if (error.code === 4902) {
+            // Chain not added, add it first
+            await addBaseSepoliaNetwork();
+            // Try switching again
+            try {
+              await (window.ethereum as any).request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0x14a34' }],
+              });
+            } catch (switchError) {
+              console.log('⚠️ Network switch failed after adding chain, using localStorage only');
+              // Fallback to localStorage
+              if (address) {
+                const localStorageKey = `wellspace_user_${address}`;
+                const existingData = localStorage.getItem(localStorageKey);
+                if (existingData) {
+                  try {
+                    const userData = JSON.parse(existingData);
+                    userData.streakCount = streakCount + 1;
+                    userData.totalScore = totalScore + reward;
+                    userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
+                    userData.weeklyGoals = weeklyGoals;
+                    localStorage.setItem(localStorageKey, JSON.stringify(userData));
+                  } catch (error) {
+                    console.error('Error updating localStorage:', error);
+                  }
+                }
+              }
+              return;
+            }
+          } else {
+            console.log('⚠️ Network switch failed, using localStorage only');
+            // Fallback to localStorage
+            if (address) {
+              const localStorageKey = `wellspace_user_${address}`;
+              const existingData = localStorage.getItem(localStorageKey);
+              if (existingData) {
+                try {
+                  const userData = JSON.parse(existingData);
+                  userData.streakCount = streakCount + 1;
+                  userData.totalScore = totalScore + reward;
+                  userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
+                  userData.weeklyGoals = weeklyGoals;
+                  localStorage.setItem(localStorageKey, JSON.stringify(userData));
+                } catch (error) {
+                  console.error('Error updating localStorage:', error);
+                }
+              }
+            }
+            return;
+          }
+        }
+      }
+      try {
+        console.log('📝 Logging activity to smart contract:', { type, name, reward });
+        await writeContract({
+          address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+          abi: wellnessTrackerAbi,
+          functionName: 'logActivity',
+          args: [type, name, BigInt(reward)],
+        });
+        console.log('✅ Activity logged to smart contract successfully');
+        
+        // Also save to localStorage as backup
+        const localStorageKey = `wellspace_user_${address}`;
+        const existingData = localStorage.getItem(localStorageKey);
+        if (existingData) {
+          try {
+            const userData = JSON.parse(existingData);
+            userData.streakCount = streakCount + 1;
+            userData.totalScore = totalScore + reward;
+            userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
+            userData.weeklyGoals = weeklyGoals;
+            localStorage.setItem(localStorageKey, JSON.stringify(userData));
+            console.log('💾 Activity also saved to localStorage backup');
+          } catch (error) {
+            console.error('Error updating localStorage:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Error logging activity to smart contract:', error);
+        console.log('🔄 Falling back to localStorage only');
+        
+        // Fallback to localStorage only
+        if (address) {
+          const localStorageKey = `wellspace_user_${address}`;
+          const existingData = localStorage.getItem(localStorageKey);
+          if (existingData) {
+            try {
+              const userData = JSON.parse(existingData);
+              userData.streakCount = streakCount + 1;
+              userData.totalScore = totalScore + reward;
+              userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
+              userData.weeklyGoals = weeklyGoals;
+              localStorage.setItem(localStorageKey, JSON.stringify(userData));
+            } catch (localError) {
+              console.error('Error updating localStorage:', localError);
+            }
+          }
+        }
+      }
+    } else {
+      // No smart contract available or wrong network, use localStorage only
+      if (chainId !== 84532) {
+        console.log('⚠️ Wrong network detected, using localStorage only');
+      } else {
+        console.log('📱 Using localStorage fallback for activity logging');
+      }
+      if (address) {
+        const localStorageKey = `wellspace_user_${address}`;
+        const existingData = localStorage.getItem(localStorageKey);
+        if (existingData) {
+          try {
+            const userData = JSON.parse(existingData);
+            userData.streakCount = streakCount + 1;
+            userData.totalScore = totalScore + reward;
+            userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
+            userData.weeklyGoals = weeklyGoals;
+            localStorage.setItem(localStorageKey, JSON.stringify(userData));
+          } catch (error) {
+            console.error('Error updating localStorage:', error);
+          }
         }
       }
     }
   };
   
   // Meal logging functions
-  const addMeal = () => {
+  const addMeal = async () => {
     if (!newMeal.name.trim() || !newMeal.calories.trim()) return;
     
     const meal = {
@@ -319,24 +474,83 @@ function LandingPageContent() {
     setNewMeal({ type: 'breakfast', name: '', calories: '' });
     setShowMealModal(false);
     
+    // Save meal to smart contract if available
+    if (address && hasWellnessData) {
+      // Force network switch to Base Sepolia if not already connected
+      if (chainId !== 84532) {
+        console.log('🔄 Switching to Base Sepolia testnet for meal logging...');
+        try {
+          await (window.ethereum as any).request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x14a34' }], // 84532 in hex
+          });
+          console.log('✅ Switched to Base Sepolia testnet');
+          
+          // Wait a moment for the switch to complete
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Check if switch was successful
+          const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
+          if (newChainId !== '0x14a34') {
+            console.log('⚠️ Network switch failed, meal logged to localStorage only');
+            return;
+          }
+        } catch (error: any) {
+          console.error('Error switching to Base Sepolia:', error);
+          if (error.code === 4902) {
+            // Chain not added, add it first
+            await addBaseSepoliaNetwork();
+            // Try switching again
+            try {
+              await (window.ethereum as any).request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0x14a34' }],
+              });
+            } catch (switchError) {
+              console.log('⚠️ Network switch failed after adding chain, meal logged to localStorage only');
+              return;
+            }
+          } else {
+            console.log('⚠️ Network switch failed, meal logged to localStorage only');
+            return;
+          }
+        }
+      }
+      try {
+        console.log('🍽️ Logging meal to smart contract:', { type: newMeal.type, name: newMeal.name, calories: parseInt(newMeal.calories) });
+        await writeContract({
+          address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+          abi: wellnessTrackerAbi,
+          functionName: 'logMeal',
+          args: [newMeal.type, newMeal.name, BigInt(newMeal.calories)],
+        });
+        console.log('✅ Meal logged to smart contract successfully');
+      } catch (error) {
+        console.error('Error logging meal to smart contract:', error);
+        console.log('🔄 Falling back to localStorage only');
+      }
+    } else if (chainId !== 84532) {
+      console.log('⚠️ Wrong network detected, meal logged to localStorage only');
+    }
+    
     // Give reward for logging meal
     logActivity('meal', 'Logged meal', 10);
   };
   
   // Quick action functions
-  const handleQuickAction = (action: string) => {
+  const handleQuickAction = async (action: string) => {
     switch (action) {
       case 'workout':
-        logActivity('workout', 'Completed workout', 50);
+        await logActivity('workout', 'Completed workout', 50);
         break;
       case 'meditation':
-        logActivity('meditation', 'Logged meditation', 25);
+        await logActivity('meditation', 'Logged meditation', 25);
         break;
       case 'meal':
         setShowMealModal(true);
         break;
       case 'sleep':
-        logActivity('sleep', 'Logged sleep', 30);
+        await logActivity('sleep', 'Logged sleep', 30);
         setWeeklyGoals(prev => ({
           ...prev,
           sleep: { ...prev.sleep, current: Math.min(prev.sleep.current + 1, prev.sleep.target) }
@@ -347,15 +561,33 @@ function LandingPageContent() {
   
   // Utility function to format timestamps
   const formatTimeAgo = (timestamp: number) => {
-    const now = Date.now();
-    const diff = now - timestamp;
-    const minutes = Math.floor(diff / (1000 * 60));
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    // Handle invalid timestamps
+    if (!timestamp || isNaN(timestamp) || timestamp <= 0) {
+      console.warn('⚠️ Invalid timestamp received:', timestamp);
+      return 'Just now';
+    }
     
-    if (minutes < 60) return `${minutes} minutes ago`;
-    if (hours < 24) return `${hours} hours ago`;
-    return `${days} days ago`;
+    try {
+      const now = Date.now();
+      const diff = now - timestamp;
+      
+      // Handle future timestamps (shouldn't happen but just in case)
+      if (diff < 0) {
+        console.warn('⚠️ Future timestamp detected:', timestamp);
+        return 'Just now';
+      }
+      
+      const minutes = Math.floor(diff / (1000 * 60));
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      
+      if (minutes < 60) return `${minutes} minutes ago`;
+      if (hours < 24) return `${hours} hours ago`;
+      return `${days} days ago`;
+    } catch (error) {
+      console.error('❌ Error formatting timestamp:', error, 'timestamp:', timestamp);
+      return 'Just now';
+    }
   };
   
   // Get user onboarding status from smart contract
@@ -375,18 +607,161 @@ function LandingPageContent() {
     args: address ? [address] : undefined,
     query: { enabled: !!address && !!isOnboarded },
   });
+
+  // Get user wellness data from WellnessTracker contract
+  const { data: wellnessData, error: wellnessError } = useReadContract({
+    address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+    abi: wellnessTrackerAbi,
+    functionName: 'getUserWellnessData',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  // Check if user has wellness data initialized
+  const { data: hasWellnessData, error: wellnessDataError } = useReadContract({
+    address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+    abi: wellnessTrackerAbi,
+    functionName: 'hasUserWellnessData',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  // Get user's recent activities from smart contract
+  const { data: contractActivities, error: activitiesError } = useReadContract({
+    address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+    abi: wellnessTrackerAbi,
+    functionName: 'getUserRecentActivities',
+    args: address ? [address, BigInt(10)] : undefined,
+    query: { enabled: !!address && !!hasWellnessData },
+  });
+
+  // Get user's recent meals from smart contract
+  const { data: contractMeals, error: mealsError } = useReadContract({
+    address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+    abi: wellnessTrackerAbi,
+    functionName: 'getUserRecentMeals',
+    args: address ? [address, BigInt(10)] : undefined,
+    query: { enabled: !!address && !!hasWellnessData },
+  });
   
   // Debug logging
   useEffect(() => {
     if (address) {
       console.log('🔍 Debug - Wallet connected:', address);
-      console.log('🔍 Debug - Contract address:', CONTRACT_ADDRESSES.USER_PROFILE);
-      console.log('🔍 Debug - Contract error:', contractReadError);
+      console.log('🔍 Debug - User Profile Contract address:', CONTRACT_ADDRESSES.USER_PROFILE);
+      console.log('🔍 Debug - Wellness Tracker Contract address:', CONTRACT_ADDRESSES.WELLNESS_TRACKER);
+      console.log('🔍 Debug - Contract read error:', contractReadError);
       console.log('🔍 Debug - Profile error:', profileError);
+      console.log('🔍 Debug - Wellness error:', wellnessError);
       console.log('🔍 Debug - Is onboarded:', isOnboarded);
+      console.log('🔍 Debug - Has wellness data:', hasWellnessData);
       console.log('🔍 Debug - Profile data:', profileData);
+      console.log('🔍 Debug - Wellness data:', wellnessData);
+      console.log('🔍 Debug - Contract activities:', contractActivities);
+      console.log('🔍 Debug - Contract meals:', contractMeals);
     }
-  }, [address, contractReadError, profileError, isOnboarded, profileData]);
+  }, [address, contractReadError, profileError, wellnessError, isOnboarded, hasWellnessData, profileData, wellnessData, contractActivities, contractMeals]);
+
+  // Force network switch to Base Sepolia on component mount
+  useEffect(() => {
+    if (address && chainId !== 84532) {
+      console.log('🔄 Component mounted - checking network connection...');
+      console.log('⚠️ Wrong network detected:', chainId);
+      
+      // Auto-switch to Base Sepolia
+      const forceNetworkSwitch = async () => {
+        try {
+          console.log('🔄 Auto-switching to Base Sepolia testnet...');
+          await (window.ethereum as any).request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x14a34' }], // 84532 in hex
+          });
+          console.log('✅ Auto-switched to Base Sepolia testnet');
+        } catch (error: any) {
+          console.error('Error auto-switching to Base Sepolia:', error);
+          if (error.code === 4902) {
+            // Chain not added, add it first
+            console.log('🔗 Adding Base Sepolia network first...');
+            await addBaseSepoliaNetwork();
+            // Try switching again
+            try {
+              await (window.ethereum as any).request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0x14a34' }],
+              });
+              console.log('✅ Auto-switched to Base Sepolia testnet after adding network');
+            } catch (switchError) {
+              console.log('⚠️ Auto-switch failed after adding network');
+            }
+          }
+        }
+      };
+      
+      // Delay the auto-switch slightly to avoid conflicts
+      setTimeout(forceNetworkSwitch, 1000);
+    }
+  }, [address, chainId]);
+
+  // Aggressive network switching - run immediately when wallet connects
+  useEffect(() => {
+    if (address) {
+      console.log('🔍 Wallet connected, checking network...');
+      
+      const checkAndSwitchNetwork = async () => {
+        // Get current network from MetaMask directly
+        try {
+          const currentChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
+          console.log('🔍 Current MetaMask chain ID:', currentChainId);
+          
+          if (currentChainId !== '0x14a34') { // Not Base Sepolia
+            console.log('🚨 WRONG NETWORK DETECTED! Forcing switch to Base Sepolia...');
+            setIsNetworkSwitching(true);
+            setNetworkSwitchAttempts(prev => prev + 1);
+            
+            // Force switch immediately
+            try {
+              await (window.ethereum as any).request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0x14a34' }],
+              });
+              console.log('✅ Forced network switch to Base Sepolia');
+              setIsNetworkSwitching(false);
+            } catch (error: any) {
+              console.error('❌ Network switch failed:', error);
+              if (error.code === 4902) {
+                console.log('🔗 Adding Base Sepolia network...');
+                await addBaseSepoliaNetwork();
+                // Try switching again
+                await (window.ethereum as any).request({
+                  method: 'wallet_switchEthereumChain',
+                  params: [{ chainId: '0x14a34' }],
+                });
+                console.log('✅ Network switch successful after adding chain');
+                setIsNetworkSwitching(false);
+              } else {
+                setIsNetworkSwitching(false);
+              }
+            }
+          } else {
+            console.log('✅ Already on Base Sepolia testnet');
+            setIsNetworkSwitching(false);
+          }
+        } catch (error) {
+          console.error('Error checking network:', error);
+          setIsNetworkSwitching(false);
+        }
+      };
+      
+      // Run immediately and also after a short delay
+      checkAndSwitchNetwork();
+      setTimeout(checkAndSwitchNetwork, 500);
+      setTimeout(() => {
+        if (networkSwitchAttempts < 3) {
+          checkAndSwitchNetwork();
+        }
+      }, 2000);
+    }
+  }, [address, networkSwitchAttempts]);
   
   // Update local state when contract data changes
   useEffect(() => {
@@ -412,6 +787,244 @@ function LandingPageContent() {
       setGeneratedImageUrl(profileData[8] || null);
     }
   }, [profileData]);
+
+  // Load wellness data from smart contract when available
+  useEffect(() => {
+    if (wellnessData && Array.isArray(wellnessData)) {
+      // wellnessData is an array: [streakCount, totalScore, lastActivityTimestamp, dailyStreakStart, weeklyGoals, totalActivities, totalMeals]
+      console.log('📊 Loading wellness data from smart contract:', wellnessData);
+      
+      const [contractStreakCount, contractTotalScore, lastActivityTimestamp, dailyStreakStart, contractWeeklyGoals, totalActivities, totalMeals] = wellnessData;
+      
+      // Update local state with contract data
+      setStreakCount(Number(contractStreakCount) || 0);
+      setTotalScore(Number(contractTotalScore) || 0);
+      
+      // Update weekly goals if available
+      if (contractWeeklyGoals && Array.isArray(contractWeeklyGoals)) {
+        const [exerciseCurrent, exerciseTarget, meditationCurrent, meditationTarget, sleepCurrent, sleepTarget, exerciseCompleted, meditationCompleted, sleepCompleted] = contractWeeklyGoals;
+        
+        setWeeklyGoals({
+          exercise: { 
+            current: Number(exerciseCurrent) || 0, 
+            target: Number(exerciseTarget) || 5, 
+            completed: exerciseCompleted || false 
+          },
+          meditation: { 
+            current: Number(meditationCurrent) || 0, 
+            target: Number(meditationTarget) || 7, 
+            completed: meditationCompleted || false 
+          },
+          sleep: { 
+            current: Number(sleepCurrent) || 0, 
+            target: Number(sleepTarget) || 7, 
+            completed: sleepCompleted || false 
+          }
+        });
+      }
+      
+      console.log('✅ Wellness data loaded from smart contract successfully');
+    }
+  }, [wellnessData]);
+
+  // Load activities from smart contract when available
+  useEffect(() => {
+    if (contractActivities && Array.isArray(contractActivities)) {
+      console.log('📊 Loading activities from smart contract:', contractActivities);
+      console.log('🔍 Raw activity data structure:', contractActivities[0]);
+      console.log('🔍 Activity data type:', typeof contractActivities[0]);
+      console.log('🔍 Activity data keys:', Object.keys(contractActivities[0] || {}));
+      console.log('🔍 Activity data length:', contractActivities[0]?.length);
+      
+      // Check if contract data is valid
+      const hasValidData = contractActivities.length > 0 && 
+        contractActivities[0] && 
+        (contractActivities[0][0] !== undefined || contractActivities[0].id !== undefined);
+      
+      console.log('🔍 Has valid data:', hasValidData);
+      
+      if (hasValidData) {
+        const formattedActivities = contractActivities.map((activity, index) => {
+          console.log(`🔍 Processing activity ${index}:`, activity);
+          console.log(`🔍 Activity type:`, typeof activity);
+          console.log(`🔍 Activity keys:`, Object.keys(activity || {}));
+          
+          // Handle both array format [0,1,2,3,4,5] and object format {id, type, name, etc}
+          let formatted;
+          if (Array.isArray(activity)) {
+            console.log(`🔍 Activity is array format`);
+            // Convert timestamp from seconds to milliseconds if it's a reasonable value
+            let timestamp = Number(activity[4]) || Date.now();
+            if (timestamp > 1000000000 && timestamp < 10000000000) {
+              // If timestamp is in seconds (10 digits), convert to milliseconds
+              timestamp = timestamp * 1000;
+              console.log(`🔍 Converting timestamp from seconds to milliseconds: ${Number(activity[4])} -> ${timestamp}`);
+            }
+            
+            formatted = {
+              id: Number(activity[0]) || 0, // id
+              type: activity[1] || 'unknown', // activityType
+              name: activity[2] || 'Unknown Activity', // name
+              reward: Number(activity[3]) || 0, // reward
+              timestamp: timestamp, // timestamp (converted if needed)
+              completed: activity[5] || false // completed
+            };
+          } else if (typeof activity === 'object' && activity !== null) {
+            console.log(`🔍 Activity is object format`);
+            // Convert timestamp from seconds to milliseconds if it's a reasonable value
+            let timestamp = Number(activity.timestamp) || Date.now();
+            if (timestamp > 1000000000 && timestamp < 10000000000) {
+              // If timestamp is in seconds (10 digits), convert to milliseconds
+              timestamp = timestamp * 1000;
+              console.log(`🔍 Converting timestamp from seconds to milliseconds: ${Number(activity.timestamp)} -> ${timestamp}`);
+            }
+            
+            formatted = {
+              id: Number(activity.id) || 0,
+              type: activity.activityType || activity.type || 'unknown',
+              name: activity.name || 'Unknown Activity',
+              reward: Number(activity.reward) || 0,
+              timestamp: timestamp, // timestamp (converted if needed)
+              completed: activity.completed || false
+            };
+          } else {
+            console.log(`🔍 Activity is unknown format:`, activity);
+            formatted = {
+              id: 0,
+              type: 'unknown',
+              name: 'Unknown Activity',
+              reward: 0,
+              timestamp: Date.now(),
+              completed: false
+            };
+          }
+          
+          console.log(`🔍 Formatted activity ${index}:`, formatted);
+          return formatted;
+        });
+        
+        setActivities(formattedActivities);
+        console.log('✅ Activities loaded from smart contract successfully');
+        console.log('🔍 Final formatted activities:', formattedActivities);
+      } else {
+        console.log('⚠️ Contract activities data incomplete, falling back to localStorage');
+        // Fallback to localStorage
+        if (address) {
+          const localStorageKey = `wellspace_user_${address}`;
+          const savedData = localStorage.getItem(localStorageKey);
+          if (savedData) {
+            try {
+              const userData = JSON.parse(savedData);
+              if (userData.activities && Array.isArray(userData.activities)) {
+                setActivities(userData.activities);
+                console.log('📱 Activities loaded from localStorage fallback');
+              }
+            } catch (error) {
+              console.error('Error loading activities from localStorage:', error);
+            }
+          }
+        }
+      }
+    }
+  }, [contractActivities, address]);
+
+  // Load meals from smart contract when available
+  useEffect(() => {
+    if (contractMeals && Array.isArray(contractMeals)) {
+      console.log('🍽️ Loading meals from smart contract:', contractMeals);
+      console.log('🔍 Raw meal data structure:', contractMeals[0]);
+      console.log('🔍 Meal data type:', typeof contractMeals[0]);
+      console.log('🔍 Meal data keys:', Object.keys(contractMeals[0] || {}));
+      console.log('🔍 Meal data length:', contractMeals[0]?.length);
+      
+      // Check if contract data is valid
+      const hasValidData = contractMeals.length > 0 && 
+        contractMeals[0] && 
+        (contractMeals[0][0] !== undefined || contractMeals[0].id !== undefined);
+      
+      console.log('🔍 Has valid meal data:', hasValidData);
+      
+      if (hasValidData) {
+        const formattedMeals = contractMeals.map((meal, index) => {
+          console.log(`🔍 Processing meal ${index}:`, meal);
+          console.log(`🔍 Meal type:`, typeof meal);
+          console.log(`🔍 Meal keys:`, Object.keys(meal || {}));
+          
+          // Handle both array format [0,1,2,3,4] and object format {id, type, name, etc}
+          let formatted;
+          if (Array.isArray(meal)) {
+            console.log(`🔍 Meal is array format`);
+            // Convert timestamp from seconds to milliseconds if it's a reasonable value
+            let timestamp = Number(meal[4]) || Date.now();
+            if (timestamp > 1000000000 && timestamp < 10000000000) {
+              // If timestamp is in seconds (10 digits), convert to milliseconds
+              timestamp = timestamp * 1000;
+              console.log(`🔍 Converting meal timestamp from seconds to milliseconds: ${Number(meal[4])} -> ${timestamp}`);
+            }
+            
+            formatted = {
+              id: Number(meal[0]) || 0, // id
+              type: meal[1] || 'breakfast', // mealType
+              name: meal[2] || 'Unknown Meal', // name
+              calories: Number(meal[3]) || 0, // calories
+              timestamp: timestamp // timestamp (converted if needed)
+            };
+          } else if (typeof meal === 'object' && meal !== null) {
+            console.log(`🔍 Meal is object format`);
+            // Convert timestamp from seconds to milliseconds if it's a reasonable value
+            let timestamp = Number(meal.timestamp) || Date.now();
+            if (timestamp > 1000000000 && timestamp < 10000000000) {
+              // If timestamp is in seconds (10 digits), convert to milliseconds
+              timestamp = timestamp * 1000;
+              console.log(`🔍 Converting meal timestamp from seconds to milliseconds: ${Number(meal.timestamp)} -> ${timestamp}`);
+            }
+            
+            formatted = {
+              id: Number(meal.id) || 0,
+              type: meal.mealType || meal.type || 'breakfast',
+              name: meal.name || 'Unknown Meal',
+              calories: Number(meal.calories) || 0,
+              timestamp: timestamp // timestamp (converted if needed)
+            };
+          } else {
+            console.log(`🔍 Meal is unknown format:`, meal);
+            formatted = {
+              id: 0,
+              type: 'breakfast',
+              name: 'Unknown Meal',
+              calories: 0,
+              timestamp: Date.now()
+            };
+          }
+          
+          console.log(`🔍 Formatted meal ${index}:`, formatted);
+          return formatted;
+        });
+        
+        setMeals(formattedMeals);
+        console.log('✅ Meals loaded from smart contract successfully');
+        console.log('🔍 Final formatted meals:', formattedMeals);
+      } else {
+        console.log('⚠️ Contract meals data incomplete, falling back to localStorage');
+        // Fallback to localStorage
+        if (address) {
+          const localStorageKey = `wellspace_user_${address}`;
+          const savedData = localStorage.getItem(localStorageKey);
+          if (savedData) {
+            try {
+              const userData = JSON.parse(savedData);
+              if (userData.meals && Array.isArray(userData.meals)) {
+                setMeals(userData.meals);
+                console.log('📱 Meals loaded from localStorage fallback');
+              }
+            } catch (error) {
+              console.error('Error loading meals from localStorage:', error);
+            }
+          }
+        }
+      }
+    }
+  }, [contractMeals, address]);
   
   // Fallback: Load from localStorage if smart contract fails
   useEffect(() => {
@@ -457,6 +1070,17 @@ function LandingPageContent() {
       checkContractHealth();
     }
   }, [address]);
+
+  // Auto-hide wellness data initialization success message
+  useEffect(() => {
+    if (wellnessDataInitialized) {
+      const timer = setTimeout(() => {
+        setWellnessDataInitialized(false);
+      }, 5000); // Hide after 5 seconds
+      
+      return () => clearTimeout(timer);
+    }
+  }, [wellnessDataInitialized]);
   
   // Check contract health and accessibility
   const checkContractHealth = async () => {
@@ -498,6 +1122,73 @@ function LandingPageContent() {
       
       if (contractHealth === 'unhealthy') {
         throw new Error('Smart contract is currently unavailable');
+      }
+      
+      // Initialize wellness data on WellnessTracker contract if not already done
+      if (!hasWellnessData) {
+        // Force network switch to Base Sepolia if not already connected
+        if (chainId !== 84532) {
+          console.log('🔄 Switching to Base Sepolia testnet for profile initialization...');
+          try {
+            await (window.ethereum as any).request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: '0x14a34' }], // 84532 in hex
+            });
+            console.log('✅ Switched to Base Sepolia testnet');
+            
+            // Wait a moment for the switch to complete
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Check if switch was successful
+            const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
+            if (newChainId !== '0x14a34') {
+              console.log('⚠️ Network switch failed, skipping smart contract initialization');
+            } else {
+              console.log('🚀 Initializing wellness data on smart contract...');
+              await writeContract({
+                address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+                abi: wellnessTrackerAbi,
+                functionName: 'initializeWellnessData',
+                args: [],
+              });
+              console.log('✅ Wellness data initialized on smart contract');
+            }
+          } catch (error: any) {
+            console.error('Error switching to Base Sepolia:', error);
+            if (error.code === 4902) {
+              // Chain not added, add it first
+              await addBaseSepoliaNetwork();
+              // Try switching again
+              try {
+                await (window.ethereum as any).request({
+                  method: 'wallet_switchEthereumChain',
+                  params: [{ chainId: '0x14a34' }],
+                });
+                console.log('🚀 Initializing wellness data on smart contract...');
+                await writeContract({
+                  address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+                  abi: wellnessTrackerAbi,
+                  functionName: 'initializeWellnessData',
+                  args: [],
+                });
+                console.log('✅ Wellness data initialized on smart contract');
+              } catch (switchError) {
+                console.log('⚠️ Network switch failed after adding chain, skipping smart contract initialization');
+              }
+            } else {
+              console.log('⚠️ Network switch failed, skipping smart contract initialization');
+            }
+          }
+        } else {
+          console.log('🚀 Initializing wellness data on smart contract...');
+          await writeContract({
+            address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+            abi: wellnessTrackerAbi,
+            functionName: 'initializeWellnessData',
+            args: [],
+          });
+          console.log('✅ Wellness data initialized on smart contract');
+        }
       }
       
       // Save user profile to smart contract
@@ -553,9 +1244,201 @@ function LandingPageContent() {
         return false;
       }
     }
-  };
-  
+    };
 
+  // Initialize wellness data on smart contract
+  const initializeWellnessData = async () => {
+    if (!address) return false;
+    
+    // Force network switch to Base Sepolia if not already connected
+    if (chainId !== 84532) {
+      console.log('🔄 Switching to Base Sepolia testnet...');
+      try {
+        await (window.ethereum as any).request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x14a34' }], // 84532 in hex
+        });
+        console.log('✅ Switched to Base Sepolia testnet');
+        
+        // Wait a moment for the switch to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check if switch was successful
+        const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
+        if (newChainId !== '0x14a34') {
+          setContractError('Failed to switch to Base Sepolia testnet. Please switch manually.');
+          return false;
+        }
+      } catch (error: any) {
+        console.error('Error switching to Base Sepolia:', error);
+        if (error.code === 4902) {
+          // Chain not added, add it first
+          await addBaseSepoliaNetwork();
+          // Try switching again
+          await (window.ethereum as any).request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x14a34' }],
+          });
+        } else {
+          setContractError('Failed to switch to Base Sepolia testnet. Please switch manually.');
+          return false;
+        }
+      }
+    }
+    
+    try {
+      console.log('🚀 Initializing wellness data on smart contract...');
+      await writeContract({
+        address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+        abi: wellnessTrackerAbi,
+        functionName: 'initializeWellnessData',
+        args: [],
+      });
+      console.log('✅ Wellness data initialized on smart contract');
+      setWellnessDataInitialized(true);
+      return true;
+    } catch (error) {
+      console.error('Error initializing wellness data:', error);
+      setContractError('Failed to initialize wellness data on smart contract');
+      return false;
+    }
+  };
+
+  // Reset weekly goals on smart contract
+  const resetWeeklyGoals = async () => {
+    if (!address || !hasWellnessData) return false;
+    
+    // Force network switch to Base Sepolia if not already connected
+    if (chainId !== 84532) {
+      console.log('🔄 Switching to Base Sepolia testnet for weekly goals reset...');
+      try {
+        await (window.ethereum as any).request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x14a34' }], // 84532 in hex
+        });
+        console.log('✅ Switched to Base Sepolia testnet');
+        
+        // Wait a moment for the switch to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check if switch was successful
+        const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
+        if (newChainId !== '0x14a34') {
+          setContractError('Failed to switch to Base Sepolia testnet. Please switch manually.');
+          return false;
+        }
+      } catch (error: any) {
+        console.error('Error switching to Base Sepolia:', error);
+        if (error.code === 4902) {
+          // Chain not added, add it first
+          await addBaseSepoliaNetwork();
+          // Try switching again
+          try {
+            await (window.ethereum as any).request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: '0x14a34' }],
+            });
+          } catch (switchError) {
+            setContractError('Failed to switch to Base Sepolia testnet after adding chain. Please switch manually.');
+            return false;
+          }
+        } else {
+          setContractError('Failed to switch to Base Sepolia testnet. Please switch manually.');
+          return false;
+        }
+      }
+    }
+    
+    try {
+      console.log('🔄 Resetting weekly goals on smart contract...');
+      await writeContract({
+        address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+        abi: wellnessTrackerAbi,
+        functionName: 'resetWeeklyGoals',
+        args: [],
+      });
+      console.log('✅ Weekly goals reset on smart contract');
+      
+      // Update local state
+      setWeeklyGoals({
+        exercise: { current: 0, target: 5, completed: false },
+        meditation: { current: 0, target: 7, completed: false },
+        sleep: { current: 0, target: 7, completed: false }
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error resetting weekly goals:', error);
+      setContractError('Failed to reset weekly goals on smart contract');
+      return false;
+    }
+  };
+
+  // Add Base Sepolia network to MetaMask
+  const addBaseSepoliaNetwork = async () => {
+    if (typeof window.ethereum === 'undefined') {
+      alert('MetaMask is not installed. Please install MetaMask first.');
+      return;
+    }
+
+    try {
+      await (window.ethereum as any).request({
+        method: 'wallet_addEthereumChain',
+        params: [{
+          chainId: '0x14a34', // 84532 in hex
+          chainName: 'Base Sepolia',
+          nativeCurrency: {
+            name: 'ETH',
+            symbol: 'ETH',
+            decimals: 18,
+          },
+          rpcUrls: ['https://sepolia.base.org'],
+          blockExplorerUrls: ['https://sepolia.basescan.org'],
+        }],
+      });
+      console.log('✅ Base Sepolia network added to MetaMask');
+    } catch (error: any) {
+      console.error('Error adding Base Sepolia network:', error);
+      if (error.code === 4001) {
+        alert('Network addition was rejected by user.');
+      } else {
+        alert('Failed to add Base Sepolia network. Please add it manually.');
+      }
+    }
+  };
+
+  // Network switching overlay - prevent any OnchainKit components from rendering until network is correct
+  if (address && chainId !== 84532 && isNetworkSwitching) {
+    return (
+      <div className={cn(
+        "min-h-screen w-full overflow-hidden transition-colors duration-300",
+        isDarkMode ? "bg-black" : "bg-white"
+      )}>
+        <ThemeToggleButton />
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+            <h2 className={cn(
+              "text-xl font-semibold transition-colors",
+              isDarkMode ? "text-white" : "text-gray-900"
+            )}>Switching to Base Sepolia Testnet...</h2>
+            <p className={cn(
+              "transition-colors",
+              isDarkMode ? "text-gray-400" : "text-gray-600"
+            )}>Please approve the network switch in MetaMask</p>
+            <div className="mt-4 p-3 bg-red-100 border border-red-300 rounded-lg">
+              <p className="text-sm text-red-800">
+                <strong>Current Network:</strong> {chainId === 1 ? 'Ethereum Mainnet' : `Network ID ${chainId}`}
+              </p>
+              <p className="text-sm text-red-800 mt-1">
+                <strong>Required:</strong> Base Sepolia Testnet (Chain ID: 84532)
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Onboarding View
   if (currentView === 'onboarding') {
@@ -1058,6 +1941,216 @@ function LandingPageContent() {
             </div>
           )}
 
+          {/* Wellness Data Initialization Banner */}
+          {address && !hasWellnessData && (
+            <div className={cn(
+              "mb-6 p-4 rounded-xl border transition-colors",
+              isDarkMode 
+                ? "bg-blue-900/20 border-blue-700/50 text-blue-200" 
+                : "bg-blue-50 border-blue-200 text-blue-800"
+            )}>
+              <div className="flex items-center space-x-3">
+                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="font-medium">Initialize On-Chain Wellness Data</p>
+                  <p className="text-sm opacity-90">
+                    Your wellness data is currently stored locally. Initialize on-chain storage for better security and transparency.
+                  </p>
+                  <button
+                    onClick={initializeWellnessData}
+                    className={cn(
+                      "mt-2 px-4 py-2 text-sm rounded-lg transition-colors font-medium",
+                      isDarkMode 
+                        ? "bg-blue-800/50 hover:bg-blue-800/70 text-blue-200" 
+                        : "bg-blue-100 hover:bg-blue-200 text-blue-800"
+                    )}
+                  >
+                    🚀 Initialize On-Chain
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Wellness Data Success Banner */}
+          {address && hasWellnessData && (
+            <div className={cn(
+              "mb-6 p-4 rounded-xl border transition-colors",
+              isDarkMode 
+                ? "bg-green-900/20 border-green-700/50 text-green-200" 
+                : "bg-green-50 border-green-200 text-green-800"
+            )}>
+              <div className="flex items-center space-x-3">
+                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="font-medium">✅ On-Chain Wellness Data Active</p>
+                  <p className="text-sm opacity-90">
+                    Your wellness data is now stored securely on the blockchain. All activities, meals, and progress are being tracked on-chain.
+                  </p>
+                  <div className="flex space-x-2 mt-2">
+                    <span className="text-xs px-2 py-1 bg-green-200 text-green-800 rounded-full">
+                      🔗 Smart Contract Connected
+                    </span>
+                    <span className="text-xs px-2 py-1 bg-green-200 text-green-800 rounded-full">
+                      📊 Real-time Sync
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Temporary Success Message */}
+          {wellnessDataInitialized && (
+            <div className={cn(
+              "mb-6 p-4 rounded-xl border transition-colors animate-pulse",
+              isDarkMode 
+                ? "bg-green-900/20 border-green-700/50 text-green-200" 
+                : "bg-green-50 border-green-200 text-green-800"
+            )}>
+              <div className="flex items-center space-x-3">
+                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="font-medium">🎉 Wellness Data Successfully Initialized!</p>
+                  <p className="text-sm opacity-90">
+                    Your wellness data is now being stored on the blockchain. This message will disappear shortly.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Network Switch Banner */}
+          {address && chainId !== 84532 && (
+            <div className={cn(
+              "mb-6 p-4 rounded-xl border transition-colors",
+              isDarkMode 
+                ? "bg-red-900/20 border-red-700/50 text-red-200" 
+                : "bg-red-50 border-red-200 text-red-800"
+            )}>
+              <div className="flex items-center space-x-3">
+                <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <div>
+                  <p className="font-bold text-lg">🚨 CRITICAL: Wrong Network Detected</p>
+                  <p className="text-sm opacity-90">
+                    You're currently connected to <strong>{chainId === 1 ? 'Ethereum Mainnet' : `Network ID ${chainId}`}</strong>. 
+                    WellSpace requires <strong>Base Sepolia Testnet (Chain ID: 84532)</strong>.
+                  </p>
+                  <p className="text-sm opacity-90 mt-2">
+                    <strong>⚠️ WARNING:</strong> Transactions on the wrong network will fail and may charge you gas fees on the wrong blockchain!
+                  </p>
+                  <div className="mt-3 text-xs opacity-75">
+                    <p><strong>To fix this:</strong></p>
+                    <ol className="list-decimal list-inside mt-1 space-y-1">
+                      <li>Open MetaMask</li>
+                      <li>Click the network dropdown (top of MetaMask)</li>
+                      <li>Select "Base Sepolia" or add it if not listed</li>
+                      <li>If adding manually: Network Name: "Base Sepolia", RPC URL: "https://sepolia.base.org", Chain ID: "84532"</li>
+                    </ol>
+                  </div>
+                  <div className="mt-3 flex space-x-3">
+                    <button
+                      onClick={addBaseSepoliaNetwork}
+                      className={cn(
+                        "px-4 py-2 text-sm rounded-lg transition-colors font-medium",
+                        isDarkMode 
+                          ? "bg-red-800/50 hover:bg-red-800/70 text-red-200" 
+                          : "bg-red-100 hover:bg-red-200 text-red-800"
+                      )}
+                    >
+                      🔗 Add Base Sepolia to MetaMask
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await (window.ethereum as any).request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: '0x14a34' }],
+                          });
+                        } catch (error: any) {
+                          if (error.code === 4902) {
+                            await addBaseSepoliaNetwork();
+                          }
+                        }
+                      }}
+                      className={cn(
+                        "px-4 py-2 text-sm rounded-lg transition-colors font-medium",
+                        isDarkMode 
+                          ? "bg-blue-800/50 hover:bg-blue-800/70 text-blue-200" 
+                          : "bg-blue-100 hover:bg-blue-200 text-blue-800"
+                      )}
+                    >
+                      🔄 Switch to Base Sepolia Now
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Network Status Indicator */}
+          {address && (
+            <div className="mb-6 flex items-center justify-between">
+              <div className={cn(
+                "flex items-center space-x-2 px-3 py-2 rounded-lg border transition-colors",
+                chainId === 84532
+                  ? isDarkMode 
+                    ? "bg-green-900/20 border-green-700/50 text-green-200" 
+                    : "bg-green-50 border-green-200 text-green-800"
+                  : isDarkMode 
+                    ? "bg-red-900/20 border-red-700/50 text-red-200" 
+                    : "bg-red-50 border-red-200 text-red-800"
+              )}>
+                <div className={cn(
+                  "w-2 h-2 rounded-full",
+                  chainId === 84532 ? "bg-green-500" : "bg-red-500"
+                )} />
+                <span className="text-sm font-medium">
+                  {chainId === 84532 ? '✅ Base Sepolia Testnet' : '❌ Wrong Network'}
+                </span>
+                {chainId !== 84532 && (
+                  <span className="text-xs opacity-75">
+                    (Current: {chainId === 1 ? 'Ethereum Mainnet' : `ID ${chainId}`})
+                  </span>
+                )}
+              </div>
+              {chainId !== 84532 && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await (window.ethereum as any).request({
+                        method: 'wallet_switchEthereumChain',
+                        params: [{ chainId: '0x14a34' }],
+                      });
+                    } catch (error: any) {
+                      if (error.code === 4902) {
+                        await addBaseSepoliaNetwork();
+                      }
+                    }
+                  }}
+                  className={cn(
+                    "px-3 py-2 text-sm rounded-lg transition-colors font-medium",
+                    isDarkMode 
+                      ? "bg-blue-800/50 hover:bg-blue-800/70 text-blue-200" 
+                      : "bg-blue-100 hover:bg-blue-200 text-blue-800"
+                  )}
+                >
+                  🔄 Switch Network
+                </button>
+              )}
+            </div>
+          )}
+
+
+
           {/* Welcome Section */}
           <div className="mb-8">
             <h1 className={cn(
@@ -1488,6 +2581,16 @@ function LandingPageContent() {
                     </div>
                   </div>
                 </div>
+                
+                {/* Reset Weekly Goals Button */}
+                <div className="pt-4 border-t border-gray-200">
+                  <button
+                    onClick={resetWeeklyGoals}
+                    className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors text-sm"
+                  >
+                    🔄 Reset Weekly Goals
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1570,6 +2673,67 @@ function LandingPageContent() {
   }
 
   // Landing Page View
+  // Check network before rendering any OnchainKit components
+  if (address && chainId !== 84532) {
+    return (
+      <div className={cn(
+        "min-h-screen w-full overflow-hidden transition-colors duration-300",
+        isDarkMode ? "bg-black" : "bg-white"
+      )}>
+        <ThemeToggleButton />
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-red-100 border-4 border-red-300 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h2 className={cn(
+              "text-2xl font-bold transition-colors mb-4",
+              isDarkMode ? "text-white" : "text-gray-900"
+            )}>🚨 Wrong Network Detected</h2>
+            <p className={cn(
+              "transition-colors mb-6",
+              isDarkMode ? "text-gray-400" : "text-gray-600"
+            )}>
+              You're currently connected to <strong>{chainId === 1 ? 'Ethereum Mainnet' : `Network ID ${chainId}`}</strong>.
+              <br />
+              WellSpace requires <strong>Base Sepolia Testnet (Chain ID: 84532)</strong>.
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={async () => {
+                  try {
+                    await (window.ethereum as any).request({
+                      method: 'wallet_switchEthereumChain',
+                      params: [{ chainId: '0x14a34' }],
+                    });
+                  } catch (error: any) {
+                    if (error.code === 4902) {
+                      await addBaseSepoliaNetwork();
+                    }
+                  }
+                }}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+              >
+                🔄 Switch to Base Sepolia Now
+              </button>
+              <button
+                onClick={addBaseSepoliaNetwork}
+                className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg transition-colors ml-3"
+              >
+                🔗 Add Base Sepolia to MetaMask
+              </button>
+            </div>
+            <div className="mt-6 p-4 bg-yellow-100 border border-yellow-300 rounded-lg text-sm text-yellow-800">
+              <p><strong>⚠️ Important:</strong> Transactions on the wrong network will fail and may charge you gas fees on the wrong blockchain!</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn(
       "min-h-screen w-full transition-colors duration-300",

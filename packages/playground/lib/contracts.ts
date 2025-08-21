@@ -187,12 +187,133 @@ export const userProfileAbi = [
   }
 ] as const
 
+export const wellnessTrackerAbi = [
+  {
+    inputs: [],
+    name: 'initializeWellnessData',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [
+      { name: '_activityType', type: 'string' },
+      { name: '_name', type: 'string' },
+      { name: '_reward', type: 'uint256' }
+    ],
+    name: 'logActivity',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [
+      { name: '_mealType', type: 'string' },
+      { name: '_name', type: 'string' },
+      { name: '_calories', type: 'uint256' }
+    ],
+    name: 'logMeal',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [],
+    name: 'resetWeeklyGoals',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: '_user', type: 'address' }],
+    name: 'hasUserWellnessData',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: '_user', type: 'address' }],
+    name: 'getUserWellnessData',
+    outputs: [
+      { name: 'streakCount', type: 'uint256' },
+      { name: 'totalScore', type: 'uint256' },
+      { name: 'lastActivityTimestamp', type: 'uint256' },
+      { name: 'dailyStreakStart', type: 'uint256' },
+      {
+        name: 'weeklyGoals',
+        type: 'tuple',
+        components: [
+          { name: 'exerciseCurrent', type: 'uint256' },
+          { name: 'exerciseTarget', type: 'uint256' },
+          { name: 'meditationCurrent', type: 'uint256' },
+          { name: 'meditationTarget', type: 'uint256' },
+          { name: 'sleepCurrent', type: 'uint256' },
+          { name: 'sleepTarget', type: 'uint256' },
+          { name: 'exerciseCompleted', type: 'bool' },
+          { name: 'meditationCompleted', type: 'bool' },
+          { name: 'sleepCompleted', type: 'bool' }
+        ]
+      },
+      { name: 'totalActivities', type: 'uint256' },
+      { name: 'totalMeals', type: 'uint256' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [
+      { name: '_user', type: 'address' },
+      { name: '_count', type: 'uint256' }
+    ],
+    name: 'getUserRecentActivities',
+    outputs: [
+      {
+        name: '',
+        type: 'tuple[]',
+        components: [
+          { name: 'id', type: 'uint256' },
+          { name: 'activityType', type: 'string' },
+          { name: 'name', type: 'string' },
+          { name: 'reward', type: 'uint256' },
+          { name: 'timestamp', type: 'uint256' },
+          { name: 'completed', type: 'bool' }
+        ]
+      }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [
+      { name: '_user', type: 'address' },
+      { name: '_count', type: 'uint256' }
+    ],
+    name: 'getUserRecentMeals',
+    outputs: [
+      {
+        name: '',
+        type: 'tuple[]',
+        components: [
+          { name: 'id', type: 'uint256' },
+          { name: 'mealType', type: 'string' },
+          { name: 'name', type: 'string' },
+          { name: 'calories', type: 'uint256' },
+          { name: 'timestamp', type: 'uint256' }
+        ]
+      }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  }
+] as const
+
 // Contract addresses (set via environment variables or fallback to deployed addresses)
 export const CONTRACT_ADDRESSES = {
   WELLNESS_NFT: (process.env.NEXT_PUBLIC_WELLNESS_NFT_ADDRESS || '0x84b5fc5a47a4FcEe67793eB149032A4A981B5F04') as `0x${string}`,
   WELL_TOKEN: (process.env.NEXT_PUBLIC_WELL_TOKEN_ADDRESS || '0x3d1B85c7c772295B754A74e928eA9d3C29769c7e') as `0x${string}`,
   REWARDS: (process.env.NEXT_PUBLIC_REWARDS_CONTRACT_ADDRESS || '0x28Fd86Fe69bA36b9E12f5A8F0395D172Ac227D29') as `0x${string}`,
   USER_PROFILE: (process.env.NEXT_PUBLIC_USER_PROFILE_ADDRESS || '0x62513A440FCb39604Aa2B5Ae926f14DDa9E129Ca') as `0x${string}`,
+  WELLNESS_TRACKER: (process.env.NEXT_PUBLIC_WELLNESS_TRACKER_ADDRESS || '0x6f6ec3ca1B207172625b32821bcBEE36c49b49fA') as `0x${string}`,
 }
 
 // Utility function to format token amounts
