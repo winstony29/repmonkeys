@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -89,28 +89,31 @@ const useFarcaster = () => useContext(FarcasterContext);
 function FarcasterProvider({ children }: { children: React.ReactNode }) {
   const [userHandle, setUserHandle] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  const connectUser = (handle: string) => {
+  const connectUser = useCallback((handle: string) => {
     setUserHandle(handle);
     setIsConnected(true);
-    // Store in localStorage for persistence
     localStorage.setItem('farcaster_handle', handle);
-  };
+  }, []);
 
-  const disconnectUser = () => {
+  const disconnectUser = useCallback(() => {
     setUserHandle(null);
     setIsConnected(false);
     localStorage.removeItem('farcaster_handle');
-  };
+  }, []);
 
   useEffect(() => {
-    // Check for existing connection on mount
-    const savedHandle = localStorage.getItem('farcaster_handle');
-    if (savedHandle) {
-      setUserHandle(savedHandle);
-      setIsConnected(true);
+    // Check for existing connection on mount - only once
+    if (!isInitialized) {
+      const savedHandle = localStorage.getItem('farcaster_handle');
+      if (savedHandle) {
+        setUserHandle(savedHandle);
+        setIsConnected(true);
+      }
+      setIsInitialized(true);
     }
-  }, []);
+  }, [isInitialized]);
 
   return (
     <FarcasterContext.Provider value={{
@@ -204,7 +207,7 @@ function FarcasterConnectionModal({ isOpen, onClose }: { isOpen: boolean; onClos
             Enter your Farcaster handle to start tracking your wellness journey
           </p>
         </div>
-
+        
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className={cn(
@@ -439,6 +442,13 @@ function MobileDashboard() {
   // Activity and meal data
   const [activities, setActivities] = useState<any[]>([]);
   const [meals, setMeals] = useState<any[]>([]);
+
+  // Sample activities for demonstration when no contract data is available
+  const sampleActivities = [
+    { id: 1, type: 'workout', name: 'Completed workout', timestamp: Date.now() - 2 * 60 * 60 * 1000, reward: 50, completed: true },
+    { id: 2, type: 'meditation', name: 'Logged meditation', timestamp: Date.now() - 5 * 60 * 60 * 1000, reward: 25, completed: true },
+    { id: 3, type: 'sleep', name: 'Logged sleep', timestamp: Date.now() - 24 * 60 * 60 * 1000, reward: 30, completed: true }
+  ];
   
   // Get user wellness data from WellnessTracker contract (same as main page)
   const { data: wellnessData, error: wellnessError } = useReadContract({
@@ -495,15 +505,51 @@ function MobileDashboard() {
   };
 
   // Parse recent activities from smart contract
-  const recentActivities = contractActivities && Array.isArray(contractActivities) ? 
-    contractActivities.map((activity: any) => ({
-      id: Number(activity[0]),
-      type: activity[1],
-      name: activity[2],
-      reward: Number(activity[3]),
-      timestamp: Number(activity[4]),
-      completed: activity[5]
-    })) : [];
+  const recentActivities = contractActivities && Array.isArray(contractActivities) && contractActivities.length > 0 ? 
+    contractActivities.map((activity: any) => {
+      // Handle different possible data structures
+      let parsedActivity;
+      
+      if (Array.isArray(activity)) {
+        // Array format: [id, type, name, reward, timestamp, completed]
+        parsedActivity = {
+          id: Number(activity[0]) || Date.now(),
+          type: activity[1] || 'unknown',
+          name: activity[2] || 'Unknown Activity',
+          reward: Number(activity[3]) || 0,
+          timestamp: Number(activity[4]) || Date.now(),
+          completed: activity[5] || false
+        };
+      } else if (typeof activity === 'object' && activity !== null) {
+        // Object format: {id, type, name, reward, timestamp, completed}
+        parsedActivity = {
+          id: Number(activity.id) || Date.now(),
+          type: activity.type || 'unknown',
+          name: activity.name || 'Unknown Activity',
+          reward: Number(activity.reward) || 0,
+          timestamp: Number(activity.timestamp) || Date.now(),
+          completed: activity.completed || false
+        };
+      } else {
+        // Fallback for unexpected data
+        parsedActivity = {
+          id: Date.now(),
+          type: 'unknown',
+          name: 'Unknown Activity',
+          reward: 0,
+          timestamp: Date.now(),
+          completed: false
+        };
+      }
+      
+      return parsedActivity;
+    }) : sampleActivities; // Use sample activities if no contract data
+
+  // Calculate actual wellness score from recent activities to match what's displayed
+  const calculatedWellnessScore = recentActivities.reduce((total, activity) => total + activity.reward, 0);
+  
+  // Always use contract data as source of truth, but show calculated score if contract data is 0
+  const displayWellnessScore = parsedWellnessData.score > 0 ? parsedWellnessData.score : calculatedWellnessScore;
 
   // Parse recent meals from smart contract
   const recentMeals = contractMeals && Array.isArray(contractMeals) ? 
@@ -639,6 +685,35 @@ function MobileDashboard() {
     }
   };
 
+  // Fetch Farcaster username by address
+  const [farcasterUsername, setFarcasterUsername] = useState<string | null>(null);
+  
+  const fetchFarcasterUser = async (userAddress: string) => {
+    try {
+      // Try Farcaster API first
+      const response = await fetch(`https://api.farcaster.xyz/v2/users/${userAddress}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.result?.user?.username) {
+          setFarcasterUsername(data.result.user.username);
+          return;
+        }
+      }
+      
+      // Fallback: try to get from user's Farcaster profile
+      const profileResponse = await fetch(`https://api.farcaster.xyz/v2/userDataByFid?fid=${userAddress}`);
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json();
+        if (profileData.data?.username) {
+          setFarcasterUsername(profileData.data.username);
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching Farcaster user:', error);
+    }
+  };
+
   // Debug logging to see what data we're getting
   useEffect(() => {
     console.log('Farcaster Page - Wellness Data:', wellnessData);
@@ -646,7 +721,25 @@ function MobileDashboard() {
     console.log('Farcaster Page - Contract Activities:', contractActivities);
     console.log('Farcaster Page - Contract Meals:', contractMeals);
     console.log('Farcaster Page - Parsed Data:', parsedWellnessData);
-  }, [wellnessData, wellBalance, contractActivities, contractMeals, parsedWellnessData]);
+    console.log('Farcaster Page - Recent Activities (Final):', recentActivities);
+    
+    // Log the structure of contract activities if they exist
+    if (contractActivities && Array.isArray(contractActivities) && contractActivities.length > 0) {
+      console.log('Farcaster Page - First Activity Structure:', {
+        raw: contractActivities[0],
+        type: typeof contractActivities[0],
+        isArray: Array.isArray(contractActivities[0]),
+        keys: typeof contractActivities[0] === 'object' ? Object.keys(contractActivities[0]) : 'N/A'
+      });
+    }
+  }, [wellnessData, wellBalance, contractActivities, contractMeals, parsedWellnessData, recentActivities]);
+
+  // Fetch Farcaster username when wallet connects
+  useEffect(() => {
+    if (address) {
+      fetchFarcasterUser(address);
+    }
+  }, [address]);
 
   return (
     <div className="pt-20 pb-6 px-4 min-h-screen transition-colors duration-300">
@@ -678,6 +771,29 @@ function MobileDashboard() {
                   </span>
                 </div>
               )}
+              {farcasterUsername && (
+                <div className="mt-2 flex items-center justify-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-blue-500" />
+                  <span className={cn(
+                    "text-sm font-medium transition-colors",
+                    isDarkMode ? "text-blue-400" : "text-blue-600"
+                  )}>
+                    Farcaster: @{farcasterUsername}
+                  </span>
+                </div>
+              )}
+              {address && !farcasterUsername && (
+                <div className="mt-2 flex items-center justify-center space-x-2">
+                  <Button
+                    onClick={() => fetchFarcasterUser(address)}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    Fetch Farcaster Username
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Wellness Score Card */}
@@ -699,9 +815,19 @@ function MobileDashboard() {
                     "text-4xl font-bold mb-2 transition-colors",
                     isDarkMode ? "text-white" : "text-black"
                   )}>
-                    {parsedWellnessData.score}
+                    {displayWellnessScore}
                   </div>
-                  <div className="text-green-500 text-sm font-medium">+12% this week</div>
+
+                  {parsedWellnessData.score === 0 && calculatedWellnessScore > 0 && (
+                    <div className="text-orange-500 text-xs text-center">
+                      Using calculated score (contract data loading...)
+                    </div>
+                  )}
+                  {parsedWellnessData.score > 0 && calculatedWellnessScore !== parsedWellnessData.score && (
+                    <div className="text-blue-500 text-xs text-center">
+                      Contract data loaded ✓
+                    </div>
+                  )}
                 </div>
                 
                 <div className="grid grid-cols-3 gap-3">
@@ -797,40 +923,61 @@ function MobileDashboard() {
               isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
             )}>
               <CardHeader className="pb-3">
-                <CardTitle className={cn(
-                  "text-lg transition-colors",
-                  isDarkMode ? "text-white" : "text-black"
-                )}>
-                  Recent Activity
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className={cn(
+                    "text-lg transition-colors",
+                    isDarkMode ? "text-white" : "text-black"
+                  )}>
+                    Recent Activity
+                  </CardTitle>
+                  {recentActivities === sampleActivities && (
+                    <Badge variant="outline" className="text-xs">
+                      Sample Data
+                    </Badge>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {recentActivities.length > 0 ? (
-                  recentActivities.map(activity => (
-                    <div key={activity.id} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className={cn(
-                          "text-sm transition-colors",
-                          isDarkMode ? "text-gray-300" : "text-gray-700"
-                        )}>
-                          {activity.name}
-                        </span>
+                  recentActivities.map(activity => {
+                    // Safely calculate time difference and reward
+                    const timestamp = Number(activity.timestamp) || Date.now();
+                    const reward = Number(activity.reward) || 0;
+                    const timeDiff = Math.max(0, (Date.now() - timestamp) / 1000 / 60);
+                    
+                    return (
+                      <div key={activity.id} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span className={cn(
+                            "text-sm transition-colors",
+                            isDarkMode ? "text-gray-300" : "text-gray-700"
+                          )}>
+                            {activity.name || 'Unknown Activity'}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-gray-500">
+                            {timeDiff < 1 ? '< 1 min ago' : `${Math.round(timeDiff)} min ago`}
+                          </div>
+                          <div className="text-sm font-medium text-green-500">+{reward} WELL</div>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-xs text-gray-500">{(Date.now() - activity.timestamp) / 1000 / 60} min ago</div>
-                        <div className="text-sm font-medium text-green-500">+{activity.reward} WELL</div>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="text-center py-4">
                     <p className={cn(
                       "text-sm transition-colors",
                       isDarkMode ? "text-gray-400" : "text-gray-600"
                     )}>
-                      No recent activities. Start logging your wellness activities!
+                      {address ? 'No recent activities. Start logging your wellness activities!' : 'Connect your wallet to see activities'}
                     </p>
+                    {!address && (
+                      <div className="mt-2 text-xs text-gray-500">
+                        Sample activities will appear here once you connect and log activities
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -839,64 +986,7 @@ function MobileDashboard() {
             {/* Wallet Status - Keep this for debugging connection issues */}
             <WalletStatus />
             
-            {/* Debug Info - Remove this in production */}
-            <Card className={cn(
-              "transition-colors duration-300",
-              isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-            )}>
-              <CardHeader className="pb-3">
-                <CardTitle className={cn(
-                  "text-sm transition-colors",
-                  isDarkMode ? "text-white" : "text-black"
-                )}>
-                  Debug Info (Contract Data)
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-xs">
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Raw Wellness Data:</strong> {safeStringify(wellnessData)}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>WELL Balance:</strong> {safeStringify(wellBalance)}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Contract Activities:</strong> {safeStringify(contractActivities)}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Contract Meals:</strong> {safeStringify(contractMeals)}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Parsed Data:</strong> {safeStringify(parsedWellnessData)}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Wallet Connected:</strong> {isConnected ? 'Yes' : 'No'}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Wallet Address:</strong> {address || 'None'}
-                </div>
-              </CardContent>
-            </Card>
+
           </div>
         )}
 
@@ -1372,14 +1462,48 @@ function MobileDashboard() {
 // Main Farcaster Page Component
 function FarcasterPageContent() {
   const [showConnectionModal, setShowConnectionModal] = useState(false);
+  const [hasCheckedConnection, setHasCheckedConnection] = useState(false);
   const { isConnected: isFarcasterConnected } = useFarcaster();
+  const { address, isConnecting } = useAccount();
 
-  // Show connection modal if not connected
+  // Only show connection modal once on initial load if not connected
   useEffect(() => {
-    if (!isFarcasterConnected) {
-      setShowConnectionModal(true);
+    if (!hasCheckedConnection && !isConnecting) {
+      setHasCheckedConnection(true);
+      if (!isFarcasterConnected) {
+        setShowConnectionModal(true);
+      }
     }
-  }, [isFarcasterConnected]);
+  }, [isFarcasterConnected, hasCheckedConnection, isConnecting]);
+
+  // Don't show modal if user is already connected or wallet is connecting
+  const shouldShowModal = showConnectionModal && !isFarcasterConnected && !isConnecting;
+
+  // Debug logging to track connection states
+  useEffect(() => {
+    console.log('Farcaster Page - Connection States:', {
+      isConnecting,
+      isFarcasterConnected,
+      hasCheckedConnection,
+      showConnectionModal,
+      shouldShowModal
+    });
+  }, [isConnecting, isFarcasterConnected, hasCheckedConnection, showConnectionModal, shouldShowModal]);
+
+  // Show loading state while wallet is connecting
+  if (isConnecting) {
+    return (
+      <div className={cn(
+        "min-h-screen w-full flex items-center justify-center transition-colors duration-300",
+        "bg-white dark:bg-black"
+      )}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-lg font-medium">Connecting wallet...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn(
@@ -1390,7 +1514,7 @@ function FarcasterPageContent() {
       <MobileDashboard />
       
       <FarcasterConnectionModal 
-        isOpen={showConnectionModal} 
+        isOpen={shouldShowModal} 
         onClose={() => setShowConnectionModal(false)} 
       />
     </div>
