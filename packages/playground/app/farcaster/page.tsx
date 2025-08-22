@@ -446,13 +446,38 @@ function MobileDashboard() {
   // Activity and meal data
   const [activities, setActivities] = useState<any[]>([]);
   const [meals, setMeals] = useState<any[]>([]);
+  
+  // Current time for client-side calculations (prevents hydration issues)
+  const [currentTime, setCurrentTime] = useState(0);
+  
+
 
   // Sample activities for demonstration when no contract data is available
-  const sampleActivities = [
-    { id: 1, type: 'workout', name: 'Completed workout', timestamp: Date.now() - 2 * 60 * 60 * 1000, reward: 50, completed: true },
-    { id: 2, type: 'meditation', name: 'Logged meditation', timestamp: Date.now() - 5 * 60 * 60 * 1000, reward: 25, completed: true },
-    { id: 3, type: 'sleep', name: 'Logged sleep', timestamp: Date.now() - 24 * 60 * 60 * 1000, reward: 30, completed: true }
-  ];
+  const [sampleActivities, setSampleActivities] = useState([
+    { id: 1, type: 'workout', name: 'Completed workout', timestamp: 0, reward: 50, completed: true },
+    { id: 2, type: 'meditation', name: 'Logged meditation', timestamp: 0, reward: 25, completed: true },
+    { id: 3, type: 'sleep', name: 'Logged sleep', timestamp: 0, reward: 30, completed: true }
+  ]);
+
+  // Initialize sample activities with proper timestamps on client side only
+  useEffect(() => {
+    const now = Date.now();
+    setCurrentTime(now);
+    setSampleActivities([
+      { id: 1, type: 'workout', name: 'Completed workout', timestamp: now - 2 * 60 * 60 * 1000, reward: 50, completed: true },
+      { id: 2, type: 'meditation', name: 'Logged meditation', timestamp: now - 5 * 60 * 60 * 1000, reward: 25, completed: true },
+      { id: 3, type: 'sleep', name: 'Logged sleep', timestamp: now - 24 * 60 * 60 * 1000, reward: 30, completed: true }
+    ]);
+    
+    // Update current time every minute for time difference calculations
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000);
+    
+
+    
+    return () => clearInterval(interval);
+  }, []);
   
   // Get user wellness data from WellnessTracker contract (same as main page)
   const { data: wellnessData, error: wellnessError } = useReadContract({
@@ -517,31 +542,31 @@ function MobileDashboard() {
       if (Array.isArray(activity)) {
         // Array format: [id, type, name, reward, timestamp, completed]
         parsedActivity = {
-          id: Number(activity[0]) || Date.now(),
+          id: Number(activity[0]) || 0,
           type: activity[1] || 'unknown',
           name: activity[2] || 'Unknown Activity',
           reward: Number(activity[3]) || 0,
-          timestamp: Number(activity[4]) || Date.now(),
+          timestamp: Number(activity[4]) || 0,
           completed: activity[5] || false
         };
       } else if (typeof activity === 'object' && activity !== null) {
         // Object format: {id, type, name, reward, timestamp, completed}
         parsedActivity = {
-          id: Number(activity.id) || Date.now(),
+          id: Number(activity.id) || 0,
           type: activity.type || 'unknown',
           name: activity.name || 'Unknown Activity',
           reward: Number(activity.reward) || 0,
-          timestamp: Number(activity.timestamp) || Date.now(),
+          timestamp: Number(activity.timestamp) || 0,
           completed: activity.completed || false
         };
       } else {
         // Fallback for unexpected data
         parsedActivity = {
-          id: Date.now(),
+          id: 0,
           type: 'unknown',
           name: 'Unknown Activity',
           reward: 0,
-          timestamp: Date.now(),
+          timestamp: 0,
           completed: false
         };
       }
@@ -567,11 +592,12 @@ function MobileDashboard() {
 
   // Functional activity logging with smart contract integration
   const handleLogActivity = async (type: string, name: string, reward: number) => {
+    const now = Date.now();
     const newActivity = {
-      id: Date.now(),
+      id: now,
       type,
       name,
-      timestamp: Date.now(),
+      timestamp: now,
       reward,
       completed: true
     };
@@ -614,12 +640,13 @@ function MobileDashboard() {
   const handleLogMeal = async () => {
     if (!newMeal.name.trim() || !newMeal.calories.trim()) return;
     
+    const now = Date.now();
     const meal = {
-      id: Date.now(),
+      id: now,
       type: newMeal.type,
       name: newMeal.name,
       calories: parseInt(newMeal.calories),
-      timestamp: Date.now()
+      timestamp: now
     };
     
     setMeals(prev => [meal, ...prev.slice(0, 9)]);
@@ -959,9 +986,9 @@ function MobileDashboard() {
                 {recentActivities.length > 0 ? (
                   recentActivities.map(activity => {
                     // Safely calculate time difference and reward
-                    const timestamp = Number(activity.timestamp) || Date.now();
+                    const timestamp = Number(activity.timestamp) || 0;
                     const reward = Number(activity.reward) || 0;
-                    const timeDiff = Math.max(0, (Date.now() - timestamp) / 1000 / 60);
+                    const timeDiff = timestamp > 0 && currentTime > 0 ? Math.max(0, (currentTime - timestamp) / 1000 / 60) : 0;
                     
                     return (
                       <div key={activity.id} className="flex items-center justify-between">
@@ -1049,106 +1076,7 @@ function MobileDashboard() {
               </div>
             )}
             
-            {/* Debug Info - Remove this in production */}
-            <Card className={cn(
-              "transition-colors duration-300",
-              isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-            )}>
-              <CardHeader className="pb-3">
-                <CardTitle className={cn(
-                  "text-sm transition-colors",
-                  isDarkMode ? "text-white" : "text-black"
-                )}>
-                  Debug Info (Contract Data)
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-xs">
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Raw Wellness Data:</strong> {safeStringify(wellnessData)}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>WELL Balance:</strong> {safeStringify(wellBalance)}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Contract Activities:</strong> {safeStringify(contractActivities)}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Parsed Activities:</strong> {safeStringify(recentActivities)}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Data Source:</strong> {recentActivities === sampleActivities ? 'Sample Data' : 'Smart Contract'}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Contract Meals:</strong> {safeStringify(contractMeals)}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Parsed Data:</strong> {safeStringify(parsedWellnessData)}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Contract Score:</strong> {parsedWellnessData.score}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Calculated Score:</strong> {calculatedWellnessScore}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Display Score:</strong> {displayWellnessScore}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Contract Data Loaded:</strong> {parsedWellnessData.score > 0 ? 'Yes' : 'No'}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Score Source:</strong> {parsedWellnessData.score > 0 ? 'Contract' : 'Calculated'}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Wallet Connected:</strong> {isConnected ? 'Yes' : 'No'}
-                </div>
-                <div className={cn(
-                  "transition-colors",
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>
-                  <strong>Wallet Address:</strong> {address || 'None'}
-                </div>
-              </CardContent>
-            </Card>
+
           </div>
         )}
 
