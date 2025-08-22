@@ -22,10 +22,13 @@ contract WellnessNFT is ERC721, ERC721URIStorage, Ownable {
     // Mapping to track user's token ID
     mapping(address => uint256) public userTokenId;
     
+    // Events
+    event NFTMinted(address indexed user, uint256 indexed tokenId, string uri);
+    
     constructor() ERC721("Wellness Profile", "WELLP") Ownable(msg.sender) {}
     
     /**
-     * @dev Mint a new wellness profile NFT
+     * @dev Mint a new wellness profile NFT (owner only)
      * @param to Address to mint the NFT to
      * @param uri IPFS URI containing metadata and artwork
      */
@@ -44,6 +47,26 @@ contract WellnessNFT is ERC721, ERC721URIStorage, Ownable {
     }
     
     /**
+     * @dev Mint a new wellness profile NFT (user minting)
+     * @param uri IPFS URI containing metadata and artwork
+     */
+    function mintWellnessNFT(string memory uri) public {
+        require(!hasProfile[msg.sender], "User already has a profile");
+        require(bytes(uri).length > 0, "URI cannot be empty");
+        
+        _tokenIds++;
+        uint256 newTokenId = _tokenIds;
+        
+        _safeMint(msg.sender, newTokenId);
+        _setTokenURI(newTokenId, uri);
+        
+        hasProfile[msg.sender] = true;
+        userTokenId[msg.sender] = newTokenId;
+        
+        emit NFTMinted(msg.sender, newTokenId, uri);
+    }
+    
+    /**
      * @dev Get the token ID for a specific user
      * @param user Address of the user
      * @return Token ID if user has a profile, 0 otherwise
@@ -59,6 +82,33 @@ contract WellnessNFT is ERC721, ERC721URIStorage, Ownable {
      */
     function userHasProfile(address user) public view returns (bool) {
         return hasProfile[user];
+    }
+    
+    /**
+     * @dev Get total number of NFTs minted
+     * @return Total count of NFTs
+     */
+    function totalSupply() public view returns (uint256) {
+        return _tokenIds;
+    }
+    
+    /**
+     * @dev Get all NFTs for a user (if you want to allow multiple NFTs per user)
+     * @param user Address of the user
+     * @return Array of token IDs owned by the user
+     */
+    function getUserNFTs(address user) public view returns (uint256[] memory) {
+        uint256[] memory userTokens = new uint256[](balanceOf(user));
+        uint256 tokenIndex = 0;
+        
+        for (uint256 i = 1; i <= _tokenIds; i++) {
+            if (_ownerOf(i) == user) {
+                userTokens[tokenIndex] = i;
+                tokenIndex++;
+            }
+        }
+        
+        return userTokens;
     }
     
     // Override required functions

@@ -12,13 +12,14 @@ contract DeployWellnessTracker is Script {
         // Start broadcasting with the private key
         vm.startBroadcast(deployerPrivateKey);
         
-        // Deploy the contract
+        // Deploy the enhanced WellnessTracker contract
         WellnessTracker wellnessTracker = new WellnessTracker();
         
         // Log deployment information
-        console.log("WellnessTracker deployed at:", address(wellnessTracker));
+        console.log("Enhanced WellnessTracker deployed at:", address(wellnessTracker));
         console.log("Deployer address:", vm.addr(deployerPrivateKey));
         console.log("Private key loaded successfully");
+        console.log("New features: Workout, Meditation, Meal (with macros), Sleep tracking");
         
         vm.stopBroadcast();
     }

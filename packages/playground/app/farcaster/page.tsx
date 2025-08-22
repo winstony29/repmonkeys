@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { WalletStatus } from '@/components/WalletStatus';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { 
   Activity, 
   Utensils, 
@@ -24,11 +26,14 @@ import {
   User,
   CheckCircle,
   MessageSquare,
-  Brain
+  Brain,
+  Dumbbell,
+  EditIcon,
+  Coffee
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAccount, useReadContract, useBalance, useWriteContract, useChainId, useDisconnect, useConnect } from 'wagmi';
-import { wellnessTrackerAbi, CONTRACT_ADDRESSES } from '@/lib/contracts';
+import { wellnessTrackerAbi, wellnessNFTAbi, CONTRACT_ADDRESSES, testContractConnectivity } from '@/lib/contracts';
 import { http, createConfig, createStorage } from 'wagmi';
 import { WagmiProvider } from 'wagmi';
 import { baseSepolia } from 'wagmi/chains';
@@ -43,16 +48,30 @@ const wagmiConfig = createConfig({
   },
   ssr: true,
   connectors: [
-    coinbaseWallet({
-      appName: 'WellSpace',
-      appLogoUrl: '/WellSpace_logo.png',
-      preference: 'smartWalletOnly',
-    }),
-    coinbaseWallet({
-      appName: 'WellSpace',
-      appLogoUrl: '/WellSpace_logo.png', 
-      preference: 'eoaOnly',
-    }),
+            coinbaseWallet({
+          appName: 'WellSpace',
+          appLogoUrl: (() => {
+            if (typeof window !== 'undefined') {
+              const logoUrl = `${window.location.protocol}//${window.location.host}/WellSpace_logo.png`;
+              console.log('🔍 Farcaster App - Coinbase Wallet Logo URL:', logoUrl);
+              
+              // Test if logo is accessible
+              const testImg = new Image();
+              testImg.onload = () => console.log('✅ Farcaster App - Logo image loads successfully');
+              testImg.onerror = () => console.error('❌ Farcaster App - Logo image failed to load');
+              testImg.src = logoUrl;
+              
+              return logoUrl;
+            }
+            return '/WellSpace_logo.png';
+          })(),
+          preference: 'smartWalletOnly',
+        }),
+          coinbaseWallet({
+        appName: 'WellSpace',
+        appLogoUrl: typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.host}/WellSpace_logo.png` : '/WellSpace_logo.png',
+        preference: 'eoaOnly',
+      }),
   ],
   // Add wallet persistence and stability
   storage: createStorage({
@@ -431,7 +450,40 @@ function MobileDashboard() {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { userHandle, isConnected: isFarcasterConnected } = useFarcaster();
-  const [currentView, setCurrentView] = useState<'dashboard' | 'activity' | 'meals' | 'goals' | 'rewards' | 'ai-chat'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'activity' | 'meals' | 'goals' | 'rewards' | 'ai-chat' | 'nft-generation'>('dashboard');
+  
+  // Modal states for quick actions
+  const [showWorkoutModal, setShowWorkoutModal] = useState(false);
+  const [showMeditationModal, setShowMeditationModal] = useState(false);
+  const [showMealModal, setShowMealModal] = useState(false);
+  const [showSleepModal, setShowSleepModal] = useState(false);
+  
+  // Form states for quick actions
+  const [workoutForm, setWorkoutForm] = useState({
+    duration: '',
+    sets: '',
+    caloriesBurned: '',
+    activityType: '',
+    name: ''
+  });
+  
+  const [meditationForm, setMeditationForm] = useState({
+    duration: '',
+    name: ''
+  });
+  
+  const [mealForm, setMealForm] = useState({
+    mealType: '',
+    name: '',
+    calories: '',
+    protein: '',
+    fat: '',
+    carbs: ''
+  });
+  
+  const [sleepForm, setSleepForm] = useState({
+    duration: ''
+  });
   
   // Disconnect confirmation state
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
@@ -446,8 +498,21 @@ function MobileDashboard() {
   const [aiResponse, setAiResponse] = useState<string>('');
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   
-  // Meal logging state
-  const [showMealModal, setShowMealModal] = useState(false);
+  // NFT Generation state
+  const [nftTheme, setNftTheme] = useState<'minimalist' | 'cosmic' | 'custom' | null>(null);
+  const [customNftPrompt, setCustomNftPrompt] = useState('');
+  const [isGeneratingNFT, setIsGeneratingNFT] = useState(false);
+  const [generatedNFTImage, setGeneratedNFTImage] = useState<string | null>(null);
+  const [userNFTs, setUserNFTs] = useState<any[]>([]);
+  
+  // Contract status for user feedback
+  const [contractStatus, setContractStatus] = useState<{
+    type: 'success' | 'error' | null;
+    message: string;
+    timestamp: number;
+  } | null>(null);
+  
+  // Meal logging state (using the new form structure)
   const [newMeal, setNewMeal] = useState({ type: 'breakfast', name: '', calories: '' });
   
   // Activity and meal data
@@ -474,6 +539,30 @@ function MobileDashboard() {
       { id: 1, type: 'workout', name: 'Completed workout', timestamp: now - 2 * 60 * 60 * 1000, reward: 50, completed: true },
       { id: 2, type: 'meditation', name: 'Logged meditation', timestamp: now - 5 * 60 * 60 * 1000, reward: 25, completed: true },
       { id: 3, type: 'sleep', name: 'Logged sleep', timestamp: now - 24 * 60 * 60 * 1000, reward: 30, completed: true }
+    ]);
+    
+    // Initialize sample NFTs
+    setUserNFTs([
+      {
+        tokenId: 1,
+        image: 'https://image.pollinations.ai/prompt/minimalist%20wellness%20art%2C%20clean%20lines%2C%20simple%20shapes%2C%20meditation%20symbols%2C%20zen%20aesthetic%2C%20white%20space%2C%20elegant%20design?width=512&height=512&seed=123',
+        metadata: {
+          name: 'Wellness NFT - Minimalist',
+          description: 'AI-generated minimalist wellness art',
+          theme: 'minimalist'
+        },
+        mintedAt: new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        tokenId: 2,
+        image: 'https://image.pollinations.ai/prompt/cosmic%20wellness%20art%2C%20space%20galaxy%20theme%2C%20stars%2C%20nebula%2C%20cosmic%20energy%2C%20wellness%20symbols%2C%20vibrant%20colors%2C%20mystical?width=512&height=512&seed=456',
+        metadata: {
+          name: 'Wellness NFT - Cosmic',
+          description: 'AI-generated cosmic wellness art',
+          theme: 'cosmic'
+        },
+        mintedAt: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString()
+      }
     ]);
     
     // Update current time every minute for time difference calculations
@@ -523,11 +612,13 @@ function MobileDashboard() {
   const parsedWellnessData = wellnessData && Array.isArray(wellnessData) ? {
     streak: Number(wellnessData[0]) || 0,           // streakCount
     score: Number(wellnessData[1]) || 0,            // totalScore
-    lastActivityTimestamp: Number(wellnessData[2]) || 0,
-    dailyStreakStart: Number(wellnessData[3]) || 0,
-    weeklyGoals: wellnessData[4] || null,
-    activities: Number(wellnessData[5]) || 0,       // totalActivities
+    // Contract timestamps are in SECONDS, convert to milliseconds for frontend
+    lastActivityTimestamp: Number(wellnessData[2]) > 0 ? Number(wellnessData[2]) * 1000 : 0,
+    dailyStreakStart: Number(wellnessData[3]) > 0 ? Number(wellnessData[3]) * 1000 : 0,
+    workouts: Number(wellnessData[4]) || 0,         // totalWorkouts
+    meditations: Number(wellnessData[5]) || 0,      // totalMeditations
     meals: Number(wellnessData[6]) || 0,            // totalMeals
+    sleepSessions: Number(wellnessData[7]) || 0,    // totalSleepSessions
     wellBalance: wellBalance ? Number(wellBalance.formatted) : 0.00 // Real WELL balance from contract
   } : {
     streak: 0,
@@ -535,8 +626,10 @@ function MobileDashboard() {
     lastActivityTimestamp: 0,
     dailyStreakStart: 0,
     weeklyGoals: null,
-    activities: 0,
+    workouts: 0,
+    meditations: 0,
     meals: 0,
+    sleepSessions: 0,
     wellBalance: wellBalance ? Number(wellBalance.formatted) : 0.00 // Real WELL balance from contract
   };
 
@@ -548,22 +641,30 @@ function MobileDashboard() {
       
       if (Array.isArray(activity)) {
         // Array format: [id, type, name, reward, timestamp, completed]
+        // Contract timestamps are in SECONDS, convert to milliseconds for frontend
+        const rawTimestamp = Number(activity[4]) || 0;
+        const timestampInMs = rawTimestamp > 0 ? rawTimestamp * 1000 : 0;
+        
         parsedActivity = {
           id: Number(activity[0]) || 0,
           type: activity[1] || 'unknown',
           name: activity[2] || 'Unknown Activity',
           reward: Number(activity[3]) || 0,
-          timestamp: Number(activity[4]) || 0,
+          timestamp: timestampInMs,
           completed: activity[5] || false
         };
       } else if (typeof activity === 'object' && activity !== null) {
         // Object format: {id, type, name, reward, timestamp, completed}
+        // Contract timestamps are in SECONDS, convert to milliseconds for frontend
+        const rawTimestamp = Number(activity.timestamp) || 0;
+        const timestampInMs = rawTimestamp > 0 ? rawTimestamp * 1000 : 0;
+        
         parsedActivity = {
           id: Number(activity.id) || 0,
           type: activity.type || 'unknown',
           name: activity.name || 'Unknown Activity',
           reward: Number(activity.reward) || 0,
-          timestamp: Number(activity.timestamp) || 0,
+          timestamp: timestampInMs,
           completed: activity.completed || false
         };
       } else {
@@ -589,13 +690,19 @@ function MobileDashboard() {
 
   // Parse recent meals from smart contract
   const recentMeals = contractMeals && Array.isArray(contractMeals) ? 
-    contractMeals.map((meal: any) => ({
-      id: Number(meal[0]),
-      type: meal[1],
-      name: meal[2],
-      calories: Number(meal[3]),
-      timestamp: Number(meal[4])
-    })) : [];
+    contractMeals.map((meal: any) => {
+      // Contract timestamps are in SECONDS, convert to milliseconds for frontend
+      const rawTimestamp = Number(meal[4]) || 0;
+      const timestampInMs = rawTimestamp > 0 ? rawTimestamp * 1000 : 0;
+      
+      return {
+        id: Number(meal[0]),
+        type: meal[1],
+        name: meal[2],
+        calories: Number(meal[3]),
+        timestamp: timestampInMs
+      };
+    }) : [];
 
   // Functional activity logging with smart contract integration
   const handleLogActivity = async (type: string, name: string, reward: number) => {
@@ -615,30 +722,72 @@ function MobileDashboard() {
     // Save to smart contract if available
     if (address && chainId === 84532) {
       try {
-        await writeContract({
-          address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
-          abi: wellnessTrackerAbi,
-          functionName: 'logActivity',
-          args: [type, name, BigInt(reward)],
-        });
-        console.log('✅ Activity logged to smart contract');
-      } catch (error) {
-        console.log('🔄 Falling back to localStorage only');
-      }
-    }
-    
-    // Always save to localStorage as backup
-    if (address) {
-      const localStorageKey = `wellspace_user_${address}`;
-      const existingData = localStorage.getItem(localStorageKey);
-      if (existingData) {
-        try {
-          const userData = JSON.parse(existingData);
-          userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
-          localStorage.setItem(localStorageKey, JSON.stringify(userData));
-        } catch (error) {
-          console.error('Error updating localStorage:', error);
+        console.log('🚀 Logging activity to smart contract:', { type, name, reward });
+        console.log('📝 Contract Address:', CONTRACT_ADDRESSES.WELLNESS_TRACKER);
+        console.log('🔗 Chain ID:', chainId);
+        console.log('👤 User Address:', address);
+        
+        // Map old activity types to new contract functions
+        let result;
+        if (type === 'workout') {
+          result = await writeContract({
+            address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+            abi: wellnessTrackerAbi,
+            functionName: 'logWorkout',
+            args: [BigInt(30), BigInt(1), BigInt(100), 'General Workout', name, BigInt(50)],
+          });
+        } else if (type === 'meditation') {
+          result = await writeContract({
+            address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+            abi: wellnessTrackerAbi,
+            functionName: 'logMeditation',
+            args: [BigInt(20), name, BigInt(25)],
+          });
+        } else if (type === 'sleep') {
+          result = await writeContract({
+            address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+            abi: wellnessTrackerAbi,
+            functionName: 'logSleep',
+            args: [BigInt(8)],
+          });
+        } else {
+          // Fallback to workout for unknown types
+          result = await writeContract({
+            address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+            abi: wellnessTrackerAbi,
+            functionName: 'logWorkout',
+            args: [BigInt(30), BigInt(1), BigInt(100), type, name, BigInt(50)],
+          });
         }
+        
+        console.log('✅ Activity logged to smart contract successfully!');
+        console.log('📊 Transaction Result:', result);
+        
+        // Show success message to user
+        setContractStatus({
+          type: 'success',
+          message: `✅ ${name} logged to blockchain successfully!`,
+          timestamp: Date.now()
+        });
+        
+        // Clear success message after 5 seconds
+        setTimeout(() => {
+          setContractStatus(null);
+        }, 5000);
+        
+      } catch (error) {
+        console.error('❌ Failed to log activity to smart contract:', error);
+        
+        setContractStatus({
+          type: 'error',
+          message: `❌ Failed to log ${name} to blockchain. Please try again.`,
+          timestamp: Date.now()
+        });
+        
+        // Clear error message after 8 seconds
+        setTimeout(() => {
+          setContractStatus(null);
+        }, 8000);
       }
     }
   };
@@ -663,37 +812,368 @@ function MobileDashboard() {
     // Save to smart contract if available
     if (address && chainId === 84532) {
       try {
-        await writeContract({
+        console.log('🚀 Logging meal to smart contract:', { type: meal.type, name: meal.name, calories: meal.calories });
+        console.log('📝 Contract Address:', CONTRACT_ADDRESSES.WELLNESS_TRACKER);
+        console.log('🔗 Chain ID:', chainId);
+        console.log('👤 User Address:', address);
+        
+        const result = await writeContract({
           address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
           abi: wellnessTrackerAbi,
           functionName: 'logMeal',
-          args: [meal.type, meal.name, BigInt(meal.calories)],
+          args: [meal.type, meal.name, BigInt(meal.calories), BigInt(0), BigInt(0), BigInt(0)],
         });
-        console.log('✅ Meal logged to smart contract');
+        
+        console.log('✅ Meal logged to smart contract successfully!');
+        console.log('📊 Transaction Result:', result);
+        
+        // Show success message to user
+        setContractStatus({
+          type: 'success',
+          message: `✅ ${meal.name} logged to blockchain successfully!`,
+          timestamp: Date.now()
+        });
+        
+        // Clear success message after 5 seconds
+        setTimeout(() => {
+          setContractStatus(null);
+        }, 5000);
+        
       } catch (error) {
-        console.log('🔄 Falling back to localStorage only');
-      }
-    }
-    
-    // Always save to localStorage as backup
-    if (address) {
-      const localStorageKey = `wellspace_user_${address}`;
-      const existingData = localStorage.getItem(localStorageKey);
-      if (existingData) {
-        try {
-          const userData = JSON.parse(existingData);
-          userData.meals = [meal, ...(userData.meals || []).slice(0, 9)];
-          localStorage.setItem(localStorageKey, JSON.stringify(userData));
-        } catch (error) {
-          console.error('Error updating localStorage:', error);
-        }
+        console.error('❌ Failed to log meal to smart contract:', error);
+        
+        setContractStatus({
+          type: 'error',
+          message: `❌ Failed to log ${meal.name} to blockchain. Please try again.`,
+          timestamp: Date.now()
+        });
+        
+        // Clear error message after 8 seconds
+        setTimeout(() => {
+          setContractStatus(null);
+        }, 8000);
       }
     }
   };
 
   // Functional sleep logging with smart contract integration
   const handleLogSleep = async () => {
-    await handleLogActivity('sleep', 'Logged sleep', 30);
+    if (!address) {
+      setContractStatus({
+        type: 'error',
+        message: 'Please connect your wallet to log sleep',
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
+    // Validate form
+    if (!sleepForm.duration) {
+      setContractStatus({
+        type: 'error',
+        message: 'Please fill in sleep duration',
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
+    try {
+      setContractStatus({
+        type: 'success',
+        message: 'Submitting sleep to blockchain...',
+        timestamp: Date.now()
+      });
+      
+      // Call smart contract to log sleep
+      const result = await writeContract({
+        address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+        abi: wellnessTrackerAbi,
+        functionName: 'logSleep',
+        args: [BigInt(Math.round(parseFloat(sleepForm.duration) * 60))] // Convert hours to minutes
+      });
+      
+      console.log('Sleep logged to blockchain:', result);
+      
+      setContractStatus({
+        type: 'success',
+        message: 'Sleep logged successfully to blockchain!',
+        timestamp: Date.now()
+      });
+      
+      // Add to local state for immediate UI update
+      const newSleepEntry = {
+        id: activities.length + 1,
+        type: 'sleep',
+        name: 'Sleep session',
+        duration: parseFloat(sleepForm.duration),
+        timestamp: Date.now(),
+        reward: 30
+      };
+      
+      setActivities([...activities, newSleepEntry]);
+      
+      // Reset form and close modal
+      setSleepForm({
+        duration: ''
+      });
+      setShowSleepModal(false);
+      
+    } catch (error) {
+      console.error('Failed to log sleep to blockchain:', error);
+      setContractStatus({
+        type: 'error',
+        message: `Failed to log sleep: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: Date.now()
+      });
+    }
+  };
+  
+  // Handle workout logging with smart contract integration
+  const handleLogWorkout = async () => {
+    if (!address) {
+      setContractStatus({
+        type: 'error',
+        message: 'Please connect your wallet to log workouts',
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
+    // Validate form
+    if (!workoutForm.duration || !workoutForm.sets || !workoutForm.caloriesBurned) {
+      setContractStatus({
+        type: 'error',
+        message: 'Please fill in all required fields',
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
+    try {
+      setContractStatus({
+        type: 'success',
+        message: 'Submitting workout to blockchain...',
+        timestamp: Date.now()
+      });
+      
+      // Call smart contract to log workout
+      const result = await writeContract({
+        address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+        abi: wellnessTrackerAbi,
+        functionName: 'logWorkout',
+        args: [
+          BigInt(workoutForm.duration),
+          BigInt(workoutForm.sets),
+          BigInt(workoutForm.caloriesBurned),
+          workoutForm.activityType || 'General Workout',
+          workoutForm.name || 'Workout Session',
+          BigInt(50)
+        ]
+      });
+      
+      console.log('Workout logged to blockchain:', result);
+      
+      setContractStatus({
+        type: 'success',
+        message: 'Workout logged successfully to blockchain!',
+        timestamp: Date.now()
+      });
+      
+      // Add to local state for immediate UI update
+      const newWorkoutEntry = {
+        id: activities.length + 1,
+        type: 'workout',
+        name: workoutForm.name || `${workoutForm.activityType} workout`,
+        duration: parseInt(workoutForm.duration),
+        sets: parseInt(workoutForm.sets),
+        caloriesBurned: parseInt(workoutForm.caloriesBurned),
+        timestamp: Date.now(),
+        reward: 50
+      };
+      
+      setActivities([...activities, newWorkoutEntry]);
+      
+      // Reset form and close modal
+      setWorkoutForm({
+        duration: '',
+        sets: '',
+        caloriesBurned: '',
+        activityType: '',
+        name: ''
+      });
+      setShowWorkoutModal(false);
+      
+    } catch (error) {
+      console.error('Failed to log workout to blockchain:', error);
+      setContractStatus({
+        type: 'error',
+        message: `Failed to log workout: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: Date.now()
+      });
+    }
+  };
+  
+  // Handle meditation logging with smart contract integration
+  const handleLogMeditation = async () => {
+    if (!address) {
+      setContractStatus({
+        type: 'error',
+        message: 'Please connect your wallet to log meditation',
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
+    // Validate form
+    if (!meditationForm.duration) {
+      setContractStatus({
+        type: 'error',
+        message: 'Please fill in duration',
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
+    try {
+      setContractStatus({
+        type: 'success',
+        message: 'Submitting meditation to blockchain...',
+        timestamp: Date.now()
+      });
+      
+      // Call smart contract to log meditation
+      const result = await writeContract({
+        address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+        abi: wellnessTrackerAbi,
+        functionName: 'logMeditation',
+        args: [
+          BigInt(meditationForm.duration),
+          meditationForm.name || 'Meditation Session',
+          BigInt(25)
+        ]
+      });
+      
+      console.log('Meditation logged to blockchain:', result);
+      
+      setContractStatus({
+        type: 'success',
+        message: 'Meditation logged successfully to blockchain!',
+        timestamp: Date.now()
+      });
+      
+      // Add to local state for immediate UI update
+      const newMeditationEntry = {
+        id: activities.length + 1,
+        type: 'meditation',
+        name: meditationForm.name || 'Meditation session',
+        duration: parseInt(meditationForm.duration),
+        timestamp: Date.now(),
+        reward: 25
+      };
+      
+      setActivities([...activities, newMeditationEntry]);
+      
+      // Reset form and close modal
+      setMeditationForm({
+        duration: '',
+        name: ''
+      });
+      setShowMeditationModal(false);
+      
+    } catch (error) {
+      console.error('Failed to log meditation to blockchain:', error);
+      setContractStatus({
+        type: 'error',
+        message: `Failed to log meditation: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: Date.now()
+      });
+    }
+  };
+  
+  // Handle enhanced meal logging with macros and smart contract integration
+  const handleLogMealWithMacros = async () => {
+    if (!address) {
+      setContractStatus({
+        type: 'error',
+        message: 'Please connect your wallet to log meals',
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
+    // Validate form
+    if (!mealForm.mealType || !mealForm.calories) {
+      setContractStatus({
+        type: 'error',
+        message: 'Please fill in meal type and calories',
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
+    try {
+      setContractStatus({
+        type: 'success',
+        message: 'Submitting meal to blockchain...',
+        timestamp: Date.now()
+      });
+      
+      // Call smart contract to log meal with macros
+      const result = await writeContract({
+        address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+        abi: wellnessTrackerAbi,
+        functionName: 'logMeal',
+        args: [
+          mealForm.mealType,
+          mealForm.name || `${mealForm.mealType} logged`,
+          BigInt(mealForm.calories),
+          BigInt(mealForm.protein || 0),
+          BigInt(mealForm.fat || 0),
+          BigInt(mealForm.carbs || 0)
+        ]
+      });
+      
+      console.log('Meal logged to blockchain:', result);
+      
+      setContractStatus({
+        type: 'success',
+        message: 'Meal logged successfully to blockchain!',
+        timestamp: Date.now()
+      });
+      
+      // Add to local state for immediate UI update
+      const newMealEntry = {
+        id: meals.length + 1,
+        type: mealForm.mealType,
+        name: mealForm.name || `${mealForm.mealType} logged`,
+        calories: parseInt(mealForm.calories),
+        protein: parseInt(mealForm.protein) || 0,
+        fat: parseInt(mealForm.fat) || 0,
+        carbs: parseInt(mealForm.carbs) || 0,
+        timestamp: Date.now()
+      };
+      
+      setMeals([...meals, newMealEntry]);
+      
+      // Reset form and close modal
+      setMealForm({
+        mealType: '',
+        name: '',
+        calories: '',
+        protein: '',
+        fat: '',
+        carbs: ''
+      });
+      setShowMealModal(false);
+      
+    } catch (error) {
+      console.error('Failed to log meal to blockchain:', error);
+      setContractStatus({
+        type: 'error',
+        message: `Failed to log meal: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: Date.now()
+      });
+    }
   };
 
   // AI Chat functionality (placeholder)
@@ -709,6 +1189,234 @@ function MobileDashboard() {
       console.error('Failed to get AI advice:', error);
     } finally {
       setIsLoadingAI(false);
+    }
+  };
+
+  // NFT Generation functionality with Pollinations.ai
+  const handleGenerateNFT = async () => {
+    if (!nftTheme || (nftTheme === 'custom' && !customNftPrompt.trim())) return;
+    
+    setIsGeneratingNFT(true);
+    try {
+      // Generate prompt based on theme
+      let prompt = '';
+      switch (nftTheme) {
+        case 'minimalist':
+          prompt = 'minimalist wellness art, clean lines, simple shapes, meditation symbols, zen aesthetic, white space, elegant design';
+          break;
+        case 'cosmic':
+          prompt = 'cosmic wellness art, space galaxy theme, stars, nebula, cosmic energy, wellness symbols, vibrant colors, mystical';
+          break;
+        case 'custom':
+          prompt = customNftPrompt.trim();
+          break;
+      }
+      
+      // Generate image using Pollinations.ai with better URL construction
+      const seed = Date.now();
+      
+      // Try multiple Pollinations.ai URL formats
+      const pollinationsUrls = [
+        `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&seed=${seed}`,
+        `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512`,
+        `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}`
+      ];
+      
+      let imageLoaded = false;
+      
+      // Try each URL format until one works
+      for (let i = 0; i < pollinationsUrls.length && !imageLoaded; i++) {
+        const testImage = new Image();
+        testImage.onload = () => {
+          console.log('✅ Pollinations.ai image loaded successfully:', pollinationsUrls[i]);
+          setGeneratedNFTImage(pollinationsUrls[i]);
+          imageLoaded = true;
+        };
+        testImage.onerror = () => {
+          console.log(`❌ Pollinations.ai URL ${i + 1} failed:`, pollinationsUrls[i]);
+          if (i === pollinationsUrls.length - 1) {
+            // All URLs failed, use fallback
+            console.log('❌ All Pollinations.ai URLs failed, using fallback');
+            const fallbackUrl = `https://via.placeholder.com/512x512/6366f1/ffffff?text=${encodeURIComponent(prompt.substring(0, 20))}`;
+            setGeneratedNFTImage(fallbackUrl);
+          }
+        };
+        testImage.src = pollinationsUrls[i];
+        
+        // Wait a bit before trying the next URL
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+
+      
+      // Mint NFT to blockchain (don't await here to allow image to load first)
+      setTimeout(async () => {
+        try {
+          await mintWellnessNFT(generatedNFTImage || pollinationsUrls[0], prompt);
+        } catch (error) {
+          console.error('Failed to mint NFT:', error);
+        }
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Failed to generate NFT:', error);
+      // Set fallback image on error
+      const fallbackUrl = `https://via.placeholder.com/512x512/ef4444/ffffff?text=Generation+Failed`;
+      setGeneratedNFTImage(fallbackUrl);
+    } finally {
+      setIsGeneratingNFT(false);
+    }
+  };
+
+  // Fetch NFTs from blockchain using wagmi hooks
+  const { data: userHasProfile } = useReadContract({
+    address: CONTRACT_ADDRESSES.WELLNESS_NFT,
+    abi: wellnessNFTAbi,
+    functionName: 'userHasProfile',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  const { data: userTokenId } = useReadContract({
+    address: CONTRACT_ADDRESSES.WELLNESS_NFT,
+    abi: wellnessNFTAbi,
+    functionName: 'getUserTokenId',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && !!userHasProfile },
+  });
+
+  const { data: tokenUri } = useReadContract({
+    address: CONTRACT_ADDRESSES.WELLNESS_NFT,
+    abi: wellnessNFTAbi,
+    functionName: 'tokenURI',
+    args: userTokenId ? [userTokenId] : undefined,
+    query: { enabled: !!userTokenId },
+  });
+
+  // Debug contract addresses
+  useEffect(() => {
+    console.log('🔍 Contract Debug Info:');
+    console.log('WELLNESS_NFT Address:', CONTRACT_ADDRESSES.WELLNESS_NFT);
+    console.log('Chain ID:', chainId);
+    console.log('User Address:', address);
+    console.log('User Has Profile:', userHasProfile);
+    console.log('User Token ID:', userTokenId);
+    console.log('Token URI:', tokenUri);
+
+    // Test contract connectivity when user connects
+    if (address) {
+      console.log('🌐 Testing contract connectivity from Farcaster page...');
+      testContractConnectivity().catch(error => {
+        console.error('❌ Farcaster page contract connectivity test failed:', error);
+      });
+    }
+    
+    // Debug timestamp conversion
+    if (contractActivities && Array.isArray(contractActivities) && contractActivities.length > 0) {
+      console.log('⏰ Timestamp Debug:');
+      contractActivities.forEach((activity, index) => {
+        if (Array.isArray(activity)) {
+          const rawTimestamp = Number(activity[4]);
+          const timestampInMs = rawTimestamp > 0 ? rawTimestamp * 1000 : 0;
+          console.log(`Activity ${index}: Raw=${rawTimestamp}s, Converted=${timestampInMs}ms, Diff=${Date.now() - timestampInMs}ms`);
+        }
+      });
+    }
+  }, [address, chainId, userHasProfile, userTokenId, tokenUri, contractActivities]);
+
+  // Mint NFT to blockchain
+  const mintWellnessNFT = async (imageUrl: string, prompt: string) => {
+    if (!address) return;
+    
+    try {
+      // Create metadata for the NFT
+      const metadata = {
+        name: `Wellness NFT - ${nftTheme}`,
+        description: `AI-generated wellness art: ${prompt}`,
+        image: imageUrl,
+        attributes: [
+          { trait_type: "Theme", value: nftTheme },
+          { trait_type: "Generated", value: new Date().toISOString() },
+          { trait_type: "Wellness Score", value: displayWellnessScore }
+        ]
+      };
+      
+      // For now, we'll use the image URL directly as the URI
+      // In production, you would upload metadata to IPFS
+      const metadataUri = imageUrl; // This will be the IPFS URI in production
+      
+      // Mint NFT using smart contract
+      if (address && chainId === 84532) {
+        try {
+          console.log('🚀 Attempting to mint NFT to contract:', CONTRACT_ADDRESSES.WELLNESS_NFT);
+          console.log('📝 Metadata URI:', metadataUri);
+          console.log('👤 User Address:', address);
+          console.log('🔗 Chain ID:', chainId);
+          
+          await writeContract({
+            address: CONTRACT_ADDRESSES.WELLNESS_NFT,
+            abi: wellnessNFTAbi,
+            functionName: 'mintWellnessNFT',
+            args: [metadataUri],
+          });
+          
+          console.log('✅ NFT minted to smart contract successfully');
+          
+          // Create local NFT object
+          const newNFT = {
+            tokenId: Date.now(), // This will be the actual token ID from the contract
+            image: imageUrl,
+            metadata: metadata,
+            mintedAt: new Date().toISOString(),
+            transactionHash: 'pending' // Transaction hash will be available after confirmation
+          };
+          
+          // Add to local state
+          setUserNFTs(prev => [...prev, newNFT]);
+          
+          // Reset form
+          setNftTheme(null);
+          setCustomNftPrompt('');
+          setGeneratedNFTImage(null);
+          
+          // Show success message
+          console.log('NFT minted successfully:', newNFT);
+          
+        } catch (contractError) {
+          console.error('Contract minting failed, falling back to local storage:', contractError);
+          
+          // Fallback to local storage if contract fails
+          const newNFT = {
+            tokenId: Date.now(),
+            image: imageUrl,
+            metadata: metadata,
+            mintedAt: new Date().toISOString(),
+            fallback: true
+          };
+          
+          setUserNFTs(prev => [...prev, newNFT]);
+          setNftTheme(null);
+          setCustomNftPrompt('');
+          setGeneratedNFTImage(null);
+        }
+      } else {
+        // Fallback for non-Base Sepolia networks
+        const newNFT = {
+          tokenId: Date.now(),
+          image: imageUrl,
+          metadata: metadata,
+          mintedAt: new Date().toISOString(),
+          fallback: true
+        };
+        
+        setUserNFTs(prev => [...prev, newNFT]);
+        setNftTheme(null);
+        setCustomNftPrompt('');
+        setGeneratedNFTImage(null);
+      }
+      
+    } catch (error) {
+      console.error('Failed to mint NFT:', error);
     }
   };
 
@@ -778,6 +1486,34 @@ function MobileDashboard() {
       fetchFarcasterUser(address);
     }
   }, [address]);
+
+  // Update NFTs when blockchain data changes
+  useEffect(() => {
+    if (userHasProfile && userTokenId && tokenUri) {
+      // Create NFT object from blockchain data
+      const blockchainNFT = {
+        tokenId: Number(userTokenId),
+        image: tokenUri, // This should be the IPFS URI in production
+        metadata: {
+          name: `Wellness NFT #${userTokenId}`,
+          description: 'Blockchain-stored wellness NFT',
+          theme: 'blockchain'
+        },
+        mintedAt: new Date().toISOString(),
+        blockchain: true
+      };
+      
+      // Update local state with blockchain data
+      setUserNFTs(prev => {
+        const existing = prev.find(nft => nft.blockchain);
+        if (existing) {
+          return prev.map(nft => nft.blockchain ? blockchainNFT : nft);
+        } else {
+          return [...prev, blockchainNFT];
+        }
+      });
+    }
+  }, [userHasProfile, userTokenId, tokenUri]);
 
   return (
     <div className="pt-20 pb-6 px-4 min-h-screen transition-colors duration-300">
@@ -855,6 +1591,45 @@ function MobileDashboard() {
               )}
             </div>
 
+            {/* Smart Contract Activity Status */}
+            {contractStatus && (
+              <div className={cn(
+                "p-4 rounded-xl border transition-all duration-300",
+                contractStatus.type === 'success'
+                  ? isDarkMode 
+                    ? "bg-green-900/20 border-green-700/50 text-green-200" 
+                    : "bg-green-50 border-green-200 text-green-800"
+                  : isDarkMode 
+                    ? "bg-red-900/20 border-red-700/50 text-red-200" 
+                    : "bg-red-50 border-red-200 text-red-800"
+              )}>
+                <div className="flex items-center space-x-3">
+                  <svg className={cn(
+                    "w-5 h-5",
+                    contractStatus.type === 'success' ? "text-green-500" : "text-red-500"
+                  )} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={
+                      contractStatus.type === 'success' 
+                        ? "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        : "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    } />
+                  </svg>
+                  <div>
+                    <p className="font-medium">
+                      {contractStatus.type === 'success' ? '✅ Smart Contract Success' : '❌ Smart Contract Error'}
+                    </p>
+                    <p className="text-sm opacity-90">{contractStatus.message}</p>
+                    <p className="text-xs opacity-75 mt-1">
+                      {contractStatus.type === 'success' 
+                        ? 'Your activity has been successfully logged to the blockchain!'
+                        : 'There was an issue logging your activity. Please try again.'
+                      }
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Wellness Score Card */}
             <Card className={cn(
               "transition-colors duration-300",
@@ -880,6 +1655,8 @@ function MobileDashboard() {
                   {parsedWellnessData.score === 0 && calculatedWellnessScore > 0 && (
                     <div className="text-orange-500 text-xs text-center">
                       Using calculated score (contract data loading...)
+                      <br />
+                      <span className="text-red-500">Check console for missing env vars</span>
                     </div>
                   )}
                   {parsedWellnessData.score > 0 && calculatedWellnessScore !== parsedWellnessData.score && (
@@ -909,7 +1686,7 @@ function MobileDashboard() {
                       "text-xl font-bold transition-colors",
                       isDarkMode ? "text-white" : "text-black"
                     )}>
-                      3
+                       {userNFTs.length}
                     </div>
                     <div className={cn(
                       "text-xs transition-colors",
@@ -936,21 +1713,99 @@ function MobileDashboard() {
               </CardContent>
             </Card>
 
-                         {/* Quick Actions */}
+            {/* NFT Collection Display */}
+            {address && (
+              <Card className={cn(
+                "transition-colors duration-300",
+                isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+              )}>
+                <CardHeader className="pb-3">
+                  <CardTitle className={cn(
+                    "text-lg transition-colors",
+                    isDarkMode ? "text-white" : "text-black"
+                  )}>
+                    Your Wellness NFTs
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {userNFTs.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      {userNFTs.map((nft, index) => (
+                        <div key={index} className="text-center">
+                          <div className="w-full aspect-square bg-gray-100 rounded-lg mb-2 overflow-hidden relative">
+                            <img 
+                              src={nft.image} 
+                              alt={`Wellness NFT ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            {nft.blockchain && (
+                              <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
+                                On-Chain
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-600">Wellness NFT #{nft.tokenId}</p>
+                          {nft.blockchain && (
+                            <p className="text-xs text-blue-600">Blockchain Verified</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className={cn(
+                        "text-sm transition-colors",
+                        isDarkMode ? "text-gray-400" : "text-gray-600"
+                      )}>
+                        No NFTs yet. Generate your first wellness NFT!
+                      </p>
+                      <Button 
+                        onClick={() => setCurrentView('nft-generation')}
+                        variant="outline" 
+                        size="sm"
+                        className="mt-2"
+                      >
+                        Generate NFT
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Quick Actions */}
              <div className="space-y-3">
                <Button 
-                 onClick={() => setCurrentView('activity')}
+                 onClick={() => setShowWorkoutModal(true)}
                  variant="outline"
                  className="w-full h-12"
                >
-                 Log Activity
+                 <Dumbbell className="w-4 h-4 mr-2" />
+                 Log Workout
                </Button>
                <Button 
-                 onClick={() => setCurrentView('meals')}
+                 onClick={() => setShowMeditationModal(true)}
                  variant="outline"
                  className="w-full h-12"
                >
+                 <EditIcon className="w-4 h-4 mr-2" />
+                 Log Meditation
+               </Button>
+               <Button 
+                 onClick={() => setShowMealModal(true)}
+                 variant="outline"
+                 className="w-full h-12"
+               >
+                 <Coffee className="w-4 h-4 mr-2" />
                  Log Meal
+               </Button>
+               <Button 
+                 onClick={() => setShowSleepModal(true)}
+                 variant="outline"
+                 className="w-full h-12"
+               >
+                 <Bed className="w-4 h-4 mr-2" />
+                 Log Sleep
                </Button>
                <Button 
                  onClick={() => setCurrentView('goals')}
@@ -1301,8 +2156,8 @@ function MobileDashboard() {
                 )}>
                   Exercise 5x/week
                 </span>
-                <Badge variant={parsedWellnessData.activities >= 5 ? "default" : "secondary"}>
-                  {parsedWellnessData.activities}/5
+                <Badge variant={(parsedWellnessData.workouts + parsedWellnessData.meditations) >= 5 ? "default" : "secondary"}>
+                  {(parsedWellnessData.workouts + parsedWellnessData.meditations)}/5
                 </Badge>
               </div>
               
@@ -1406,13 +2261,279 @@ function MobileDashboard() {
                     )}>
                       Unlock achievements as unique NFTs
                     </p>
-                    <Button variant="outline" className="w-full">
-                      View Collection
+                    <Button 
+                      onClick={() => setCurrentView('nft-generation')}
+                      variant="outline" 
+                      className="w-full"
+                    >
+                      Generate NFT
                     </Button>
                   </div>
                 </CardContent>
               </Card>
             </div>
+          </div>
+        )}
+
+        {/* NFT Generation View */}
+        {currentView === 'nft-generation' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setCurrentView('dashboard')}
+                className={cn(
+                  "transition-colors",
+                  isDarkMode ? "text-white hover:bg-gray-800" : "text-black hover:bg-gray-100"
+                )}
+              >
+                ← Back
+              </Button>
+              <h2 className={cn(
+                "text-xl font-bold transition-colors",
+                isDarkMode ? "text-white" : "text-black"
+              )}>
+                Generate Wellness NFT
+              </h2>
+              <div></div>
+            </div>
+            
+            <Card className={cn(
+              "transition-colors duration-300",
+              isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+            )}>
+              <CardContent className="p-6">
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <div className="w-8 h-8 bg-purple-600 rounded"></div>
+                  </div>
+                  <h3 className={cn(
+                    "text-lg font-bold mb-2 transition-colors",
+                    isDarkMode ? "text-white" : "text-black"
+                  )}>
+                    Design Your NFT
+                  </h3>
+                  <p className={cn(
+                    "text-sm transition-colors",
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  )}>
+                    Choose a theme for your personalized wellness NFT that will be generated by AI and minted to your wallet.
+                  </p>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-3">
+                    <Button
+                      variant={nftTheme === 'minimalist' ? 'default' : 'outline'}
+                      onClick={() => setNftTheme('minimalist')}
+                      className="h-16 justify-start"
+                    >
+                      <div className="text-left">
+                        <div className="font-medium">Minimalist</div>
+                        <div className="text-xs text-gray-500">Simple and elegant</div>
+                      </div>
+                    </Button>
+                    
+                    <Button
+                      variant={nftTheme === 'cosmic' ? 'default' : 'outline'}
+                      onClick={() => setNftTheme('cosmic')}
+                      className="h-16 justify-start"
+                    >
+                      <div className="text-left">
+                        <div className="font-medium">Cosmic</div>
+                        <div className="text-xs text-gray-500">Space and galaxy themes</div>
+                      </div>
+                    </Button>
+                    
+                    <Button
+                      variant={nftTheme === 'custom' ? 'default' : 'outline'}
+                      onClick={() => setNftTheme('custom')}
+                      className="h-16 justify-start"
+                    >
+                      <div className="text-left">
+                        <div className="font-medium">Custom</div>
+                        <div className="text-xs text-gray-500">Describe your own idea</div>
+                      </div>
+                    </Button>
+                  </div>
+                  
+                  {nftTheme === 'custom' && (
+                    <div className="space-y-2">
+                      <label className={cn(
+                        "block text-sm font-medium transition-colors",
+                        isDarkMode ? "text-gray-300" : "text-gray-700"
+                      )}>
+                        Custom Description
+                      </label>
+                      <textarea
+                        value={customNftPrompt}
+                        onChange={(e) => setCustomNftPrompt(e.target.value)}
+                        placeholder="Describe your NFT idea (e.g., 'A serene forest scene with wellness symbols')"
+                        className={cn(
+                          "w-full px-3 py-2 border rounded-lg transition-colors duration-300 resize-none",
+                          isDarkMode 
+                            ? "bg-gray-800 border-gray-600 text-white placeholder-gray-400 focus:border-gray-500" 
+                            : "bg-white border-gray-300 text-black placeholder-gray-500 focus:border-gray-400"
+                        )}
+                        rows={3}
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Generated Image Preview */}
+                  {generatedNFTImage && (
+                    <div className="space-y-3">
+                      <div className="text-center">
+                        <h4 className={cn(
+                          "font-medium mb-2 transition-colors",
+                          isDarkMode ? "text-white" : "text-black"
+                        )}>
+                          Generated Image Preview
+                        </h4>
+                        <div className="w-full aspect-square bg-gray-100 rounded-lg overflow-hidden border-2 border-dashed border-gray-300">
+                          <img 
+                            src={generatedNFTImage} 
+                            alt="Generated NFT Preview"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              console.log('Image failed to load, setting fallback');
+                              const target = e.target as HTMLImageElement;
+                              target.src = `https://via.placeholder.com/512x512/6366f1/ffffff?text=Image+Failed+to+Load`;
+                            }}
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {generatedNFTImage.includes('pollinations.ai') 
+                            ? 'AI-generated wellness art' 
+                            : generatedNFTImage.includes('placeholder') 
+                              ? 'Fallback image (AI generation may be slow)' 
+                              : 'Custom image'
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Loading State */}
+                  {isGeneratingNFT && !generatedNFTImage && (
+                    <div className="space-y-3">
+                      <div className="text-center">
+                        <div className="w-full aspect-square bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300">
+                          <div className="text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-3"></div>
+                            <p className="text-sm text-gray-600">Generating your wellness NFT...</p>
+                            <p className="text-xs text-gray-500">This may take a few seconds</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <Button 
+                    onClick={handleGenerateNFT}
+                    disabled={!nftTheme || (nftTheme === 'custom' && !customNftPrompt.trim()) || isGeneratingNFT}
+                    className="w-full h-12 bg-purple-600 hover:bg-purple-700"
+                  >
+                    {isGeneratingNFT ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Generating Image...
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-4 h-4 bg-white rounded mr-2"></div>
+                        Generate Wellness NFT
+                      </>
+                    )}
+                  </Button>
+                  
+                  {/* Debug Info */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="mt-4 p-3 bg-gray-100 rounded-lg text-xs text-gray-600">
+                      <p><strong>Debug Info:</strong></p>
+                      <p>NFT Theme: {nftTheme || 'None'}</p>
+                      <p>Custom Prompt: {customNftPrompt || 'None'}</p>
+                      <p>Generated Image: {generatedNFTImage ? 'Yes' : 'No'}</p>
+                      <p>Is Generating: {isGeneratingNFT ? 'Yes' : 'No'}</p>
+                      <p>User NFTs Count: {userNFTs.length}</p>
+                      
+                      <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200">
+                        <p><strong>Contract Status:</strong></p>
+                        <p>Contract Address: {CONTRACT_ADDRESSES.WELLNESS_NFT}</p>
+                        <p>Chain ID: {chainId}</p>
+                        <p>User Address: {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Not Connected'}</p>
+                        <p>Has Profile: {userHasProfile ? 'Yes' : 'No'}</p>
+                        <p>Token ID: {userTokenId ? userTokenId.toString() : 'None'}</p>
+                        
+                        {recentActivities.length > 0 && recentActivities !== sampleActivities && (
+                          <div className="mt-2 p-2 bg-yellow-50 rounded border border-yellow-200">
+                            <p><strong>Timestamp Debug:</strong></p>
+                            {recentActivities.slice(0, 2).map((activity, index) => (
+                              <div key={index} className="text-xs">
+                                <p>{activity.name}: {Math.floor((currentTime - activity.timestamp) / 1000 / 60)} min ago</p>
+                                <p className="text-gray-500">Raw: {activity.timestamp}, Current: {currentTime}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <Button 
+                        onClick={() => {
+                          const testUrl = 'https://via.placeholder.com/512x512/6366f1/ffffff?text=Test+Image';
+                          setGeneratedNFTImage(testUrl);
+                        }}
+                        variant="outline" 
+                        size="sm"
+                        className="mt-2"
+                      >
+                        Test Image Display
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {/* Success Message */}
+                  {generatedNFTImage && (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="text-center">
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                          <CheckCircle className="w-5 h-5 text-green-600" />
+                        </div>
+                        <p className="text-sm font-medium text-green-800 mb-1">
+                          NFT Generated Successfully!
+                        </p>
+                        <p className="text-xs text-green-600">
+                          Your wellness NFT has been created and is ready to be minted to your wallet.
+                        </p>
+                        <div className="flex space-x-2">
+                          <Button 
+                            onClick={() => setCurrentView('dashboard')}
+                            variant="outline" 
+                            size="sm"
+                            className="flex-1"
+                          >
+                            View Collection
+                          </Button>
+                          <Button 
+                            onClick={() => {
+                              setGeneratedNFTImage(null);
+                              setNftTheme(null);
+                              setCustomNftPrompt('');
+                            }}
+                            variant="default" 
+                            size="sm"
+                            className="flex-1"
+                          >
+                            Generate Another
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -1610,7 +2731,1899 @@ function MobileDashboard() {
             </div>
           </div>
         )}
+        
+        {/* Quick Action Modals */}
+        
+        {/* Workout Modal */}
+        {showWorkoutModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className={cn(
+              "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+              isDarkMode ? "bg-gray-900 border border-gray-700" : "bg-white border border-gray-200"
+            )}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className={cn(
+                  "text-xl font-bold transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  <Dumbbell className="w-5 h-5 inline mr-2" />
+                  Log Workout
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowWorkoutModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <form onSubmit={(e) => { e.preventDefault(); handleLogWorkout(); }} className="space-y-4">
+                <div>
+                  <Label htmlFor="workout-duration" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Duration (minutes)
+                  </Label>
+                  <Input
+                    id="workout-duration"
+                    type="number"
+                    value={workoutForm.duration}
+                    onChange={(e) => setWorkoutForm({...workoutForm, duration: e.target.value})}
+                    placeholder="30"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="workout-sets" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Number of Sets
+                  </Label>
+                  <Input
+                    id="workout-sets"
+                    type="number"
+                    value={workoutForm.sets}
+                    onChange={(e) => setWorkoutForm({...workoutForm, sets: e.target.value})}
+                    placeholder="3"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="workout-calories" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Calories Burned
+                  </Label>
+                  <Input
+                    id="workout-calories"
+                    type="number"
+                    value={workoutForm.caloriesBurned}
+                    onChange={(e) => setWorkoutForm({...workoutForm, caloriesBurned: e.target.value})}
+                    placeholder="200"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="workout-type" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Activity Type
+                  </Label>
+                  <Input
+                    id="workout-type"
+                    type="text"
+                    value={workoutForm.activityType}
+                    onChange={(e) => setWorkoutForm({...workoutForm, activityType: e.target.value})}
+                    placeholder="Weight Training"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="workout-name" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Name (optional)
+                  </Label>
+                  <Input
+                    id="workout-name"
+                    type="text"
+                    value={workoutForm.name}
+                    onChange={(e) => setWorkoutForm({...workoutForm, name: e.target.value})}
+                    placeholder="Morning workout"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <Button type="submit" className="w-full">
+                  Log Workout
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
+        
+        {/* Meditation Modal */}
+        {showMeditationModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className={cn(
+              "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+              isDarkMode ? "bg-gray-900 border border-gray-700" : "bg-white border border-gray-200"
+            )}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className={cn(
+                  "text-xl font-bold transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  <EditIcon className="w-5 h-5 inline mr-2" />
+                  Log Meditation
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowMeditationModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <form onSubmit={(e) => { e.preventDefault(); handleLogMeditation(); }} className="space-y-4">
+                <div>
+                  <Label htmlFor="meditation-duration" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Duration (minutes)
+                  </Label>
+                  <Input
+                    id="meditation-duration"
+                    type="number"
+                    value={meditationForm.duration}
+                    onChange={(e) => setMeditationForm({...meditationForm, duration: e.target.value})}
+                    placeholder="20"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="meditation-name" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Name (optional)
+                  </Label>
+                  <Input
+                    id="meditation-name"
+                    type="text"
+                    value={meditationForm.name}
+                    onChange={(e) => setMeditationForm({...meditationForm, name: e.target.value})}
+                    placeholder="Morning meditation"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <Button type="submit" className="w-full">
+                  Log Meditation
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
+        
+        {/* Enhanced Meal Modal with Macros */}
+        {showMealModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className={cn(
+              "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+              isDarkMode ? "bg-gray-900 border border-gray-700" : "bg-white border border-gray-200"
+            )}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className={cn(
+                  "text-xl font-bold transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  <Coffee className="w-5 h-5 inline mr-2" />
+                  Log Meal
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowMealModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <form onSubmit={(e) => { e.preventDefault(); handleLogMealWithMacros(); }} className="space-y-4">
+                <div>
+                  <Label htmlFor="meal-type" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Meal Type
+                  </Label>
+                  <Input
+                    id="meal-type"
+                    type="text"
+                    value={mealForm.mealType}
+                    onChange={(e) => setMealForm({...mealForm, mealType: e.target.value})}
+                    placeholder="Breakfast, Lunch, Dinner, Snack"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="meal-name" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Name (optional)
+                  </Label>
+                  <Input
+                    id="meal-name"
+                    type="text"
+                    value={mealForm.name}
+                    onChange={(e) => setMealForm({...mealForm, name: e.target.value})}
+                    placeholder="Oatmeal with berries"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="meal-calories" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Calories
+                  </Label>
+                  <Input
+                    id="meal-calories"
+                    type="number"
+                    value={mealForm.calories}
+                    onChange={(e) => setMealForm({...mealForm, calories: e.target.value})}
+                    placeholder="300"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label htmlFor="meal-protein" className={cn(
+                      "block text-sm font-medium mb-2 transition-colors",
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    )}>
+                      Protein (g)
+                    </Label>
+                    <Input
+                      id="meal-protein"
+                      type="number"
+                      value={mealForm.protein}
+                      onChange={(e) => setMealForm({...mealForm, protein: e.target.value})}
+                      placeholder="15"
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                        isDarkMode 
+                          ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                          : "bg-white border-gray-300 text-black focus:border-gray-400"
+                      )}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="meal-fat" className={cn(
+                      "block text-sm font-medium mb-2 transition-colors",
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    )}>
+                      Fat (g)
+                    </Label>
+                    <Input
+                      id="meal-fat"
+                      type="number"
+                      value={mealForm.fat}
+                      onChange={(e) => setMealForm({...mealForm, fat: e.target.value})}
+                      placeholder="8"
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                        isDarkMode 
+                          ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                          : "bg-white border-gray-300 text-black focus:border-gray-400"
+                      )}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="meal-carbs" className={cn(
+                      "block text-sm font-medium mb-2 transition-colors",
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    )}>
+                      Carbs (g)
+                    </Label>
+                    <Input
+                      id="meal-carbs"
+                      type="number"
+                      value={mealForm.carbs}
+                      onChange={(e) => setMealForm({...mealForm, carbs: e.target.value})}
+                      placeholder="45"
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                        isDarkMode 
+                          ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                          : "bg-white border-gray-300 text-black focus:border-gray-400"
+                      )}
+                    />
+                  </div>
+                </div>
+                
+                <Button type="submit" className="w-full">
+                  Log Meal
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
+        
+        {/* Sleep Modal */}
+        {showSleepModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className={cn(
+              "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+              isDarkMode ? "bg-gray-900 border border-gray-700" : "bg-white border border-gray-200"
+            )}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className={cn(
+                  "text-xl font-bold transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  <Bed className="w-5 h-5 inline mr-2" />
+                  Log Sleep
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSleepModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <form onSubmit={(e) => { e.preventDefault(); handleLogSleep(); }} className="space-y-4">
+                <div>
+                  <Label htmlFor="sleep-duration" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Duration (hours)
+                  </Label>
+                  <Input
+                    id="sleep-duration"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="24"
+                    value={sleepForm.duration}
+                    onChange={(e) => setSleepForm({...sleepForm, duration: e.target.value})}
+                    placeholder="7.5"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <Button type="submit" className="w-full">
+                  Log Sleep
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
+        
+        {/* Quick Action Modals */}
+        
+        {/* Workout Modal */}
+        {showWorkoutModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className={cn(
+              "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+              isDarkMode ? "bg-gray-900 border border-gray-700" : "bg-white border border-gray-200"
+            )}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className={cn(
+                  "text-xl font-bold transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  <Dumbbell className="w-5 h-5 inline mr-2" />
+                  Log Workout
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowWorkoutModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <form onSubmit={(e) => { e.preventDefault(); handleLogWorkout(); }} className="space-y-4">
+                <div>
+                  <Label htmlFor="workout-duration" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Duration (minutes)
+                  </Label>
+                  <Input
+                    id="workout-duration"
+                    type="number"
+                    value={workoutForm.duration}
+                    onChange={(e) => setWorkoutForm({...workoutForm, duration: e.target.value})}
+                    placeholder="30"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="workout-sets" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Number of Sets
+                  </Label>
+                  <Input
+                    id="workout-sets"
+                    type="number"
+                    value={workoutForm.sets}
+                    onChange={(e) => setWorkoutForm({...workoutForm, sets: e.target.value})}
+                    placeholder="3"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="workout-calories" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Calories Burned
+                  </Label>
+                  <Input
+                    id="workout-calories"
+                    type="number"
+                    value={workoutForm.caloriesBurned}
+                    onChange={(e) => setWorkoutForm({...workoutForm, caloriesBurned: e.target.value})}
+                    placeholder="200"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="workout-type" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Activity Type
+                  </Label>
+                  <Input
+                    id="workout-type"
+                    type="text"
+                    value={workoutForm.activityType}
+                    onChange={(e) => setWorkoutForm({...workoutForm, activityType: e.target.value})}
+                    placeholder="Weight Training"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="workout-name" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Name (optional)
+                  </Label>
+                  <Input
+                    id="workout-name"
+                    type="text"
+                    value={workoutForm.name}
+                    onChange={(e) => setWorkoutForm({...workoutForm, name: e.target.value})}
+                    placeholder="Morning workout"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <Button type="submit" className="w-full">
+                  Log Workout
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
+        
+        {/* Meditation Modal */}
+        {showMeditationModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className={cn(
+              "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+              isDarkMode ? "bg-gray-900 border border-gray-700" : "bg-white border border-gray-200"
+            )}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className={cn(
+                  "text-xl font-bold transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  <EditIcon className="w-5 h-5 inline mr-2" />
+                  Log Meditation
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowMeditationModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <form onSubmit={(e) => { e.preventDefault(); handleLogMeditation(); }} className="space-y-4">
+                <div>
+                  <Label htmlFor="meditation-duration" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Duration (minutes)
+                  </Label>
+                  <Input
+                    id="meditation-duration"
+                    type="number"
+                    value={meditationForm.duration}
+                    onChange={(e) => setMeditationForm({...meditationForm, duration: e.target.value})}
+                    placeholder="20"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="meditation-name" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Name (optional)
+                  </Label>
+                  <Input
+                    id="meditation-name"
+                    type="text"
+                    value={meditationForm.name}
+                    onChange={(e) => setMeditationForm({...meditationForm, name: e.target.value})}
+                    placeholder="Morning meditation"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <Button type="submit" className="w-full">
+                  Log Meditation
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
+        
+        {/* Enhanced Meal Modal with Macros */}
+        {showMealModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className={cn(
+              "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+              isDarkMode ? "bg-gray-900 border border-gray-700" : "bg-white border border-gray-200"
+            )}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className={cn(
+                  "text-xl font-bold transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  <Coffee className="w-5 h-5 inline mr-2" />
+                  Log Meal
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowMealModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <form onSubmit={(e) => { e.preventDefault(); handleLogMealWithMacros(); }} className="space-y-4">
+                <div>
+                  <Label htmlFor="meal-type" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Meal Type
+                  </Label>
+                  <Input
+                    id="meal-type"
+                    type="text"
+                    value={mealForm.mealType}
+                    onChange={(e) => setMealForm({...mealForm, mealType: e.target.value})}
+                    placeholder="Breakfast, Lunch, Dinner, Snack"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="meal-name" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Name (optional)
+                  </Label>
+                  <Input
+                    id="meal-name"
+                    type="text"
+                    value={mealForm.name}
+                    onChange={(e) => setMealForm({...mealForm, name: e.target.value})}
+                    placeholder="Oatmeal with berries"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="meal-calories" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Calories
+                  </Label>
+                  <Input
+                    id="meal-calories"
+                    type="number"
+                    value={mealForm.calories}
+                    onChange={(e) => setMealForm({...mealForm, calories: e.target.value})}
+                    placeholder="300"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label htmlFor="meal-protein" className={cn(
+                      "block text-sm font-medium mb-2 transition-colors",
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    )}>
+                      Protein (g)
+                    </Label>
+                    <Input
+                      id="meal-protein"
+                      type="number"
+                      value={mealForm.protein}
+                      onChange={(e) => setMealForm({...mealForm, protein: e.target.value})}
+                      placeholder="15"
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                        isDarkMode 
+                          ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                          : "bg-white border-gray-300 text-black focus:border-gray-400"
+                      )}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="meal-fat" className={cn(
+                      "block text-sm font-medium mb-2 transition-colors",
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    )}>
+                      Fat (g)
+                    </Label>
+                    <Input
+                      id="meal-fat"
+                      type="number"
+                      value={mealForm.fat}
+                      onChange={(e) => setMealForm({...mealForm, fat: e.target.value})}
+                      placeholder="8"
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                        isDarkMode 
+                          ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                          : "bg-white border-gray-300 text-black focus:border-gray-400"
+                      )}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="meal-carbs" className={cn(
+                      "block text-sm font-medium mb-2 transition-colors",
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    )}>
+                      Carbs (g)
+                    </Label>
+                    <Input
+                      id="meal-carbs"
+                      type="number"
+                      value={mealForm.carbs}
+                      onChange={(e) => setMealForm({...mealForm, carbs: e.target.value})}
+                      placeholder="45"
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                        isDarkMode 
+                          ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                          : "bg-white border-gray-300 text-black focus:border-gray-400"
+                      )}
+                    />
+                  </div>
+                </div>
+                
+                <Button type="submit" className="w-full">
+                  Log Meal
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
+        
+        {/* Sleep Modal */}
+        {showSleepModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className={cn(
+              "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+              isDarkMode ? "bg-gray-900 border border-gray-700" : "bg-white border border-gray-200"
+            )}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className={cn(
+                  "text-xl font-bold transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  <Bed className="w-5 h-5 inline mr-2" />
+                  Log Sleep
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSleepModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <form onSubmit={(e) => { e.preventDefault(); handleLogSleep(); }} className="space-y-4">
+                <div>
+                  <Label htmlFor="sleep-duration" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Duration (hours)
+                  </Label>
+                  <Input
+                    id="sleep-duration"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="24"
+                    value={sleepForm.duration}
+                    onChange={(e) => setSleepForm({...sleepForm, duration: e.target.value})}
+                    placeholder="7.5"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <Button type="submit" className="w-full">
+                  Log Sleep
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
+        
+        {/* Quick Action Modals */}
+        
+        {/* Workout Modal */}
+        {showWorkoutModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className={cn(
+              "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+              isDarkMode ? "bg-gray-900 border border-gray-700" : "bg-white border border-gray-200"
+            )}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className={cn(
+                  "text-xl font-bold transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  <Dumbbell className="w-5 h-5 inline mr-2" />
+                  Log Workout
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowWorkoutModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <form onSubmit={(e) => { e.preventDefault(); handleLogWorkout(); }} className="space-y-4">
+                <div>
+                  <Label htmlFor="workout-duration" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Duration (minutes)
+                  </Label>
+                  <Input
+                    id="workout-duration"
+                    type="number"
+                    value={workoutForm.duration}
+                    onChange={(e) => setWorkoutForm({...workoutForm, duration: e.target.value})}
+                    placeholder="30"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="workout-sets" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Number of Sets
+                  </Label>
+                  <Input
+                    id="workout-sets"
+                    type="number"
+                    value={workoutForm.sets}
+                    onChange={(e) => setWorkoutForm({...workoutForm, sets: e.target.value})}
+                    placeholder="3"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="workout-calories" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Calories Burned
+                  </Label>
+                  <Input
+                    id="workout-calories"
+                    type="number"
+                    value={workoutForm.caloriesBurned}
+                    onChange={(e) => setWorkoutForm({...workoutForm, caloriesBurned: e.target.value})}
+                    placeholder="200"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="workout-type" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Activity Type
+                  </Label>
+                  <Input
+                    id="workout-type"
+                    type="text"
+                    value={workoutForm.activityType}
+                    onChange={(e) => setWorkoutForm({...workoutForm, activityType: e.target.value})}
+                    placeholder="Weight Training"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="workout-name" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Name (optional)
+                  </Label>
+                  <Input
+                    id="workout-name"
+                    type="text"
+                    value={workoutForm.name}
+                    onChange={(e) => setWorkoutForm({...workoutForm, name: e.target.value})}
+                    placeholder="Morning workout"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <Button type="submit" className="w-full">
+                  Log Workout
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
+        
+        {/* Meditation Modal */}
+        {showMeditationModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className={cn(
+              "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+              isDarkMode ? "bg-gray-900 border border-gray-700" : "bg-white border border-gray-200"
+            )}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className={cn(
+                  "text-xl font-bold transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  <EditIcon className="w-5 h-5 inline mr-2" />
+                  Log Meditation
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowMeditationModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <form onSubmit={(e) => { e.preventDefault(); handleLogMeditation(); }} className="space-y-4">
+                <div>
+                  <Label htmlFor="meditation-duration" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Duration (minutes)
+                  </Label>
+                  <Input
+                    id="meditation-duration"
+                    type="number"
+                    value={meditationForm.duration}
+                    onChange={(e) => setMeditationForm({...meditationForm, duration: e.target.value})}
+                    placeholder="20"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="meditation-name" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Name (optional)
+                  </Label>
+                  <Input
+                    id="meditation-name"
+                    type="text"
+                    value={meditationForm.name}
+                    onChange={(e) => setMeditationForm({...meditationForm, name: e.target.value})}
+                    placeholder="Morning meditation"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <Button type="submit" className="w-full">
+                  Log Meditation
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
+        
+        {/* Enhanced Meal Modal with Macros */}
+        {showMealModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className={cn(
+              "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+              isDarkMode ? "bg-gray-900 border border-gray-700" : "bg-white border border-gray-200"
+            )}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className={cn(
+                  "text-xl font-bold transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  <Coffee className="w-5 h-5 inline mr-2" />
+                  Log Meal
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowMealModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <form onSubmit={(e) => { e.preventDefault(); handleLogMealWithMacros(); }} className="space-y-4">
+                <div>
+                  <Label htmlFor="meal-type" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Meal Type
+                  </Label>
+                  <Input
+                    id="meal-type"
+                    type="text"
+                    value={mealForm.mealType}
+                    onChange={(e) => setMealForm({...mealForm, mealType: e.target.value})}
+                    placeholder="Breakfast, Lunch, Dinner, Snack"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="meal-name" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Name (optional)
+                  </Label>
+                  <Input
+                    id="meal-name"
+                    type="text"
+                    value={mealForm.name}
+                    onChange={(e) => setMealForm({...mealForm, name: e.target.value})}
+                    placeholder="Oatmeal with berries"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="meal-calories" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Calories
+                  </Label>
+                  <Input
+                    id="meal-calories"
+                    type="number"
+                    value={mealForm.calories}
+                    onChange={(e) => setMealForm({...mealForm, calories: e.target.value})}
+                    placeholder="300"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label htmlFor="meal-protein" className={cn(
+                      "block text-sm font-medium mb-2 transition-colors",
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    )}>
+                      Protein (g)
+                    </Label>
+                    <Input
+                      id="meal-protein"
+                      type="number"
+                      value={mealForm.protein}
+                      onChange={(e) => setMealForm({...mealForm, protein: e.target.value})}
+                      placeholder="15"
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                        isDarkMode 
+                          ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                          : "bg-white border-gray-300 text-black focus:border-gray-400"
+                      )}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="meal-fat" className={cn(
+                      "block text-sm font-medium mb-2 transition-colors",
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    )}>
+                      Fat (g)
+                    </Label>
+                    <Input
+                      id="meal-fat"
+                      type="number"
+                      value={mealForm.fat}
+                      onChange={(e) => setMealForm({...mealForm, fat: e.target.value})}
+                      placeholder="8"
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                        isDarkMode 
+                          ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                          : "bg-white border-gray-300 text-black focus:border-gray-400"
+                      )}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="meal-carbs" className={cn(
+                      "block text-sm font-medium mb-2 transition-colors",
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    )}>
+                      Carbs (g)
+                    </Label>
+                    <Input
+                      id="meal-carbs"
+                      type="number"
+                      value={mealForm.carbs}
+                      onChange={(e) => setMealForm({...mealForm, carbs: e.target.value})}
+                      placeholder="45"
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                        isDarkMode 
+                          ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                          : "bg-white border-gray-300 text-black focus:border-gray-400"
+                      )}
+                    />
+                  </div>
+                </div>
+                
+                <Button type="submit" className="w-full">
+                  Log Meal
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
+        
+        {/* Sleep Modal */}
+        {showSleepModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className={cn(
+              "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+              isDarkMode ? "bg-gray-900 border border-gray-700" : "bg-white border border-gray-200"
+            )}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className={cn(
+                  "text-xl font-bold transition-colors",
+                  isDarkMode ? "text-white" : "text-black"
+                )}>
+                  <Bed className="w-5 h-5 inline mr-2" />
+                  Log Sleep
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSleepModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <form onSubmit={(e) => { e.preventDefault(); handleLogSleep(); }} className="space-y-4">
+                <div>
+                  <Label htmlFor="sleep-duration" className={cn(
+                    "block text-sm font-medium mb-2 transition-colors",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Duration (hours)
+                  </Label>
+                  <Input
+                    id="sleep-duration"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="24"
+                    value={sleepForm.duration}
+                    onChange={(e) => setSleepForm({...sleepForm, duration: e.target.value})}
+                    placeholder="7.5"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-gray-400"
+                    )}
+                  />
+                </div>
+                
+                <Button type="submit" className="w-full">
+                  Log Sleep
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
+      
+      {/* Quick Action Modals */}
+      
+      {/* Workout Modal */}
+      {showWorkoutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className={cn(
+            "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+            isDarkMode 
+              ? "bg-gray-800 border-gray-600 text-white" 
+              : "bg-white border-gray-200 text-black",
+            "border"
+          )}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className={cn(
+                "text-xl font-bold",
+                isDarkMode ? "text-white" : "text-gray-900"
+              )}>
+                <Dumbbell className="w-5 h-5 inline mr-2" />
+                Log Workout
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowWorkoutModal(false)}
+                className={cn(
+                  "text-gray-500 hover:text-gray-700",
+                  isDarkMode ? "text-gray-400 hover:text-gray-200" : ""
+                )}
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            
+            <form onSubmit={(e) => { e.preventDefault(); handleLogWorkout(); }}>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="workout-activity-type" className={cn(
+                    "text-sm font-medium",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Activity Type
+                  </Label>
+                  <Input
+                    id="workout-activity-type"
+                    type="text"
+                    value={workoutForm.activityType}
+                    onChange={(e) => setWorkoutForm({...workoutForm, activityType: e.target.value})}
+                    placeholder="e.g., Running, Weightlifting, Yoga"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="workout-name" className={cn(
+                    "text-sm font-medium",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Workout Name
+                  </Label>
+                  <Input
+                    id="workout-name"
+                    type="text"
+                    value={workoutForm.name}
+                    onChange={(e) => setWorkoutForm({...workoutForm, name: e.target.value})}
+                    placeholder="e.g., Morning Cardio, Upper Body Strength"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="workout-duration" className={cn(
+                    "text-sm font-medium",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Duration (minutes)
+                  </Label>
+                  <Input
+                    id="workout-duration"
+                    type="number"
+                    min="1"
+                    value={workoutForm.duration}
+                    onChange={(e) => setWorkoutForm({...workoutForm, duration: e.target.value})}
+                    placeholder="45"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="workout-sets" className={cn(
+                    "text-sm font-medium",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Number of Sets
+                  </Label>
+                  <Input
+                    id="workout-sets"
+                    type="number"
+                    min="1"
+                    value={workoutForm.sets}
+                    onChange={(e) => setWorkoutForm({...workoutForm, sets: e.target.value})}
+                    placeholder="3"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="workout-calories" className={cn(
+                    "text-sm font-medium",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Calories Burned
+                  </Label>
+                  <Input
+                    id="workout-calories"
+                    type="number"
+                    min="1"
+                    value={workoutForm.caloriesBurned}
+                    onChange={(e) => setWorkoutForm({...workoutForm, caloriesBurned: e.target.value})}
+                    placeholder="300"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    )}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex space-x-3 mt-6">
+                <Button type="button" variant="outline" onClick={() => setShowWorkoutModal(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1">
+                  Log Workout
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Meditation Modal */}
+      {showMeditationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className={cn(
+            "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+            isDarkMode 
+              ? "bg-gray-800 border-gray-600 text-white" 
+              : "bg-white border-gray-200 text-black",
+            "border"
+          )}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className={cn(
+                "text-xl font-bold",
+                isDarkMode ? "text-white" : "text-gray-900"
+              )}>
+                <EditIcon className="w-5 h-5 inline mr-2" />
+                Log Meditation
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMeditationModal(false)}
+                className={cn(
+                  "text-gray-500 hover:text-gray-700",
+                  isDarkMode ? "text-gray-400 hover:text-gray-200" : ""
+                )}
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            
+            <form onSubmit={(e) => { e.preventDefault(); handleLogMeditation(); }}>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="meditation-name" className={cn(
+                    "text-sm font-medium",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Session Name
+                  </Label>
+                  <Input
+                    id="meditation-name"
+                    type="text"
+                    value={meditationForm.name}
+                    onChange={(e) => setMeditationForm({...meditationForm, name: e.target.value})}
+                    placeholder="e.g., Morning Mindfulness, Stress Relief"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="meditation-duration" className={cn(
+                    "text-sm font-medium",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Duration (minutes)
+                  </Label>
+                  <Input
+                    id="meditation-duration"
+                    type="number"
+                    min="1"
+                    value={meditationForm.duration}
+                    onChange={(e) => setMeditationForm({...meditationForm, duration: e.target.value})}
+                    placeholder="20"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    )}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex space-x-3 mt-6">
+                <Button type="button" variant="outline" onClick={() => setShowMeditationModal(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1">
+                  Log Meditation
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Meal Modal */}
+      {showMealModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className={cn(
+            "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+            isDarkMode 
+              ? "bg-gray-800 border-gray-600 text-white" 
+              : "bg-white border-gray-200 text-black",
+            "border"
+          )}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className={cn(
+                "text-xl font-bold",
+                isDarkMode ? "text-white" : "text-gray-900"
+              )}>
+                <Coffee className="w-5 h-5 inline mr-2" />
+                Log Meal
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMealModal(false)}
+                className={cn(
+                  "text-gray-500 hover:text-gray-700",
+                  isDarkMode ? "text-gray-400 hover:text-gray-200" : ""
+                )}
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            
+            <form onSubmit={(e) => { e.preventDefault(); handleLogMealWithMacros(); }}>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="meal-type" className={cn(
+                    "text-sm font-medium",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Meal Type
+                  </Label>
+                  <select
+                    id="meal-type"
+                    value={mealForm.mealType}
+                    onChange={(e) => setMealForm({...mealForm, mealType: e.target.value})}
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    )}
+                  >
+                    <option value="">Select meal type</option>
+                    <option value="breakfast">Breakfast</option>
+                    <option value="lunch">Lunch</option>
+                    <option value="dinner">Dinner</option>
+                    <option value="snack">Snack</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="meal-name" className={cn(
+                    "text-sm font-medium",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Meal Name
+                  </Label>
+                  <Input
+                    id="meal-name"
+                    type="text"
+                    value={mealForm.name}
+                    onChange={(e) => setMealForm({...mealForm, name: e.target.value})}
+                    placeholder="e.g., Grilled Chicken Salad, Protein Smoothie"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    )}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="meal-calories" className={cn(
+                    "text-sm font-medium",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Calories
+                  </Label>
+                  <Input
+                    id="meal-calories"
+                    type="number"
+                    min="1"
+                    value={mealForm.calories}
+                    onChange={(e) => setMealForm({...mealForm, calories: e.target.value})}
+                    placeholder="450"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    )}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label htmlFor="meal-protein" className={cn(
+                      "text-sm font-medium",
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    )}>
+                      Protein (g)
+                    </Label>
+                    <Input
+                      id="meal-protein"
+                      type="number"
+                      min="0"
+                      value={mealForm.protein}
+                      onChange={(e) => setMealForm({...mealForm, protein: e.target.value})}
+                      placeholder="25"
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                        isDarkMode 
+                          ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                          : "bg-white border-gray-300 text-black focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      )}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="meal-fat" className={cn(
+                      "text-sm font-medium",
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    )}>
+                      Fat (g)
+                    </Label>
+                    <Input
+                      id="meal-fat"
+                      type="number"
+                      min="0"
+                      value={mealForm.fat}
+                      onChange={(e) => setMealForm({...mealForm, fat: e.target.value})}
+                      placeholder="15"
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                        isDarkMode 
+                          ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                          : "bg-white border-gray-300 text-black focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      )}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="meal-carbs" className={cn(
+                      "text-sm font-medium",
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    )}>
+                      Carbs (g)
+                    </Label>
+                    <Input
+                      id="meal-carbs"
+                      type="number"
+                      min="0"
+                      value={mealForm.carbs}
+                      onChange={(e) => setMealForm({...mealForm, carbs: e.target.value})}
+                      placeholder="30"
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                        isDarkMode 
+                          ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                          : "bg-white border-gray-300 text-black focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex space-x-3 mt-6">
+                <Button type="button" variant="outline" onClick={() => setShowMealModal(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1">
+                  Log Meal
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Sleep Modal */}
+      {showSleepModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className={cn(
+            "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+            isDarkMode 
+              ? "bg-gray-800 border-gray-600 text-white" 
+              : "bg-white border-gray-200 text-black",
+            "border"
+          )}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className={cn(
+                "text-xl font-bold",
+                isDarkMode ? "text-white" : "text-gray-900"
+              )}>
+                <Bed className="w-5 h-5 inline mr-2" />
+                Log Sleep
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSleepModal(false)}
+                className={cn(
+                  "text-gray-500 hover:text-gray-700",
+                  isDarkMode ? "text-gray-400 hover:text-gray-200" : ""
+                )}
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            
+            <form onSubmit={(e) => { e.preventDefault(); handleLogSleep(); }}>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="sleep-duration" className={cn(
+                    "text-sm font-medium",
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  )}>
+                    Duration (hours)
+                  </Label>
+                  <Input
+                    id="sleep-duration"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="24"
+                    value={sleepForm.duration}
+                    onChange={(e) => setSleepForm({...sleepForm, duration: e.target.value})}
+                    placeholder="7.5"
+                    required
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-lg transition-colors duration-300",
+                      isDarkMode 
+                        ? "bg-gray-800 border-gray-600 text-white focus:border-gray-500" 
+                        : "bg-white border-gray-300 text-black focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    )}
+                  />
+                </div>
+                
+                <Button type="submit" className="w-full">
+                  Log Sleep
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1677,51 +4690,10 @@ function FarcasterPageContent() {
       <MobileNavigation />
       <MobileDashboard />
       
-      <FarcasterConnectionModal 
+            <FarcasterConnectionModal 
         isOpen={shouldShowModal} 
         onClose={() => setShowConnectionModal(false)} 
       />
-      
-      {/* Wallet Connection Modal - Show when wallet is disconnected */}
-      {!address && !isConnecting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className={cn(
-            "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
-            "bg-white border border-gray-200"
-          )}>
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Wallet className="w-8 h-8 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                Connect Your Wallet
-              </h3>
-              <p className="text-sm text-gray-600">
-                Connect your wallet to start tracking your wellness journey and earn rewards
-              </p>
-            </div>
-            
-            <div className="space-y-3">
-              <Button 
-                onClick={() => {
-                  // Use the first available connector to connect
-                  if (connectors.length > 0) {
-                    connect({ connector: connectors[0] });
-                  }
-                }}
-                className="w-full h-12 text-base"
-              >
-                <Wallet className="w-5 h-5 mr-2" />
-                Connect Wallet
-              </Button>
-              
-              <p className="text-xs text-gray-500 text-center">
-                Click to start the wallet connection process
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

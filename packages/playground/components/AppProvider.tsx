@@ -73,14 +73,38 @@ const wagmiConfig = createConfig({
   },
   ssr: true,
   connectors: [
+            coinbaseWallet({
+          appName: 'WellSpace',
+          appLogoUrl: (() => {
+            if (typeof window !== 'undefined') {
+              // Try multiple approaches for the logo URL
+              const approaches = [
+                `${window.location.protocol}//${window.location.host}/WellSpace_logo.png`,
+                `${window.location.origin}/WellSpace_logo.png`,
+                '/WellSpace_logo.png'
+              ];
+              
+              console.log('🔍 Coinbase Wallet Logo URL approaches:', approaches);
+              
+              // Test the first approach
+              const testImg = new Image();
+              testImg.onload = () => console.log('✅ Logo image loads successfully with:', approaches[0]);
+              testImg.onerror = () => {
+                console.error('❌ Logo image failed to load with:', approaches[0]);
+                // Try the second approach
+                testImg.src = approaches[1];
+              };
+              testImg.src = approaches[0];
+              
+              return approaches[0]; // Use the most specific URL first
+            }
+            return '/WellSpace_logo.png';
+          })(),
+          preference: 'smartWalletOnly',
+        }),
     coinbaseWallet({
       appName: 'WellSpace',
-      appLogoUrl: '/WellSpace_logo.png',
-      preference: 'smartWalletOnly',
-    }),
-    coinbaseWallet({
-      appName: 'WellSpace',
-      appLogoUrl: '/WellSpace_logo.png', 
+      appLogoUrl: typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.host}/WellSpace_logo.png` : '/WellSpace_logo.png',
       preference: 'eoaOnly',
     }),
   ],

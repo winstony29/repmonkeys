@@ -18,7 +18,7 @@ import {
 import { FundButton } from '@coinbase/onchainkit/fund';
 import { cn } from '@/lib/utils';
 import { useAccount, useReadContract, useBalance, useWriteContract, useChainId, useDisconnect } from 'wagmi';
-import { wellnessNFTAbi, wellTokenAbi, userProfileAbi, wellnessTrackerAbi, CONTRACT_ADDRESSES, formatTokenAmount } from '@/lib/contracts';
+import { wellnessNFTAbi, wellTokenAbi, userProfileAbi, wellnessTrackerAbi, CONTRACT_ADDRESSES, formatTokenAmount, testContractConnectivity } from '@/lib/contracts';
 import { useWellnessAPI } from '@/lib/api';
 import { useSogniGeneration } from '@/lib/sogni';
 
@@ -96,8 +96,29 @@ function ThemeToggleButton() {
 function LandingPageContent() {
   const [currentView, setCurrentView] = useState<'landing' | 'onboarding' | 'dashboard'>('landing');
   const [wellnessPrompt, setWellnessPrompt] = useState('');
-  const [aiResponse, setAiResponse] = useState<any>(null);
-  const [isLoadingAI, setIsLoadingAI] = useState(false);
+     const [aiResponse, setAiResponse] = useState<any>(null);
+   const [isLoadingAI, setIsLoadingAI] = useState(false);
+   
+   // Chat interface state
+   const [showChatModal, setShowChatModal] = useState(false);
+   const [chatMessages, setChatMessages] = useState<Array<{id: number, type: 'user' | 'assistant', content: string, timestamp: Date}>>([]);
+   const [currentMessage, setCurrentMessage] = useState('');
+   const [thinkingProgress, setThinkingProgress] = useState({
+     gymbro: 0,
+     dietking: 0,
+     sleepyjoe: 0,
+     compiling: 0
+   });
+  
+  // Contract status for user feedback
+  const [contractStatus, setContractStatus] = useState<{
+    type: 'success' | 'error' | null;
+    message: string;
+    timestamp: number;
+  } | null>(null);
+  
+  // Loading state for contract data refresh
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
   
   // Disconnect confirmation state
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
@@ -107,8 +128,8 @@ function LandingPageContent() {
   const [customPrompt, setCustomPrompt] = useState('');
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
-  const [streakCount, setStreakCount] = useState(12);
-  const [totalScore, setTotalScore] = useState(2840);
+  const [streakCount, setStreakCount] = useState(0);
+  const [totalScore, setTotalScore] = useState(0);
   
   // Network switching state
   const [isNetworkSwitching, setIsNetworkSwitching] = useState(false);
@@ -137,6 +158,29 @@ function LandingPageContent() {
   // Show meal logging modal
   const [showMealModal, setShowMealModal] = useState(false);
   const [newMeal, setNewMeal] = useState({ type: 'breakfast', name: '', calories: '' });
+  
+  // Modal states for quick actions
+  const [showWorkoutModal, setShowWorkoutModal] = useState(false);
+  const [showMeditationModal, setShowMeditationModal] = useState(false);
+  const [showSleepModal, setShowSleepModal] = useState(false);
+  
+  // Form states for quick actions
+  const [workoutForm, setWorkoutForm] = useState({
+    duration: '',
+    sets: '',
+    caloriesBurned: '',
+    activityType: '',
+    name: ''
+  });
+  
+  const [meditationForm, setMeditationForm] = useState({
+    duration: '',
+    name: ''
+  });
+  
+  const [sleepForm, setSleepForm] = useState({
+    duration: ''
+  });
   
   // User onboarding status
   const [isUserOnboarded, setIsUserOnboarded] = useState(false);
@@ -210,19 +254,90 @@ function LandingPageContent() {
     setOnboardingStep(1);
   };
 
-  const getWellnessAdviceHandler = async () => {
-    if (!wellnessPrompt.trim()) return;
-    
-    setIsLoadingAI(true);
-    try {
-      const response = await getWellnessAdvice(wellnessPrompt);
-      setAiResponse(response);
-    } catch (error) {
-      console.error('Failed to get wellness advice:', error);
-    } finally {
-      setIsLoadingAI(false);
-    }
-  };
+     const getWellnessAdviceHandler = async () => {
+     if (!wellnessPrompt.trim()) return;
+     
+     // Add user message to chat
+     const userMessage = {
+       id: Date.now(),
+       type: 'user' as const,
+       content: wellnessPrompt,
+       timestamp: new Date()
+     };
+     
+     console.log('🔍 Setting chat messages and modal state...');
+     setChatMessages(prev => [...prev, userMessage]);
+     setShowChatModal(true);
+     console.log('🔍 showChatModal set to true');
+     setCurrentMessage('');
+     
+     // Start the thinking process
+     setThinkingProgress({ gymbro: 0, dietking: 0, sleepyjoe: 0, compiling: 0 });
+     
+     // Simulate the agents thinking
+     const simulateThinking = async () => {
+       // Gymbro thinking
+       for (let i = 0; i <= 100; i += 10) {
+         await new Promise(resolve => setTimeout(resolve, 100));
+         setThinkingProgress(prev => ({ ...prev, gymbro: i }));
+       }
+       
+       // Dietking thinking
+       for (let i = 0; i <= 100; i += 10) {
+         await new Promise(resolve => setTimeout(resolve, 100));
+         setThinkingProgress(prev => ({ ...prev, dietking: i }));
+       }
+       
+       // Sleepyjoe thinking
+       for (let i = 0; i <= 100; i += 10) {
+         await new Promise(resolve => setTimeout(resolve, 100));
+         setThinkingProgress(prev => ({ ...prev, sleepyjoe: i }));
+       }
+       
+       // Compiling progress
+       for (let i = 0; i <= 100; i += 20) {
+         await new Promise(resolve => setTimeout(resolve, 150));
+         setThinkingProgress(prev => ({ ...prev, compiling: i }));
+       }
+       
+       // Add Smasher's response
+       const smasherResponse = {
+         id: Date.now() + 1,
+         type: 'assistant' as const,
+         content: generateSmasherResponse(wellnessPrompt),
+         timestamp: new Date()
+       };
+       
+       setChatMessages(prev => [...prev, smasherResponse]);
+       setThinkingProgress({ gymbro: 0, dietking: 0, sleepyjoe: 0, compiling: 0 });
+     };
+     
+     simulateThinking();
+   };
+   
+   // Generate hardcoded responses from Smasher
+   const generateSmasherResponse = (prompt: string): string => {
+     const lowerPrompt = prompt.toLowerCase();
+     
+     if (lowerPrompt.includes('workout') || lowerPrompt.includes('exercise') || lowerPrompt.includes('gym')) {
+       return "💪 Based on your workout goals, I recommend a balanced approach:\n\n🏃‍♂️ **Cardio**: 3-4 sessions per week, 30-45 minutes\n🏋️‍♂️ **Strength Training**: 3 sessions per week, focusing on compound movements\n🧘‍♀️ **Recovery**: Include stretching and rest days\n\nStart with 3 days per week and gradually increase intensity. Remember, consistency beats perfection!";
+     }
+     
+     if (lowerPrompt.includes('diet') || lowerPrompt.includes('nutrition') || lowerPrompt.includes('food')) {
+       return "🥗 Here's your personalized nutrition plan:\n\n🍳 **Breakfast**: Protein + complex carbs (eggs + oatmeal)\n🥙 **Lunch**: Lean protein + vegetables + healthy fats\n🍽️ **Dinner**: Light protein + vegetables\n🍎 **Snacks**: Nuts, fruits, or Greek yogurt\n\nAim for 3 meals + 2 snacks daily. Stay hydrated with 8+ glasses of water!";
+     }
+     
+     if (lowerPrompt.includes('sleep') || lowerPrompt.includes('rest') || lowerPrompt.includes('bedtime')) {
+       return "😴 Sleep optimization strategy:\n\n⏰ **Bedtime**: Aim for 7-9 hours, go to bed at the same time daily\n🌙 **Environment**: Dark, cool (65-68°F), quiet room\n📱 **Habits**: No screens 1 hour before bed, read or meditate instead\n☕ **Avoid**: Caffeine after 2 PM, heavy meals before bed\n\nQuality sleep is your foundation for wellness!";
+     }
+     
+     if (lowerPrompt.includes('stress') || lowerPrompt.includes('anxiety') || lowerPrompt.includes('mental')) {
+       return "🧘‍♀️ Mental wellness approach:\n\n💆‍♂️ **Daily Practice**: 10-15 minutes meditation or deep breathing\n🏃‍♀️ **Physical Activity**: Exercise releases endorphins\n📝 **Journaling**: Write down thoughts and gratitude\n🎯 **Mindfulness**: Stay present, one task at a time\n\nRemember, mental health is just as important as physical health!";
+     }
+     
+     // Default response
+     return "🌟 Here's your comprehensive wellness advice:\n\n🎯 **Set Clear Goals**: Define what wellness means to you\n📊 **Track Progress**: Monitor your habits and improvements\n🔄 **Stay Consistent**: Small daily actions create lasting change\n🎉 **Celebrate Wins**: Acknowledge your progress, no matter how small\n\nYou're on the right path! Keep going! 💪";
+   };
 
   const generateWellnessImage = async () => {
     setIsGeneratingImage(true);
@@ -267,201 +382,7 @@ function LandingPageContent() {
     }
   };
   
-  // Activity tracking functions
-  const logActivity = async (type: string, name: string, reward: number) => {
-    const newActivity = {
-      id: Date.now(),
-      type,
-      name,
-      timestamp: Date.now(),
-      reward,
-      completed: true
-    };
-    
-    // Update local state immediately for UI responsiveness
-    setActivities(prev => [newActivity, ...prev.slice(0, 9)]); // Keep last 10 activities
-    setTotalScore(prev => prev + reward);
-    setStreakCount(prev => prev + 1);
-    
-    // Update weekly goals
-    if (type === 'workout') {
-      setWeeklyGoals(prev => ({
-        ...prev,
-        exercise: { ...prev.exercise, current: Math.min(prev.exercise.current + 1, prev.exercise.target) }
-      }));
-    } else if (type === 'meditation') {
-      setWeeklyGoals(prev => ({
-        ...prev,
-        meditation: { ...prev.meditation, current: Math.min(prev.meditation.current + 1, prev.meditation.target) }
-      }));
-    }
-    
-    // Save to smart contract if available
-    if (address && hasWellnessData) {
-      // Force network switch to Base Sepolia if not already connected
-      if (chainId !== 84532) {
-        console.log('🔄 Switching to Base Sepolia testnet for activity logging...');
-        try {
-          await (window.ethereum as any).request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0x14a34' }], // 84532 in hex
-          });
-          console.log('✅ Switched to Base Sepolia testnet');
-          
-          // Wait a moment for the switch to complete
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Check if switch was successful
-          const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
-          if (newChainId !== '0x14a34') {
-            console.log('⚠️ Network switch failed, using localStorage only');
-            // Fallback to localStorage
-            if (address) {
-              const localStorageKey = `wellspace_user_${address}`;
-              const existingData = localStorage.getItem(localStorageKey);
-              if (existingData) {
-                try {
-                  const userData = JSON.parse(existingData);
-                  userData.streakCount = streakCount + 1;
-                  userData.totalScore = totalScore + reward;
-                  userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
-                  userData.weeklyGoals = weeklyGoals;
-                  localStorage.setItem(localStorageKey, JSON.stringify(userData));
-                } catch (error) {
-                  console.error('Error updating localStorage:', error);
-                }
-              }
-            }
-            return;
-          }
-        } catch (error: any) {
-          console.error('Error switching to Base Sepolia:', error);
-          if (error.code === 4902) {
-            // Chain not added, add it first
-            await addBaseSepoliaNetwork();
-            // Try switching again
-            try {
-              await (window.ethereum as any).request({
-                method: 'wallet_switchEthereumChain',
-                params: [{ chainId: '0x14a34' }],
-              });
-            } catch (switchError) {
-              console.log('⚠️ Network switch failed after adding chain, using localStorage only');
-              // Fallback to localStorage
-              if (address) {
-                const localStorageKey = `wellspace_user_${address}`;
-                const existingData = localStorage.getItem(localStorageKey);
-                if (existingData) {
-                  try {
-                    const userData = JSON.parse(existingData);
-                    userData.streakCount = streakCount + 1;
-                    userData.totalScore = totalScore + reward;
-                    userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
-                    userData.weeklyGoals = weeklyGoals;
-                    localStorage.setItem(localStorageKey, JSON.stringify(userData));
-                  } catch (error) {
-                    console.error('Error updating localStorage:', error);
-                  }
-                }
-              }
-              return;
-            }
-          } else {
-            console.log('⚠️ Network switch failed, using localStorage only');
-            // Fallback to localStorage
-            if (address) {
-              const localStorageKey = `wellspace_user_${address}`;
-              const existingData = localStorage.getItem(localStorageKey);
-              if (existingData) {
-                try {
-                  const userData = JSON.parse(existingData);
-                  userData.streakCount = streakCount + 1;
-                  userData.totalScore = totalScore + reward;
-                  userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
-                  userData.weeklyGoals = weeklyGoals;
-                  localStorage.setItem(localStorageKey, JSON.stringify(userData));
-                } catch (error) {
-                  console.error('Error updating localStorage:', error);
-                }
-              }
-            }
-            return;
-          }
-        }
-      }
-      try {
-        console.log('📝 Logging activity to smart contract:', { type, name, reward });
-        await writeContract({
-          address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
-          abi: wellnessTrackerAbi,
-          functionName: 'logActivity',
-          args: [type, name, BigInt(reward)],
-        });
-        console.log('✅ Activity logged to smart contract successfully');
-        
-        // Also save to localStorage as backup
-        const localStorageKey = `wellspace_user_${address}`;
-        const existingData = localStorage.getItem(localStorageKey);
-        if (existingData) {
-          try {
-            const userData = JSON.parse(existingData);
-            userData.streakCount = streakCount + 1;
-            userData.totalScore = totalScore + reward;
-            userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
-            userData.weeklyGoals = weeklyGoals;
-            localStorage.setItem(localStorageKey, JSON.stringify(userData));
-            console.log('💾 Activity also saved to localStorage backup');
-          } catch (error) {
-            console.error('Error updating localStorage:', error);
-          }
-        }
-      } catch (error) {
-        console.error('Error logging activity to smart contract:', error);
-        console.log('🔄 Falling back to localStorage only');
-        
-        // Fallback to localStorage only
-        if (address) {
-          const localStorageKey = `wellspace_user_${address}`;
-          const existingData = localStorage.getItem(localStorageKey);
-          if (existingData) {
-            try {
-              const userData = JSON.parse(existingData);
-              userData.streakCount = streakCount + 1;
-              userData.totalScore = totalScore + reward;
-              userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
-              userData.weeklyGoals = weeklyGoals;
-              localStorage.setItem(localStorageKey, JSON.stringify(userData));
-            } catch (localError) {
-              console.error('Error updating localStorage:', localError);
-            }
-          }
-        }
-      }
-    } else {
-      // No smart contract available or wrong network, use localStorage only
-      if (chainId !== 84532) {
-        console.log('⚠️ Wrong network detected, using localStorage only');
-      } else {
-        console.log('📱 Using localStorage fallback for activity logging');
-      }
-      if (address) {
-        const localStorageKey = `wellspace_user_${address}`;
-        const existingData = localStorage.getItem(localStorageKey);
-        if (existingData) {
-          try {
-            const userData = JSON.parse(existingData);
-            userData.streakCount = streakCount + 1;
-            userData.totalScore = totalScore + reward;
-            userData.activities = [newActivity, ...(userData.activities || []).slice(0, 9)];
-            userData.weeklyGoals = weeklyGoals;
-            localStorage.setItem(localStorageKey, JSON.stringify(userData));
-          } catch (error) {
-            console.error('Error updating localStorage:', error);
-          }
-        }
-      }
-    }
-  };
+
   
   // Meal logging functions
   const addMeal = async () => {
@@ -497,7 +418,7 @@ function LandingPageContent() {
           // Check if switch was successful
           const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
           if (newChainId !== '0x14a34') {
-            console.log('⚠️ Network switch failed, meal logged to localStorage only');
+            console.log('⚠️ Network switch failed - cannot log meal to blockchain');
             return;
           }
         } catch (error: any) {
@@ -512,55 +433,328 @@ function LandingPageContent() {
                 params: [{ chainId: '0x14a34' }],
               });
             } catch (switchError) {
-              console.log('⚠️ Network switch failed after adding chain, meal logged to localStorage only');
+              console.log('⚠️ Network switch failed after adding chain - cannot log meal to blockchain');
               return;
             }
           } else {
-            console.log('⚠️ Network switch failed, meal logged to localStorage only');
+            console.log('⚠️ Network switch failed - cannot log meal to blockchain');
             return;
           }
         }
       }
       try {
+        // Check if wellness data is initialized, if not, initialize it first
+        if (!hasWellnessData) {
+          console.log('🔄 Wellness data not initialized, initializing first...');
+          const initialized = await initializeWellnessData();
+          if (!initialized) {
+            console.log('⚠️ Failed to initialize wellness data - cannot log meal to blockchain');
+            return;
+          }
+          // Wait a moment for the initialization to complete
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        
         console.log('🍽️ Logging meal to smart contract:', { type: newMeal.type, name: newMeal.name, calories: parseInt(newMeal.calories) });
-        await writeContract({
+        const txHash = await writeContract({
           address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
           abi: wellnessTrackerAbi,
           functionName: 'logMeal',
-          args: [newMeal.type, newMeal.name, BigInt(newMeal.calories)],
+          args: [newMeal.type, newMeal.name, BigInt(newMeal.calories), BigInt(0), BigInt(0), BigInt(0)],
         });
+        console.log('✅ Meal transaction submitted:', txHash);
+        console.log('⏳ Waiting for transaction confirmation...');
+        
+        // Wait a moment for the transaction to be mined
+        await new Promise(resolve => setTimeout(resolve, 3000));
         console.log('✅ Meal logged to smart contract successfully');
+        
+        // Show success message
+        setContractStatus({
+          type: 'success',
+          message: '✅ Meal logged successfully! Your wellness score has been updated.',
+          timestamp: Date.now()
+        });
+        
+        // Note: Wellness score will update automatically via contract data refresh
+        console.log('✅ Transaction successful - wellness score should update automatically');
       } catch (error) {
-        console.error('Error logging meal to smart contract:', error);
-        console.log('🔄 Falling back to localStorage only');
+        console.error('❌ Error logging meal to smart contract:', error);
+        console.error('❌ Error details:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+          hasWellnessData,
+          meal: newMeal
+        });
+        console.log('🔄 Smart contract failed - no localStorage fallback');
       }
     } else if (chainId !== 84532) {
-      console.log('⚠️ Wrong network detected, meal logged to localStorage only');
+      console.log('⚠️ Wrong network detected - cannot log meal to blockchain');
     }
     
-    // Give reward for logging meal
-    logActivity('meal', 'Logged meal', 10);
+    // Meal logged successfully
   };
   
   // Quick action functions
   const handleQuickAction = async (action: string) => {
     switch (action) {
       case 'workout':
-        await logActivity('workout', 'Completed workout', 50);
+        setShowWorkoutModal(true);
         break;
       case 'meditation':
-        await logActivity('meditation', 'Logged meditation', 25);
+        setShowMeditationModal(true);
         break;
       case 'meal':
         setShowMealModal(true);
         break;
       case 'sleep':
-        await logActivity('sleep', 'Logged sleep', 30);
-        setWeeklyGoals(prev => ({
-          ...prev,
-          sleep: { ...prev.sleep, current: Math.min(prev.sleep.current + 1, prev.sleep.target) }
-        }));
+        setShowSleepModal(true);
         break;
+    }
+  };
+  
+  // Handle workout logging with smart contract integration
+  const handleLogWorkout = async () => {
+    if (!address) {
+      setContractError('Please connect your wallet to log workouts');
+      return;
+    }
+    
+    // Validate form
+    if (!workoutForm.duration || !workoutForm.sets || !workoutForm.caloriesBurned) {
+      setContractError('Please fill in all required fields');
+      return;
+    }
+    
+          try {
+        setContractError(null);
+        
+        // Check if wellness data is initialized, if not, initialize it first
+        if (!hasWellnessData) {
+          console.log('🔄 Wellness data not initialized, initializing first...');
+          const initialized = await initializeWellnessData();
+          if (!initialized) {
+            setContractError('Failed to initialize wellness data. Please try again.');
+            return;
+          }
+          // Wait a moment for the initialization to complete
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        
+        console.log('🚀 Logging workout to smart contract...');
+        
+        // Call smart contract to log workout
+        const txHash = await writeContract({
+          address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+          abi: wellnessTrackerAbi,
+          functionName: 'logWorkout',
+          args: [
+            BigInt(workoutForm.duration),
+            BigInt(workoutForm.sets),
+            BigInt(workoutForm.caloriesBurned),
+            workoutForm.activityType || 'General Workout',
+            workoutForm.name || 'Workout Session',
+            BigInt(50) // Reward for workout
+          ]
+        });
+      
+        console.log('✅ Workout transaction submitted:', txHash);
+        console.log('⏳ Waiting for transaction confirmation...');
+        
+        // Wait a moment for the transaction to be mined
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Show success message
+      setContractStatus({
+        type: 'success',
+        message: '✅ Workout logged successfully! Your wellness score has been updated.',
+        timestamp: Date.now()
+      });
+      
+      console.log('🎉 Workout successfully logged to blockchain!');
+      
+      // Reset form and close modal
+      setWorkoutForm({
+        duration: '',
+        sets: '',
+        caloriesBurned: '',
+        activityType: '',
+        name: ''
+      });
+      setShowWorkoutModal(false);
+      
+      // Note: Wellness score will update automatically via contract data refresh
+      console.log('✅ Transaction successful - wellness score should update automatically');
+      
+    } catch (error) {
+      console.error('❌ Failed to log workout to blockchain:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+        hasWellnessData,
+        workoutForm
+      });
+      setContractError(`Failed to log workout: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+  
+  // Handle meditation logging with smart contract integration
+  const handleLogMeditation = async () => {
+    if (!address) {
+      setContractError('Please connect your wallet to log meditation');
+      return;
+    }
+    
+    // Validate form
+    if (!meditationForm.duration) {
+      setContractError('Please fill in duration');
+      return;
+    }
+    
+          try {
+        setContractError(null);
+        
+        // Check if wellness data is initialized, if not, initialize it first
+        if (!hasWellnessData) {
+          console.log('🔄 Wellness data not initialized, initializing first...');
+          const initialized = await initializeWellnessData();
+          if (!initialized) {
+            setContractError('Failed to initialize wellness data. Please try again.');
+            return;
+          }
+          // Wait a moment for the initialization to complete
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        
+        console.log('🚀 Logging meditation to smart contract...');
+        
+        // Call smart contract to log meditation
+        const txHash = await writeContract({
+          address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+          abi: wellnessTrackerAbi,
+          functionName: 'logMeditation',
+          args: [
+            BigInt(meditationForm.duration),
+            meditationForm.name || 'Meditation Session',
+            BigInt(25) // Reward for meditation
+          ]
+        });
+      
+        console.log('✅ Meditation transaction submitted:', txHash);
+        console.log('⏳ Waiting for transaction confirmation...');
+        
+        // Wait a moment for the transaction to be mined
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Show success message
+      setContractStatus({
+        type: 'success',
+        message: '✅ Meditation logged successfully! Your wellness score has been updated.',
+        timestamp: Date.now()
+      });
+      
+      console.log('🎉 Meditation successfully logged to blockchain!');
+      
+      // Reset form and close modal
+      setMeditationForm({
+        duration: '',
+        name: ''
+      });
+      setShowMeditationModal(false);
+      
+      // Note: Wellness score will update automatically via contract data refresh
+      console.log('✅ Transaction successful - wellness score should update automatically');
+      
+    } catch (error) {
+      console.error('❌ Failed to log meditation to blockchain:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+        hasWellnessData,
+        meditationForm
+      });
+      setContractError(`Failed to log meditation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+  
+  // Handle sleep logging with smart contract integration
+  const handleLogSleep = async () => {
+    if (!address) {
+      setContractError('Please connect your wallet to log sleep');
+      return;
+    }
+    
+    // Validate form
+    if (!sleepForm.duration) {
+      setContractError('Please fill in sleep duration');
+      return;
+    }
+    
+    // Validate sleep duration doesn't exceed 24 hours
+    const sleepHours = parseFloat(sleepForm.duration);
+    if (sleepHours > 24) {
+      setContractError('Sleep duration cannot exceed 24 hours');
+      return;
+    }
+    
+          try {
+        setContractError(null);
+        
+        // Check if wellness data is initialized, if not, initialize it first
+        if (!hasWellnessData) {
+          console.log('🔄 Wellness data not initialized, initializing first...');
+          const initialized = await initializeWellnessData();
+          if (!initialized) {
+            setContractError('Failed to initialize wellness data. Please try again.');
+            return;
+          }
+          // Wait a moment for the initialization to complete
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        
+        console.log('🚀 Logging sleep to smart contract...');
+        
+        // Call smart contract to log sleep
+        const txHash = await writeContract({
+          address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+          abi: wellnessTrackerAbi,
+          functionName: 'logSleep',
+          args: [BigInt(Math.round(parseFloat(sleepForm.duration)))], // Send duration in hours
+        });
+      
+        console.log('✅ Sleep transaction submitted:', txHash);
+        console.log('⏳ Waiting for transaction confirmation...');
+        
+        // Wait a moment for the transaction to be mined
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Show success message
+      setContractStatus({
+        type: 'success',
+        message: '✅ Sleep logged successfully! Your wellness score has been updated.',
+        timestamp: Date.now()
+      });
+      
+      console.log('🎉 Sleep successfully logged to blockchain!');
+      
+      // Reset form and close modal
+      setSleepForm({
+        duration: ''
+      });
+      setShowSleepModal(false);
+      
+      // Note: Wellness score will update automatically via contract data refresh
+      console.log('✅ Transaction successful - wellness score should update automatically');
+      
+    } catch (error) {
+      console.error('❌ Failed to log sleep to blockchain:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+        hasWellnessData,
+        sleepForm
+      });
+      setContractError(`Failed to log sleep: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
   
@@ -649,23 +843,57 @@ function LandingPageContent() {
     query: { enabled: !!address && !!hasWellnessData },
   });
   
-  // Debug logging
+    // Enhanced Debug logging for main app
   useEffect(() => {
     if (address) {
-      console.log('🔍 Debug - Wallet connected:', address);
-      console.log('🔍 Debug - User Profile Contract address:', CONTRACT_ADDRESSES.USER_PROFILE);
-      console.log('🔍 Debug - Wellness Tracker Contract address:', CONTRACT_ADDRESSES.WELLNESS_TRACKER);
-      console.log('🔍 Debug - Contract read error:', contractReadError);
-      console.log('🔍 Debug - Profile error:', profileError);
-      console.log('🔍 Debug - Wellness error:', wellnessError);
-      console.log('🔍 Debug - Is onboarded:', isOnboarded);
-      console.log('🔍 Debug - Has wellness data:', hasWellnessData);
-      console.log('🔍 Debug - Profile data:', profileData);
-      console.log('🔍 Debug - Wellness data:', wellnessData);
-      console.log('🔍 Debug - Contract activities:', contractActivities);
-      console.log('🔍 Debug - Contract meals:', contractMeals);
+      console.log('🔍 LandingPage Debug - Wallet connected:', address);
+      console.log('🔍 LandingPage Debug - Chain ID:', chainId);
+      console.log('🔍 LandingPage Debug - Contract Addresses:');
+      console.log('  - WELLNESS_NFT:', CONTRACT_ADDRESSES.WELLNESS_NFT);
+      console.log('  - WELL_TOKEN:', CONTRACT_ADDRESSES.WELL_TOKEN);
+      console.log('  - WELLNESS_TRACKER:', CONTRACT_ADDRESSES.WELLNESS_TRACKER);
+      console.log('  - USER_PROFILE:', CONTRACT_ADDRESSES.USER_PROFILE);
+      console.log('  - REWARDS:', CONTRACT_ADDRESSES.REWARDS);
+      console.log('🔍 LandingPage Debug - Contract Read Status:');
+      console.log('  - Contract read error:', contractReadError);
+      console.log('  - Profile error:', profileError);
+      console.log('  - Wellness error:', wellnessError);
+      console.log('🔍 LandingPage Debug - User Status:');
+      console.log('  - Is onboarded:', isOnboarded);
+      console.log('  - Has wellness data:', hasWellnessData);
+      console.log('🔍 LandingPage Debug - Contract Data:');
+      console.log('  - Profile data:', profileData);
+      console.log('  - Wellness data:', wellnessData);
+      console.log('  - Contract activities:', contractActivities);
+      console.log('  - Contract meals:', contractMeals);
+      console.log('🔍 LandingPage Debug - Local State:');
+      console.log('  - Total score:', totalScore);
+      console.log('  - Streak count:', streakCount);
+      console.log('  - Well balance:', wellBalance);
+
+      // Check if environment variables are missing
+      const requiredVars = [
+        'NEXT_PUBLIC_WELLNESS_NFT_ADDRESS',
+        'NEXT_PUBLIC_WELL_TOKEN_ADDRESS',
+        'NEXT_PUBLIC_WELLNESS_TRACKER_ADDRESS',
+        'NEXT_PUBLIC_USER_PROFILE_ADDRESS',
+        'NEXT_PUBLIC_REWARDS_ADDRESS'
+      ];
+
+      const missingVars = requiredVars.filter(varName => !process.env[varName]);
+      if (missingVars.length > 0) {
+        console.warn('⚠️ LandingPage - Some environment variables appear undefined in this check:', missingVars);
+        console.log('📝 Note: This can happen during Next.js hydration - environment variables may still load correctly');
+      } else {
+        console.log('✅ LandingPage - All environment variables are set');
+      }
+
+      // Test contract connectivity
+      testContractConnectivity().catch(error => {
+        console.error('❌ Contract connectivity test failed:', error);
+      });
     }
-  }, [address, contractReadError, profileError, wellnessError, isOnboarded, hasWellnessData, profileData, wellnessData, contractActivities, contractMeals]);
+  }, [address, chainId, contractReadError, profileError, wellnessError, isOnboarded, hasWellnessData, profileData, wellnessData, contractActivities, contractMeals, totalScore, streakCount, wellBalance]);
 
   // Force network switch to Base Sepolia on component mount
   useEffect(() => {
@@ -784,51 +1012,54 @@ function LandingPageContent() {
   useEffect(() => {
     if (profileData && Array.isArray(profileData)) {
       // profile is an array: [hasOnboarded, goals, imageTheme, customPrompt, streakCount, totalScore, createdAt, lastActive, profileImageUrl, nftTokenId]
+      console.log('🔍 LandingPage - Profile data loaded from contract:', profileData);
       setUserGoals([...(profileData[1] || [])]);
       setSelectedImageTheme(profileData[2] || '');
       setCustomPrompt(profileData[3] || '');
       setStreakCount(Number(profileData[4]) || 0);
       setTotalScore(Number(profileData[5]) || 0);
       setGeneratedImageUrl(profileData[8] || null);
+      console.log('✅ LandingPage - Profile data processed and local state updated');
     }
   }, [profileData]);
 
   // Load wellness data from smart contract when available
   useEffect(() => {
     if (wellnessData && Array.isArray(wellnessData)) {
-      // wellnessData is an array: [streakCount, totalScore, lastActivityTimestamp, dailyStreakStart, weeklyGoals, totalActivities, totalMeals]
+      // wellnessData is an array: [streakCount, totalScore, lastActivityTimestamp, dailyStreakStart, totalWorkouts, totalMeditations, totalMeals, totalSleepSessions]
       console.log('📊 Loading wellness data from smart contract:', wellnessData);
       
-      const [contractStreakCount, contractTotalScore, lastActivityTimestamp, dailyStreakStart, contractWeeklyGoals, totalActivities, totalMeals] = wellnessData;
+      const [contractStreakCount, contractTotalScore, lastActivityTimestamp, dailyStreakStart, totalWorkouts, totalMeditations, totalMeals, totalSleepSessions] = wellnessData;
       
       // Update local state with contract data
       setStreakCount(Number(contractStreakCount) || 0);
       setTotalScore(Number(contractTotalScore) || 0);
       
-      // Update weekly goals if available
-      if (contractWeeklyGoals && Array.isArray(contractWeeklyGoals)) {
-        const [exerciseCurrent, exerciseTarget, meditationCurrent, meditationTarget, sleepCurrent, sleepTarget, exerciseCompleted, meditationCompleted, sleepCompleted] = contractWeeklyGoals;
-        
-        setWeeklyGoals({
-          exercise: { 
-            current: Number(exerciseCurrent) || 0, 
-            target: Number(exerciseTarget) || 5, 
-            completed: exerciseCompleted || false 
-          },
-          meditation: { 
-            current: Number(meditationCurrent) || 0, 
-            target: Number(meditationTarget) || 7, 
-            completed: meditationCompleted || false 
-          },
-          sleep: { 
-            current: Number(sleepCurrent) || 0, 
-            target: Number(sleepTarget) || 7, 
-            completed: sleepCompleted || false 
-          }
-        });
+      // Debug timestamp conversion for wellness data
+      if (lastActivityTimestamp > 0) {
+        const lastActivityMs = Number(lastActivityTimestamp) * 1000;
+        console.log(`🔍 Wellness data timestamp conversion: ${lastActivityTimestamp}s -> ${lastActivityMs}ms`);
+      }
+      if (dailyStreakStart > 0) {
+        const dailyStreakMs = Number(dailyStreakStart) * 1000;
+        console.log(`🔍 Daily streak timestamp conversion: ${dailyStreakStart}s -> ${dailyStreakMs}ms`);
       }
       
-      console.log('✅ Wellness data loaded from smart contract successfully');
+      // Note: Weekly goals are now handled by a separate getUserWeeklyGoals contract call
+      // This keeps the wellness data structure simple with just basic counts
+      
+      console.log('✅ LandingPage - Wellness data loaded from smart contract successfully');
+      console.log('🔍 LandingPage - Raw wellness data:', wellnessData);
+      console.log('🔍 LandingPage - Parsed data:', {
+        streakCount: Number(contractStreakCount),
+        totalScore: Number(contractTotalScore),
+        lastActivityTimestamp: Number(lastActivityTimestamp),
+        dailyStreakStart: Number(dailyStreakStart),
+        totalWorkouts: Number(totalWorkouts),
+        totalMeditations: Number(totalMeditations),
+        totalMeals: Number(totalMeals),
+        totalSleepSessions: Number(totalSleepSessions)
+      });
     }
   }, [wellnessData]);
 
@@ -858,12 +1089,11 @@ function LandingPageContent() {
           let formatted;
           if (Array.isArray(activity)) {
             console.log(`🔍 Activity is array format`);
-            // Convert timestamp from seconds to milliseconds if it's a reasonable value
-            let timestamp = Number(activity[4]) || Date.now();
-            if (timestamp > 1000000000 && timestamp < 10000000000) {
-              // If timestamp is in seconds (10 digits), convert to milliseconds
-              timestamp = timestamp * 1000;
-              console.log(`🔍 Converting timestamp from seconds to milliseconds: ${Number(activity[4])} -> ${timestamp}`);
+            // Contract timestamps are in SECONDS, convert to milliseconds for frontend
+            const rawTimestamp = Number(activity[4]) || 0;
+            const timestamp = rawTimestamp > 0 ? rawTimestamp * 1000 : Date.now();
+            if (rawTimestamp > 0) {
+              console.log(`🔍 Converting timestamp from seconds to milliseconds: ${rawTimestamp} -> ${timestamp}`);
             }
             
             formatted = {
@@ -876,12 +1106,11 @@ function LandingPageContent() {
             };
           } else if (typeof activity === 'object' && activity !== null) {
             console.log(`🔍 Activity is object format`);
-            // Convert timestamp from seconds to milliseconds if it's a reasonable value
-            let timestamp = Number(activity.timestamp) || Date.now();
-            if (timestamp > 1000000000 && timestamp < 10000000000) {
-              // If timestamp is in seconds (10 digits), convert to milliseconds
-              timestamp = timestamp * 1000;
-              console.log(`🔍 Converting timestamp from seconds to milliseconds: ${Number(activity.timestamp)} -> ${timestamp}`);
+            // Contract timestamps are in SECONDS, convert to milliseconds for frontend
+            const rawTimestamp = Number(activity.timestamp) || 0;
+            const timestamp = rawTimestamp > 0 ? rawTimestamp * 1000 : Date.now();
+            if (rawTimestamp > 0) {
+              console.log(`🔍 Converting timestamp from seconds to milliseconds: ${rawTimestamp} -> ${timestamp}`);
             }
             
             formatted = {
@@ -909,26 +1138,11 @@ function LandingPageContent() {
         });
         
         setActivities(formattedActivities);
-        console.log('✅ Activities loaded from smart contract successfully');
-        console.log('🔍 Final formatted activities:', formattedActivities);
+        console.log('✅ LandingPage - Activities loaded from smart contract successfully');
+        console.log('🔍 LandingPage - Final formatted activities:', formattedActivities);
       } else {
-        console.log('⚠️ Contract activities data incomplete, falling back to localStorage');
-        // Fallback to localStorage
-        if (address) {
-          const localStorageKey = `wellspace_user_${address}`;
-          const savedData = localStorage.getItem(localStorageKey);
-          if (savedData) {
-            try {
-              const userData = JSON.parse(savedData);
-              if (userData.activities && Array.isArray(userData.activities)) {
-                setActivities(userData.activities);
-                console.log('📱 Activities loaded from localStorage fallback');
-              }
-            } catch (error) {
-              console.error('Error loading activities from localStorage:', error);
-            }
-          }
-        }
+        console.log('⚠️ LandingPage - Contract activities data incomplete - no fallback to localStorage');
+        setActivities([]); // Set empty array instead of falling back
       }
     }
   }, [contractActivities, address]);
@@ -959,12 +1173,11 @@ function LandingPageContent() {
           let formatted;
           if (Array.isArray(meal)) {
             console.log(`🔍 Meal is array format`);
-            // Convert timestamp from seconds to milliseconds if it's a reasonable value
-            let timestamp = Number(meal[4]) || Date.now();
-            if (timestamp > 1000000000 && timestamp < 10000000000) {
-              // If timestamp is in seconds (10 digits), convert to milliseconds
-              timestamp = timestamp * 1000;
-              console.log(`🔍 Converting meal timestamp from seconds to milliseconds: ${Number(meal[4])} -> ${timestamp}`);
+            // Contract timestamps are in SECONDS, convert to milliseconds for frontend
+            const rawTimestamp = Number(meal[4]) || 0;
+            const timestamp = rawTimestamp > 0 ? rawTimestamp * 1000 : Date.now();
+            if (rawTimestamp > 0) {
+              console.log(`🔍 Converting meal timestamp from seconds to milliseconds: ${rawTimestamp} -> ${timestamp}`);
             }
             
             formatted = {
@@ -976,12 +1189,11 @@ function LandingPageContent() {
             };
           } else if (typeof meal === 'object' && meal !== null) {
             console.log(`🔍 Meal is object format`);
-            // Convert timestamp from seconds to milliseconds if it's a reasonable value
-            let timestamp = Number(meal.timestamp) || Date.now();
-            if (timestamp > 1000000000 && timestamp < 10000000000) {
-              // If timestamp is in seconds (10 digits), convert to milliseconds
-              timestamp = timestamp * 1000;
-              console.log(`🔍 Converting meal timestamp from seconds to milliseconds: ${Number(meal.timestamp)} -> ${timestamp}`);
+            // Contract timestamps are in SECONDS, convert to milliseconds for frontend
+            const rawTimestamp = Number(meal.timestamp) || 0;
+            const timestamp = rawTimestamp > 0 ? rawTimestamp * 1000 : Date.now();
+            if (rawTimestamp > 0) {
+              console.log(`🔍 Converting meal timestamp from seconds to milliseconds: ${rawTimestamp} -> ${timestamp}`);
             }
             
             formatted = {
@@ -1007,67 +1219,16 @@ function LandingPageContent() {
         });
         
         setMeals(formattedMeals);
-        console.log('✅ Meals loaded from smart contract successfully');
-        console.log('🔍 Final formatted meals:', formattedMeals);
+        console.log('✅ LandingPage - Meals loaded from smart contract successfully');
+        console.log('🔍 LandingPage - Final formatted meals:', formattedMeals);
       } else {
-        console.log('⚠️ Contract meals data incomplete, falling back to localStorage');
-        // Fallback to localStorage
-        if (address) {
-          const localStorageKey = `wellspace_user_${address}`;
-          const savedData = localStorage.getItem(localStorageKey);
-          if (savedData) {
-            try {
-              const userData = JSON.parse(savedData);
-              if (userData.meals && Array.isArray(userData.meals)) {
-                setMeals(userData.meals);
-                console.log('📱 Meals loaded from localStorage fallback');
-              }
-            } catch (error) {
-              console.error('Error loading meals from localStorage:', error);
-            }
-          }
-        }
+        console.log('⚠️ LandingPage - Contract meals data incomplete - no fallback to localStorage');
+        setMeals([]); // Set empty array instead of falling back
       }
     }
   }, [contractMeals, address]);
   
-  // Fallback: Load from localStorage if smart contract fails
-  useEffect(() => {
-    if (address && !isOnboarded && !isCheckingContract) {
-      const localStorageKey = `wellspace_user_${address}`;
-      const savedData = localStorage.getItem(localStorageKey);
-      
-      if (savedData) {
-        try {
-          const userData = JSON.parse(savedData);
-          console.log('📱 Loading from localStorage fallback:', userData);
-          
-          setIsUserOnboarded(true);
-          setUserGoals(userData.goals || []);
-          setSelectedImageTheme(userData.imageTheme || '');
-          setCustomPrompt(userData.customPrompt || '');
-          setStreakCount(userData.streakCount || 0);
-          setTotalScore(userData.totalScore || 0);
-          setGeneratedImageUrl(userData.profileImageUrl || null);
-          
-          // Load activities and weekly goals
-          if (userData.activities) {
-            setActivities(userData.activities);
-          }
-          if (userData.weeklyGoals) {
-            setWeeklyGoals(userData.weeklyGoals);
-          }
-          
-          // If we're on onboarding page, redirect to dashboard
-          if (currentView === 'onboarding') {
-            setCurrentView('dashboard');
-          }
-        } catch (error) {
-          console.error('Error parsing localStorage data:', error);
-        }
-      }
-    }
-  }, [address, isOnboarded, isCheckingContract, currentView]);
+  // No more localStorage fallbacks - only use smart contract data
 
   // Check contract health on mount and when address changes
   useEffect(() => {
@@ -1206,19 +1367,7 @@ function LandingPageContent() {
       
       console.log('📝 Transaction submitted:', result);
       
-      // Save to localStorage as backup while transaction processes
-      const localStorageKey = `wellspace_user_${address}`;
-      const userData = {
-        goals,
-        imageTheme,
-        customPrompt,
-        streakCount,
-        totalScore,
-        profileImageUrl: generatedImageUrl || '',
-        timestamp: Date.now()
-      };
-      localStorage.setItem(localStorageKey, JSON.stringify(userData));
-      console.log('💾 Saved to localStorage backup:', userData);
+      // No localStorage fallbacks - only use smart contract data
       
       setIsSavingProfile(false);
       return true;
@@ -1226,28 +1375,9 @@ function LandingPageContent() {
       console.error('Error saving user profile to smart contract:', error);
       setContractError(error instanceof Error ? error.message : 'Failed to save profile');
       
-      // Fallback: save to localStorage only
-      try {
-        const localStorageKey = `wellspace_user_${address}`;
-        const userData = {
-          goals,
-          imageTheme,
-          customPrompt,
-          streakCount,
-          totalScore,
-          profileImageUrl: generatedImageUrl || '',
-          timestamp: Date.now()
-        };
-        localStorage.setItem(localStorageKey, JSON.stringify(userData));
-        console.log('💾 Saved to localStorage fallback:', userData);
-        
-        setIsSavingProfile(false);
-        return true;
-      } catch (localError) {
-        console.error('Error saving to localStorage:', localError);
-        setIsSavingProfile(false);
-        return false;
-      }
+      // No localStorage fallbacks - only use smart contract data
+      setIsSavingProfile(false);
+      return false;
     }
     };
 
@@ -1978,6 +2108,45 @@ function LandingPageContent() {
             </div>
           )}
 
+          {/* Smart Contract Activity Status */}
+          {contractStatus && (
+            <div className={cn(
+              "mb-6 p-4 rounded-xl border transition-all duration-300",
+              contractStatus.type === 'success'
+                ? isDarkMode 
+                  ? "bg-green-900/20 border-green-700/50 text-green-200" 
+                  : "bg-green-50 border-green-200 text-green-800"
+                : isDarkMode 
+                  ? "bg-red-900/20 border-red-700/50 text-red-200" 
+                  : "bg-red-50 border-red-200 text-red-800"
+            )}>
+              <div className="flex items-center space-x-3">
+                <svg className={cn(
+                  "w-5 h-5",
+                  contractStatus.type === 'success' ? "text-green-500" : "text-red-500"
+                )} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={
+                    contractStatus.type === 'success' 
+                      ? "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      : "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  } />
+                </svg>
+                <div>
+                  <p className="font-medium">
+                    {contractStatus.type === 'success' ? '✅ Smart Contract Success' : '❌ Smart Contract Error'}
+                  </p>
+                  <p className="text-sm opacity-90">{contractStatus.message}</p>
+                  <p className="text-xs opacity-75 mt-1">
+                    {contractStatus.type === 'success' 
+                      ? 'Your activity has been successfully logged to the blockchain!'
+                      : 'There was an issue logging your activity. Please try again.'
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Wellness Data Initialization Banner */}
           {address && !hasWellnessData && (
             <div className={cn(
@@ -2040,6 +2209,8 @@ function LandingPageContent() {
               </div>
             </div>
           )}
+
+
 
           {/* Temporary Success Message */}
           {wellnessDataInitialized && (
@@ -2220,12 +2391,29 @@ function LandingPageContent() {
                     "text-sm transition-colors duration-300",
                     isDarkMode ? "text-gray-400" : "text-gray-600"
                   )}>Your wellness score</div>
-                  <div className="text-green-500 text-sm font-medium">+12%</div>
+                  <div className="flex items-center space-x-2">
+                    <div className="text-green-500 text-sm font-medium">+12%</div>
+                    <button
+                      onClick={() => window.location.reload()}
+                      className={cn(
+                        "p-1 rounded-lg transition-colors hover:bg-gray-200",
+                        isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-200"
+                      )}
+                      title="Refresh wellness score"
+                    >
+                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
                 <div className={cn(
                   "text-4xl font-bold transition-colors duration-300",
                   isDarkMode ? "text-white" : "text-gray-900"
                 )}>{totalScore}</div>
+                <div className="mt-2 text-xs text-gray-500">
+                  Last updated: {new Date().toLocaleTimeString()}
+                </div>
               </div>
               
               {/* Stats Grid */}
@@ -2309,7 +2497,7 @@ function LandingPageContent() {
                   <h2 className={cn(
                     "text-xl font-semibold transition-colors",
                     isDarkMode ? "text-white" : "text-gray-900"
-                  )}>AI Wellness Assistant</h2>
+                                     )}>AI Wellness Assistant - Smasher</h2>
                 </div>
                 
                 <div className="space-y-4">
@@ -2325,7 +2513,14 @@ function LandingPageContent() {
                     )}
                   />
                   <button
-                    onClick={getWellnessAdviceHandler}
+                    onClick={() => {
+                      console.log('🔍 Button clicked!');
+                      console.log('🔍 Current view:', currentView);
+                      console.log('🔍 Wellness prompt:', wellnessPrompt);
+                      setCurrentMessage(wellnessPrompt);
+                      getWellnessAdviceHandler();
+                      console.log('🔍 After calling function - showChatModal should be true');
+                    }}
                     disabled={isLoadingAI || !wellnessPrompt.trim()}
                     className={cn(
                       "px-6 py-3 font-medium rounded-xl transition-colors",
@@ -2705,6 +2900,212 @@ function LandingPageContent() {
             </div>
           </div>
         )}
+        
+        {/* Workout Modal */}
+        {showWorkoutModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-gray-900">Log Your Workout</h3>
+                <button 
+                  onClick={() => setShowWorkoutModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Activity Type</label>
+                  <input
+                    type="text"
+                    value={workoutForm.activityType}
+                    onChange={(e) => setWorkoutForm(prev => ({ ...prev, activityType: e.target.value }))}
+                    placeholder="e.g., Running, Weightlifting, Yoga"
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Workout Name</label>
+                  <input
+                    type="text"
+                    value={workoutForm.name}
+                    onChange={(e) => setWorkoutForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g., Morning Cardio, Upper Body Strength"
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Duration (minutes)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={workoutForm.duration}
+                    onChange={(e) => setWorkoutForm(prev => ({ ...prev, duration: e.target.value }))}
+                    placeholder="45"
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Number of Sets</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={workoutForm.sets}
+                    onChange={(e) => setWorkoutForm(prev => ({ ...prev, sets: e.target.value }))}
+                    placeholder="3"
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Calories Burned</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={workoutForm.caloriesBurned}
+                    onChange={(e) => setWorkoutForm(prev => ({ ...prev, caloriesBurned: e.target.value }))}
+                    placeholder="300"
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    onClick={() => setShowWorkoutModal(false)}
+                    className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleLogWorkout}
+                    disabled={!workoutForm.duration || !workoutForm.sets || !workoutForm.caloriesBurned}
+                    className="flex-1 px-4 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Log Workout
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Meditation Modal */}
+        {showMeditationModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-gray-900">Log Your Meditation</h3>
+                <button 
+                  onClick={() => setShowMeditationModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Session Name</label>
+                  <input
+                    type="text"
+                    value={meditationForm.name}
+                    onChange={(e) => setMeditationForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g., Morning Mindfulness, Stress Relief"
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Duration (minutes)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={meditationForm.duration}
+                    onChange={(e) => setMeditationForm(prev => ({ ...prev, duration: e.target.value }))}
+                    placeholder="20"
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    onClick={() => setShowMeditationModal(false)}
+                    className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleLogMeditation}
+                    disabled={!meditationForm.duration}
+                    className="flex-1 px-4 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Log Meditation
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Sleep Modal */}
+        {showSleepModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-gray-900">Log Your Sleep</h3>
+                <button 
+                  onClick={() => setShowSleepModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Duration (hours)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="24"
+                    value={sleepForm.duration}
+                    onChange={(e) => setSleepForm(prev => ({ ...prev, duration: e.target.value }))}
+                    placeholder="7.5"
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    onClick={() => setShowSleepModal(false)}
+                    className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleLogSleep}
+                    disabled={!sleepForm.duration}
+                    className="flex-1 px-4 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Log Sleep
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -3076,19 +3477,19 @@ function LandingPageContent() {
       {/* How It Works Section */}
       <section id="how-it-works" className={cn(
         "py-20 lg:py-32 transition-colors duration-300",
-        isDarkMode ? "bg-gray-50" : "bg-gray-100"
+        isDarkMode ? "bg-gray-900" : "bg-gray-100"
       )}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16 lg:mb-20">
             <h2 className={cn(
               "text-3xl lg:text-4xl xl:text-5xl font-bold mb-6 transition-colors",
-              isDarkMode ? "text-gray-900" : "text-gray-900"
+              isDarkMode ? "text-white" : "text-gray-900"
             )}>
               How it works
             </h2>
             <p className={cn(
               "text-lg lg:text-xl max-w-3xl mx-auto transition-colors",
-              isDarkMode ? "text-gray-700" : "text-gray-600"
+              isDarkMode ? "text-gray-300" : "text-gray-600"
             )}>
               Simple steps to start your wellness journey with AI-powered insights and blockchain rewards
             </p>
@@ -3096,66 +3497,66 @@ function LandingPageContent() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12">
             <div className="text-center">
-              <div className={cn(
-                "w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold transition-colors",
-                isDarkMode 
-                  ? "bg-gray-800 text-white" 
-                  : "bg-gray-800 text-white"
-              )}>
-                1
-              </div>
-              <h3 className={cn(
-                "text-xl lg:text-2xl font-bold mb-4 transition-colors",
-                isDarkMode ? "text-gray-900" : "text-gray-900"
-              )}>Connect Wallet</h3>
-              <p className={cn(
-                "leading-relaxed transition-colors",
-                isDarkMode ? "text-gray-700" : "text-gray-600"
-              )}>
-                Securely connect your Web3 wallet to start earning rewards and minting wellness NFTs.
-              </p>
+                          <div className={cn(
+              "w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold transition-colors",
+              isDarkMode 
+                ? "bg-gray-700 text-white" 
+                : "bg-gray-800 text-white"
+            )}>
+              1
+            </div>
+            <h3 className={cn(
+              "text-xl lg:text-2xl font-bold mb-4 transition-colors",
+              isDarkMode ? "text-white" : "text-gray-900"
+            )}>Connect Wallet</h3>
+            <p className={cn(
+              "leading-relaxed transition-colors",
+              isDarkMode ? "text-gray-300" : "text-gray-600"
+            )}>
+              Securely connect your Web3 wallet to start earning rewards and minting wellness NFTs.
+            </p>
             </div>
 
             <div className="text-center">
-              <div className={cn(
-                "w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold transition-colors",
-                isDarkMode 
-                  ? "bg-gray-800 text-white" 
-                  : "bg-gray-800 text-white"
-              )}>
-                2
-              </div>
-              <h3 className={cn(
-                "text-xl lg:text-2xl font-bold mb-4 transition-colors",
-                isDarkMode ? "text-gray-900" : "text-gray-900"
-              )}>Track Wellness</h3>
-              <p className={cn(
-                "leading-relaxed transition-colors",
-                isDarkMode ? "text-gray-700" : "text-gray-600"
-              )}>
-                Log your activities, get AI insights, and build healthy habits while earning $WELL tokens.
-              </p>
+                          <div className={cn(
+              "w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold transition-colors",
+              isDarkMode 
+                ? "bg-gray-700 text-white" 
+                : "bg-gray-800 text-white"
+            )}>
+              2
+            </div>
+            <h3 className={cn(
+              "text-xl lg:text-2xl font-bold mb-4 transition-colors",
+              isDarkMode ? "text-white" : "text-gray-900"
+            )}>Track Wellness</h3>
+            <p className={cn(
+              "leading-relaxed transition-colors",
+              isDarkMode ? "text-gray-300" : "text-gray-600"
+            )}>
+              Log your activities, get AI insights, and build healthy habits while earning $WELL tokens.
+            </p>
             </div>
 
             <div className="text-center">
-              <div className={cn(
-                "w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold transition-colors",
-                isDarkMode 
-                  ? "bg-gray-800 text-white" 
-                  : "bg-gray-800 text-white"
-              )}>
-                3
-              </div>
-              <h3 className={cn(
-                "text-xl lg:text-2xl font-bold mb-4 transition-colors",
-                isDarkMode ? "text-gray-900" : "text-gray-900"
-              )}>Earn Rewards</h3>
-              <p className={cn(
-                "leading-relaxed transition-colors",
-                isDarkMode ? "text-gray-700" : "text-gray-600"
-              )}>
-                Mint unique NFTs for milestones and accumulate $WELL tokens for your wellness achievements.
-              </p>
+                          <div className={cn(
+              "w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold transition-colors",
+              isDarkMode 
+                ? "bg-gray-700 text-white" 
+                : "bg-gray-800 text-white"
+            )}>
+              3
+            </div>
+            <h3 className={cn(
+              "text-xl lg:text-2xl font-bold mb-4 transition-colors",
+              isDarkMode ? "text-white" : "text-gray-900"
+            )}>Earn Rewards</h3>
+            <p className={cn(
+              "leading-relaxed transition-colors",
+              isDarkMode ? "text-gray-300" : "text-gray-600"
+            )}>
+              Mint unique NFTs for milestones and accumulate $WELL tokens for your wellness achievements.
+            </p>
             </div>
           </div>
         </div>
@@ -3164,19 +3565,19 @@ function LandingPageContent() {
       {/* Rewards Section */}
       <section id="rewards" className={cn(
         "py-20 lg:py-32 transition-colors duration-300",
-        isDarkMode ? "bg-white" : "bg-white"
+        isDarkMode ? "bg-gray-800" : "bg-white"
       )}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16 lg:mb-20">
             <h2 className={cn(
               "text-3xl lg:text-4xl xl:text-5xl font-bold mb-6 transition-colors",
-              isDarkMode ? "text-gray-900" : "text-gray-900"
+              isDarkMode ? "text-white" : "text-gray-900"
             )}>
               Rewards & Incentives
             </h2>
             <p className={cn(
               "text-lg lg:text-xl max-w-3xl mx-auto transition-colors",
-              isDarkMode ? "text-gray-700" : "text-gray-600"
+              isDarkMode ? "text-gray-300" : "text-gray-600"
             )}>
               Get rewarded for your wellness journey with $WELL tokens and unique NFTs
             </p>
@@ -3187,14 +3588,14 @@ function LandingPageContent() {
               <div className={cn(
                 "p-6 rounded-2xl border transition-colors",
                 isDarkMode 
-                  ? "bg-gray-50 border-gray-200" 
+                  ? "bg-gray-700 border-gray-600" 
                   : "bg-gray-50 border-gray-200"
               )}>
                 <div className="flex items-center space-x-4 mb-4">
                   <div className={cn(
                     "w-12 h-12 rounded-xl flex items-center justify-center transition-colors",
                     isDarkMode 
-                      ? "bg-gray-800" 
+                      ? "bg-gray-600" 
                       : "bg-gray-800"
                   )}>
                     <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3204,17 +3605,17 @@ function LandingPageContent() {
                   <div>
                     <h3 className={cn(
                       "text-xl font-bold transition-colors",
-                      isDarkMode ? "text-gray-900" : "text-gray-900"
+                      isDarkMode ? "text-white" : "text-gray-900"
                     )}>$WELL Token Rewards</h3>
                     <p className={cn(
                       "text-sm transition-colors",
-                      isDarkMode ? "text-gray-700" : "text-gray-600"
+                      isDarkMode ? "text-gray-300" : "text-gray-600"
                     )}>Earn tokens for every wellness activity</p>
                   </div>
                 </div>
                 <ul className={cn(
                   "space-y-2 text-sm transition-colors",
-                  isDarkMode ? "text-gray-700" : "text-gray-600"
+                  isDarkMode ? "text-gray-300" : "text-gray-600"
                 )}>
                   <li>• Workout completion: +50 WELL</li>
                   <li>• Meditation session: +25 WELL</li>
@@ -3228,14 +3629,14 @@ function LandingPageContent() {
               <div className={cn(
                 "p-6 rounded-2xl border transition-colors",
                 isDarkMode 
-                  ? "bg-gray-50 border-gray-200" 
+                  ? "bg-gray-700 border-gray-600" 
                   : "bg-gray-50 border-gray-200"
               )}>
                 <div className="flex items-center space-x-4 mb-4">
                   <div className={cn(
                     "w-12 h-12 rounded-xl flex items-center justify-center transition-colors",
                     isDarkMode 
-                      ? "bg-gray-800" 
+                      ? "bg-gray-600" 
                       : "bg-gray-800"
                   )}>
                     <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3245,17 +3646,17 @@ function LandingPageContent() {
                   <div>
                     <h3 className={cn(
                       "text-xl font-bold transition-colors",
-                      isDarkMode ? "text-gray-900" : "text-gray-900"
+                      isDarkMode ? "text-white" : "text-gray-900"
                     )}>Wellness NFTs</h3>
                     <p className={cn(
                       "text-sm transition-colors",
-                      isDarkMode ? "text-gray-700" : "text-gray-600"
+                      isDarkMode ? "text-gray-300" : "text-gray-600"
                     )}>Unique digital collectibles for milestones</p>
                   </div>
                 </div>
                 <ul className={cn(
                   "space-y-2 text-sm transition-colors",
-                  isDarkMode ? "text-gray-700" : "text-gray-600"
+                  isDarkMode ? "text-gray-300" : "text-gray-600"
                 )}>
                   <li>• 7-day streak achievement</li>
                   <li>• Monthly wellness goals</li>
@@ -3341,6 +3742,154 @@ function LandingPageContent() {
           </div>
         </div>
       </section>
+      
+               {/* Chat Modal Overlay - Only show on dashboard */}
+         {(() => {
+           console.log('🔍 Modal render check:', { showChatModal, currentView, shouldShow: showChatModal && currentView === 'dashboard' });
+           return showChatModal && currentView === 'dashboard';
+         })() && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-all duration-300">
+          <div className={cn(
+            "bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden transition-all duration-300",
+            isDarkMode ? "bg-gray-900 text-white" : "bg-white text-gray-900"
+          )}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">S</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold">AI Wellness Assistant - Smasher</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Powered by Gymbro, Dietking & Sleepyjoe</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowChatModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Chat Messages */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[60vh]">
+              {chatMessages.map((message) => (
+                <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={cn(
+                    "max-w-[80%] rounded-2xl px-4 py-3",
+                    message.type === 'user' 
+                      ? "bg-blue-600 text-white" 
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
+                  )}>
+                    <div className="whitespace-pre-line">{message.content}</div>
+                    <div className={cn(
+                      "text-xs mt-2",
+                      message.type === 'user' ? "text-blue-100" : "text-gray-500 dark:text-gray-400"
+                    )}>
+                      {message.timestamp.toLocaleTimeString()}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {/* Thinking Progress */}
+              {thinkingProgress.gymbro > 0 && (
+                <div className="space-y-3">
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">G</span>
+                      </div>
+                      <span className="font-medium text-yellow-800 dark:text-yellow-200">Gymbro is thinking...</span>
+                    </div>
+                    <div className="w-full bg-yellow-200 dark:bg-yellow-700 rounded-full h-2">
+                      <div 
+                        className="bg-yellow-500 h-2 rounded-full transition-all duration-200"
+                        style={{ width: `${thinkingProgress.gymbro}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-xs text-yellow-600 dark:text-yellow-300">{thinkingProgress.gymbro}%</span>
+                  </div>
+                  
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">D</span>
+                      </div>
+                      <span className="font-medium text-green-800 dark:text-green-200">Dietking is thinking...</span>
+                    </div>
+                    <div className="w-full bg-green-200 dark:bg-green-700 rounded-full h-2">
+                      <div 
+                        className="bg-green-500 h-2 rounded-full transition-all duration-200"
+                        style={{ width: `${thinkingProgress.dietking}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-xs text-green-600 dark:text-green-300">{thinkingProgress.dietking}%</span>
+                  </div>
+                  
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">S</span>
+                      </div>
+                      <span className="font-medium text-blue-800 dark:text-blue-200">Sleepyjoe is thinking...</span>
+                    </div>
+                    <div className="w-full bg-blue-200 dark:bg-blue-700 rounded-full h-2">
+                      <div 
+                        className="bg-blue-500 h-2 rounded-full transition-all duration-200"
+                        style={{ width: `${thinkingProgress.sleepyjoe}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-xs text-blue-600 dark:text-blue-300">{thinkingProgress.sleepyjoe}%</span>
+                  </div>
+                  
+                  {thinkingProgress.compiling > 0 && (
+                    <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg p-4">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <div className="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs font-bold">⚡</span>
+                        </div>
+                        <span className="font-medium text-purple-800 dark:text-purple-200">Compiling progress...</span>
+                      </div>
+                      <div className="w-full bg-purple-200 dark:bg-purple-700 rounded-full h-2">
+                        <div 
+                          className="bg-purple-500 h-2 rounded-full transition-all duration-200"
+                          style={{ width: `${thinkingProgress.compiling}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-xs text-purple-600 dark:text-purple-300">{thinkingProgress.compiling}%</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Input Area */}
+            <div className="p-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex space-x-3">
+                <input
+                  type="text"
+                  value={currentMessage}
+                  onChange={(e) => setCurrentMessage(e.target.value)}
+                  placeholder="Ask Smasher anything about wellness..."
+                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
+                  onKeyPress={(e) => e.key === 'Enter' && currentMessage.trim() && getWellnessAdviceHandler()}
+                />
+                <button
+                  onClick={() => currentMessage.trim() && getWellnessAdviceHandler()}
+                  disabled={!currentMessage.trim()}
+                  className="px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Disconnect Confirmation Modal */}
       {showDisconnectConfirm && (
