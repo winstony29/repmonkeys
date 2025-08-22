@@ -27,7 +27,7 @@ import {
   Brain
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAccount, useReadContract, useBalance, useWriteContract, useChainId, useDisconnect } from 'wagmi';
+import { useAccount, useReadContract, useBalance, useWriteContract, useChainId, useDisconnect, useConnect } from 'wagmi';
 import { wellnessTrackerAbi, CONTRACT_ADDRESSES } from '@/lib/contracts';
 import { http, createConfig, createStorage } from 'wagmi';
 import { WagmiProvider } from 'wagmi';
@@ -205,6 +205,12 @@ function FarcasterConnectionModal({ isOpen, onClose }: { isOpen: boolean; onClos
             isDarkMode ? "text-gray-400" : "text-gray-600"
           )}>
             Enter your Farcaster handle to start tracking your wellness journey
+          </p>
+          <p className={cn(
+            "text-xs transition-colors mt-2",
+            isDarkMode ? "text-gray-500" : "text-gray-500"
+          )}>
+            Note: You'll also need to connect your wallet to access all features
           </p>
         </div>
         
@@ -433,6 +439,7 @@ function MobileDashboard() {
   // Smart contract interaction
   const { writeContract, isPending: isWritingContract } = useWriteContract();
   const chainId = useChainId();
+  const { connect, connectors } = useConnect();
   
   // AI Chat state
   const [wellnessPrompt, setWellnessPrompt] = useState('');
@@ -825,6 +832,27 @@ function MobileDashboard() {
                   </Button>
                 </div>
               )}
+              {!address && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="text-center">
+                    <p className="text-sm text-blue-800 font-medium mb-2">
+                      Connect your wallet to start tracking wellness
+                    </p>
+                                         <Button 
+                       onClick={() => {
+                         if (connectors.length > 0) {
+                           connect({ connector: connectors[0] });
+                         }
+                       }}
+                       variant="default" 
+                       size="sm"
+                     >
+                       <Wallet className="w-4 h-4 mr-2" />
+                       Connect Wallet
+                     </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Wellness Score Card */}
@@ -948,7 +976,7 @@ function MobileDashboard() {
                </Button>
                
                {/* Wallet Management */}
-               {address && (
+               {address ? (
                  <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
                    <Button 
                      onClick={() => setShowDisconnectConfirm(true)}
@@ -958,6 +986,27 @@ function MobileDashboard() {
                      <Wallet className="w-4 h-4 mr-2" />
                      Disconnect Wallet
                    </Button>
+                 </div>
+               ) : (
+                 <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                   <div className="text-center py-3">
+                     <p className="text-sm text-gray-600 mb-2">
+                       Connect your wallet to access all features
+                     </p>
+                     <Button 
+                       onClick={() => {
+                         if (connectors.length > 0) {
+                           connect({ connector: connectors[0] });
+                         }
+                       }}
+                       variant="default" 
+                       size="sm"
+                       className="w-full"
+                     >
+                       <Wallet className="w-4 h-4 mr-2" />
+                       Connect Wallet
+                     </Button>
+                   </div>
                  </div>
                )}
              </div>
@@ -1020,7 +1069,24 @@ function MobileDashboard() {
                     </p>
                     {!address && (
                       <div className="mt-2 text-xs text-gray-500">
-                        Sample activities will appear here once you connect and log activities
+                        Connect your wallet to see your actual wellness activities and earn rewards
+                      </div>
+                    )}
+                    {!address && (
+                      <div className="mt-3">
+                                             <Button 
+                       onClick={() => {
+                         if (connectors.length > 0) {
+                           connect({ connector: connectors[0] });
+                         }
+                       }}
+                       variant="default" 
+                       size="sm"
+                       className="w-full"
+                     >
+                       <Wallet className="w-4 h-4 mr-2" />
+                       Connect Wallet
+                     </Button>
                       </div>
                     )}
                   </div>
@@ -1555,8 +1621,9 @@ function FarcasterPageContent() {
   const [hasCheckedConnection, setHasCheckedConnection] = useState(false);
   const { isConnected: isFarcasterConnected } = useFarcaster();
   const { address, isConnecting } = useAccount();
+  const { connect, connectors } = useConnect();
 
-  // Only show connection modal once on initial load if not connected
+  // Show connection modal when wallet disconnects or on initial load
   useEffect(() => {
     if (!hasCheckedConnection && !isConnecting) {
       setHasCheckedConnection(true);
@@ -1566,8 +1633,15 @@ function FarcasterPageContent() {
     }
   }, [isFarcasterConnected, hasCheckedConnection, isConnecting]);
 
-  // Don't show modal if user is already connected or wallet is connecting
-  const shouldShowModal = showConnectionModal && !isFarcasterConnected && !isConnecting;
+  // Listen for wallet disconnection and show connection modal
+  useEffect(() => {
+    if (!address && hasCheckedConnection && !isConnecting) {
+      setShowConnectionModal(true);
+    }
+  }, [address, hasCheckedConnection, isConnecting]);
+
+  // Show modal when wallet is disconnected or Farcaster is not connected
+  const shouldShowModal = showConnectionModal && (!address || !isFarcasterConnected) && !isConnecting;
 
   // Debug logging to track connection states
   useEffect(() => {
@@ -1607,6 +1681,47 @@ function FarcasterPageContent() {
         isOpen={shouldShowModal} 
         onClose={() => setShowConnectionModal(false)} 
       />
+      
+      {/* Wallet Connection Modal - Show when wallet is disconnected */}
+      {!address && !isConnecting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className={cn(
+            "w-full max-w-md mx-4 p-6 rounded-lg transition-colors duration-300",
+            "bg-white border border-gray-200"
+          )}>
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Wallet className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                Connect Your Wallet
+              </h3>
+              <p className="text-sm text-gray-600">
+                Connect your wallet to start tracking your wellness journey and earn rewards
+              </p>
+            </div>
+            
+            <div className="space-y-3">
+              <Button 
+                onClick={() => {
+                  // Use the first available connector to connect
+                  if (connectors.length > 0) {
+                    connect({ connector: connectors[0] });
+                  }
+                }}
+                className="w-full h-12 text-base"
+              >
+                <Wallet className="w-5 h-5 mr-2" />
+                Connect Wallet
+              </Button>
+              
+              <p className="text-xs text-gray-500 text-center">
+                Click to start the wallet connection process
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

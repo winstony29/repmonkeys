@@ -1,6 +1,6 @@
 'use client';
 
-import { useAccount, useDisconnect, useChainId } from 'wagmi';
+import { useAccount, useDisconnect, useChainId, useConnect } from 'wagmi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ export function WalletStatus() {
   const { address, isConnected, isConnecting, isDisconnected } = useAccount();
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
+  const { connect, connectors } = useConnect();
 
   const getConnectionStatus = () => {
     if (isConnecting) return { status: 'connecting', text: 'Connecting...', color: 'bg-yellow-500' };
@@ -67,9 +68,22 @@ export function WalletStatus() {
           </Badge>
         </div>
 
+        {/* Disconnected Message */}
+        {!isConnected && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-blue-800">
+                <p className="font-medium mb-1">Wallet Disconnected</p>
+                <p>Click "Connect Wallet" to reconnect and continue using WellSpace.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex gap-2 pt-2">
-          {isConnected && (
+          {isConnected ? (
             <Button 
               onClick={handleDisconnect} 
               variant="outline" 
@@ -77,6 +91,20 @@ export function WalletStatus() {
               className="flex-1"
             >
               Disconnect
+            </Button>
+          ) : (
+            <Button 
+              onClick={() => {
+                if (connectors.length > 0) {
+                  connect({ connector: connectors[0] });
+                }
+              }}
+              variant="default" 
+              size="sm"
+              className="flex-1"
+            >
+              <Wallet className="w-3 h-3 mr-1" />
+              Connect Wallet
             </Button>
           )}
           <Button 
