@@ -731,8 +731,8 @@ function MobileDashboard() {
         let result;
         if (type === 'workout') {
           result = await writeContract({
-            address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
-            abi: wellnessTrackerAbi,
+          address: CONTRACT_ADDRESSES.WELLNESS_TRACKER,
+          abi: wellnessTrackerAbi,
             functionName: 'logWorkout',
             args: [BigInt(30), BigInt(1), BigInt(100), 'General Workout', name, BigInt(50)],
           });
@@ -1195,51 +1195,151 @@ function MobileDashboard() {
         await new Promise(resolve => setTimeout(resolve, 2000));
         
         const comprehensiveResponse = `🎯 SMASHER'S COMPREHENSIVE WELLNESS RECOMMENDATIONS
+=========================================================
+
+📅 Date: ${new Date().toLocaleDateString()}
+🎯 User Goal: Optimize energy for gym, work, and anniversary dinner
 
 📋 ANALYSIS SUMMARY:
+─────────────────────────────────────────────────────────
 • Scenario: Early morning gym session + long work day + anniversary dinner
 • Key Challenges: Energy conservation, Stress management, Celebration balance
 • Optimal Strategy: Light morning workout + meditation + guilt-free celebration
 
 🧘‍♂️ RECOMMENDATION 1: Pre-Sleep Meditation
+───────────────────────────────────────────────────────────
 • Take a 10-minute meditation break before sleep
 • Duration: 10 minutes
 • Timing: 30 minutes before bedtime
 • Video Link: https://youtu.be/ZgPHetPG4MY
-• Benefits: Reduces stress, improves sleep quality, prepares mind for tomorrow's challenges
+• Benefits: Reduces stress, improves sleep quality, prepares mind for tomorrow's challenges, enhances recovery
+• Instructions: Find a quiet space, sit comfortably, and follow the guided meditation video. Focus on deep breathing and letting go of the day's stress.
+• Environment: Dim lights, comfortable seating, minimal distractions
+• Expected Outcomes: Better sleep quality, reduced anxiety, improved morning energy
 
-💪 RECOMMENDATION 2: Morning Workout Plan
-• Energy-conserving morning workout before your long work day
+💪 RECOMMENDATION 2: Energy-Conserving Morning Workout
+───────────────────────────────────────────────────────────
+• Title: Energy-conserving morning workout before your long work day
 • Duration: 30-45 minutes
 • Intensity: Moderate - designed to energize without exhausting
+• Focus: Energy preservation, stress relief, and work preparation
+• Rationale: Light exercise in the morning boosts energy and mood for the work day without depleting reserves
 
-WORKOUT BREAKDOWN:
-🔥 Warm-up (5 min): Light walking, arm circles, hip rotations
-🏋️ Bodyweight Squats: 3 sets × 12-15 reps (60s rest)
-💪 Push-ups (modified): 3 sets × 8-12 reps (90s rest)  
-🏋️ Plank: 3 sets × 30 seconds (60s rest)
-🧘 Stretching: 10 minutes (cat-cow, child's pose, hip flexors)
+📋 Workout Breakdown:
 
-🍽️ RECOMMENDATION 3: Anniversary Dinner Freedom
+🔥 Warm-up (5 minutes):
+  • Light walking or cycling
+  • Arm circles
+  • Gentle hip rotations
+  Purpose: Increase blood flow and prepare muscles
+
+💪 Main Exercises:
+  • Bodyweight Squats: 3 sets x 12-15 reps
+    Rest: 60 seconds between sets
+    Note: Focus on form, not intensity. Keep it light to preserve energy.
+    Benefits: Activates major muscle groups, boosts metabolism
+  
+  • Push-ups (modified if needed): 3 sets x 8-12 reps
+    Rest: 90 seconds between sets
+    Note: Use knee push-ups if needed. Keep energy for work day.
+    Benefits: Upper body strength, core engagement
+  
+  • Plank: 3 sets x 30 seconds
+    Rest: 60 seconds between sets
+    Note: Core stability without exhaustion. Focus on form.
+    Benefits: Core strength, posture improvement
+  
+  • Light Stretching Sequence: 1 set x 10 minutes
+    Exercises: Cat-cow stretches, Child's pose, Gentle twists, Hip flexor stretches
+    Note: Focus on mobility and relaxation. Perfect for work preparation.
+    Benefits: Improved flexibility, stress reduction, better posture for work
+
+🧘 Cool-down (5 minutes):
+  • Gentle stretching
+  • Deep breathing
+  • Mindfulness moment
+  Purpose: Recovery and mental preparation for the day ahead
+
+🍎 Post-Workout Nutrition:
+• Timing: Within 30 minutes
+• Recommendations: Light protein shake, Banana or apple, Water with electrolytes
+• Purpose: Replenish energy stores without heavy digestion
+
+🍽️ RECOMMENDATION 3: Anniversary Dinner
+───────────────────────────────────────────────────────────
 • Enjoy your anniversary dinner without calorie worries
-• The combination of morning workout and long work day creates 600-900 calorie deficit
-• Focus on celebration and quality time with your wife
-• Order what you truly want, savor mindfully, enjoy dessert if desired
+• Reason: You will expend significant energy during your long work day
+• Advice: Focus on the celebration and quality time with your wife
+• Guidance: The combination of morning workout and long work day will create a significant calorie deficit, allowing you to enjoy your anniversary meal guilt-free
+
+📊 Calorie Math:
+  • Morning Workout: 200-300 calories burned
+  • Work Day Activity: 400-600 calories burned
+  • Total Deficit: 600-900 calories
+  • Conclusion: Plenty of room for celebration meal
+
+🎉 Celebration Tips:
+  • Order what you truly want to enjoy
+  • Focus on the experience and company
+  • Don't stress about portion sizes
+  • Savor each bite mindfully
+  • Enjoy a dessert if desired
+
+💭 Mental Approach: This is a celebration of your relationship, not a diet day. The work you've done today has earned you this enjoyment.
+
+📊 INTEGRATION NOTES:
+───────────────────────────────────────────────────────────
+• Energy Management: Morning workout provides energy boost without exhaustion, setting positive tone for work day
+• Stress Reduction: Meditation helps manage work stress and improves sleep quality for better recovery
+• Celebration Balance: Workout and work create space for guilt-free celebration dinner
+• Recovery Focus: Light workout allows for better recovery and sustained work performance
+• Timing Optimization: 6am workout gives 2+ hours before work for recovery and preparation
+• Nutrition Synergy: Light post-workout meal sustains energy without heavy digestion
 
 🎯 SUCCESS METRICS:
-• Energy levels: 7-8/10 throughout work day
-• Stress management: 3-4/10 stress level
-• Celebration enjoyment: 100% guilt-free enjoyment
-• Sleep quality: 7-8 hours quality sleep
-• Work performance: 8-9/10 productivity
+───────────────────────────────────────────────────────────
+• Energy Levels: Maintain steady energy throughout work day (target: 7-8/10)
+• Stress Management: Reduced stress through meditation and light exercise (target: stress level 3-4/10)
+• Celebration Enjoyment: Fully enjoy anniversary dinner without guilt (target: 100% enjoyment)
+• Sleep Quality: Improved sleep through pre-bed meditation (target: 7-8 hours quality sleep)
+• Work Performance: Sustained focus and energy during long work day (target: 8-9/10 productivity)
+• Relationship Quality: Enhanced celebration experience with partner (target: memorable evening)
 
-💡 EXPERT INSIGHTS:
-🥗 DietKing: "Light morning nutrition supports workout without heavy digestion"
-😴 SleepyJoe: "Meditation before sleep improves recovery and next-day performance"  
-💪 GymBro: "Energy-conserving workout maintains strength without exhaustion"
-🤝 WellnessBuddy: "Integrated approach balances fitness, work, and celebration needs"
+📅 NEXT DAY PREPARATION:
+───────────────────────────────────────────────────────────
 
-✅ Analysis complete! Your personalized wellness plan is ready for tomorrow's success! 🌟`;
+🌙 Evening Routine (30 minutes before bed):
+  • 10-minute meditation with video
+  • Light reading
+  • Gratitude reflection
+  Purpose: Mental preparation and stress release
+
+🌅 Morning Routine (6:00 AM):
+  • Light 30-45 minute workout
+  • Post-workout nutrition
+  • Shower and preparation
+  Purpose: Energy boost and work preparation
+
+💼 Work Day Strategy:
+  • Energy Conservation: Conserve energy, stay hydrated, take short breaks
+  • Stress Management: Use breathing exercises during stressful moments
+  • Nutrition: Light, energy-sustaining meals and snacks
+
+🎊 Evening Celebration:
+  • Mindset: Enjoy anniversary dinner and quality time
+  • Focus: Celebration and relationship building
+  • Approach: Guilt-free enjoyment of the experience
+
+🧠 EXPERT INSIGHTS:
+───────────────────────────────────────────────────────────
+• DietKing Advice: Light morning nutrition supports workout without heavy digestion
+• SleepyJoe Wisdom: Meditation before sleep improves recovery and next-day performance
+• GymBro Tips: Energy-conserving workout maintains strength without exhaustion
+• WellnessBuddy Evaluation: Integrated approach balances fitness, work, and celebration needs
+
+=========================================================
+✅ Comprehensive wellness plan delivered successfully!
+=========================================================`;
 
         setAiResponse(comprehensiveResponse);
       } else {
@@ -2653,9 +2753,9 @@ WORKOUT BREAKDOWN:
                     <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
                   </div>
                   <div>
-                    <h3 className={cn(
+                  <h3 className={cn(
                       "text-xl font-bold transition-colors",
-                      isDarkMode ? "text-white" : "text-gray-900"
+                    isDarkMode ? "text-white" : "text-gray-900"
                     )}>AI Wellness Assistant - Smasher</h3>
                     <p className={cn("text-sm mt-1", isDarkMode ? "text-gray-400" : "text-gray-600")}>
                       Powered by Gymbro, Dietking & Sleepyjoe
@@ -2665,13 +2765,13 @@ WORKOUT BREAKDOWN:
                 
                 <div className="space-y-4">
                   <div className="relative">
-                    <textarea
-                      value={wellnessPrompt}
-                      onChange={(e) => setWellnessPrompt(e.target.value)}
+                  <textarea
+                    value={wellnessPrompt}
+                    onChange={(e) => setWellnessPrompt(e.target.value)}
                       placeholder="Ask Smasher about your wellness goals, nutrition, exercise, or any health-related questions..."
-                      className={cn(
+                    className={cn(
                         "w-full p-4 border rounded-xl text-sm resize-none h-24 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 shadow-sm",
-                        isDarkMode 
+                      isDarkMode 
                           ? "border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:bg-gray-600" 
                           : "border-gray-300 bg-white text-gray-900 placeholder-gray-500 focus:bg-gray-50"
                       )}
@@ -2703,11 +2803,21 @@ WORKOUT BREAKDOWN:
                       isDarkMode 
                         ? "bg-gray-700 border-gray-600" 
                         : "bg-gray-50 border-gray-200"
-                    )}>
+                    )}
+                    style={{ 
+                      wordWrap: 'break-word',
+                      overflowWrap: 'break-word',
+                      hyphens: 'auto'
+                    }}>
                       <p className={cn(
-                        "text-sm leading-relaxed transition-colors",
+                        "text-sm leading-relaxed whitespace-pre-wrap break-words transition-colors",
                         isDarkMode ? "text-gray-200" : "text-gray-900"
-                      )}>{aiResponse}</p>
+                      )}
+                      style={{ 
+                        wordWrap: 'break-word',
+                        overflowWrap: 'anywhere',
+                        maxWidth: '100%'
+                      }}>{aiResponse}</p>
                     </div>
                   )}
                 </div>
@@ -2853,7 +2963,7 @@ WORKOUT BREAKDOWN:
                 >
                   <X className="w-5 h-5" />
                 </Button>
-              </div>
+      </div>
               
               <form onSubmit={(e) => { e.preventDefault(); handleLogWorkout(); }} className="space-y-4">
                 <div>
@@ -4786,7 +4896,7 @@ function FarcasterPageContent() {
       <MobileNavigation />
       <MobileDashboard />
       
-            <FarcasterConnectionModal 
+      <FarcasterConnectionModal 
         isOpen={shouldShowModal} 
         onClose={() => setShowConnectionModal(false)} 
       />
