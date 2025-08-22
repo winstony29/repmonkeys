@@ -113,8 +113,7 @@ def buyer(use_thread_lock: bool = True):
 
     # Browse available agents based on a keyword and cluster name
     relevant_agents = acp.browse_agents(
-        keyword="<your_filter_agent_keyword>",
-        cluster="<your_cluster_name>",
+        keyword="WellnessBuddy",
         sort_by=[
             ACPAgentSort.SUCCESSFUL_JOB_COUNT,
         ],
