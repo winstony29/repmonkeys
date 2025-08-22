@@ -1176,94 +1176,17 @@ function MobileDashboard() {
     }
   };
 
-  // Enhanced AI Chat functionality matching main dashboard
+  // AI Chat functionality (placeholder)
   const handleGetAIAdvice = async () => {
     if (!wellnessPrompt.trim()) return;
     
     setIsLoadingAI(true);
-    const currentPrompt = wellnessPrompt;
-    setWellnessPrompt('');
-    
     try {
-      // Check for the specific demo query
-      const isSpecificDemoQuery = currentPrompt.toLowerCase().includes('planning to hit the gym') && 
-                                  currentPrompt.toLowerCase().includes('6am') &&
-                                  currentPrompt.toLowerCase().includes('anniversary dinner');
-      
-      if (isSpecificDemoQuery) {
-        // Simulate the exact SDK demo flow for Farcaster
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        const comprehensiveResponse = `🎯 SMASHER'S COMPREHENSIVE WELLNESS RECOMMENDATIONS
-
-📋 ANALYSIS SUMMARY:
-• Scenario: Early morning gym session + long work day + anniversary dinner
-• Key Challenges: Energy conservation, Stress management, Celebration balance
-• Optimal Strategy: Light morning workout + meditation + guilt-free celebration
-
-🧘‍♂️ RECOMMENDATION 1: Pre-Sleep Meditation
-• Take a 10-minute meditation break before sleep
-• Duration: 10 minutes
-• Timing: 30 minutes before bedtime
-• Video Link: https://youtu.be/ZgPHetPG4MY
-• Benefits: Reduces stress, improves sleep quality, prepares mind for tomorrow's challenges
-
-💪 RECOMMENDATION 2: Morning Workout Plan
-• Energy-conserving morning workout before your long work day
-• Duration: 30-45 minutes
-• Intensity: Moderate - designed to energize without exhausting
-
-WORKOUT BREAKDOWN:
-🔥 Warm-up (5 min): Light walking, arm circles, hip rotations
-🏋️ Bodyweight Squats: 3 sets × 12-15 reps (60s rest)
-💪 Push-ups (modified): 3 sets × 8-12 reps (90s rest)  
-🏋️ Plank: 3 sets × 30 seconds (60s rest)
-🧘 Stretching: 10 minutes (cat-cow, child's pose, hip flexors)
-
-🍽️ RECOMMENDATION 3: Anniversary Dinner Freedom
-• Enjoy your anniversary dinner without calorie worries
-• The combination of morning workout and long work day creates 600-900 calorie deficit
-• Focus on celebration and quality time with your wife
-• Order what you truly want, savor mindfully, enjoy dessert if desired
-
-🎯 SUCCESS METRICS:
-• Energy levels: 7-8/10 throughout work day
-• Stress management: 3-4/10 stress level
-• Celebration enjoyment: 100% guilt-free enjoyment
-• Sleep quality: 7-8 hours quality sleep
-• Work performance: 8-9/10 productivity
-
-💡 EXPERT INSIGHTS:
-🥗 DietKing: "Light morning nutrition supports workout without heavy digestion"
-😴 SleepyJoe: "Meditation before sleep improves recovery and next-day performance"  
-💪 GymBro: "Energy-conserving workout maintains strength without exhaustion"
-🤝 WellnessBuddy: "Integrated approach balances fitness, work, and celebration needs"
-
-✅ Analysis complete! Your personalized wellness plan is ready for tomorrow's success! 🌟`;
-
-        setAiResponse(comprehensiveResponse);
-      } else {
-        // Original response logic for other queries
-        const lowerPrompt = currentPrompt.toLowerCase();
-        let response = '';
-        
-        if (lowerPrompt.includes('workout') || lowerPrompt.includes('exercise') || lowerPrompt.includes('gym')) {
-          response = "💪 Based on your workout goals, I recommend a balanced approach:\n\n🏃‍♂️ **Cardio**: 3-4 sessions per week, 30-45 minutes\n🏋️‍♂️ **Strength Training**: 3 sessions per week, focusing on compound movements\n🧘‍♀️ **Recovery**: Include stretching and rest days\n\nStart with 3 days per week and gradually increase intensity. Remember, consistency beats perfection!";
-        } else if (lowerPrompt.includes('diet') || lowerPrompt.includes('nutrition') || lowerPrompt.includes('food')) {
-          response = "🥗 Here's your personalized nutrition plan:\n\n🍳 **Breakfast**: Protein + complex carbs (eggs + oatmeal)\n🥙 **Lunch**: Lean protein + vegetables + healthy fats\n🍽️ **Dinner**: Light protein + vegetables\n🍎 **Snacks**: Nuts, fruits, or Greek yogurt\n\nAim for 3 meals + 2 snacks daily. Stay hydrated with 8+ glasses of water!";
-        } else if (lowerPrompt.includes('sleep') || lowerPrompt.includes('rest') || lowerPrompt.includes('bedtime')) {
-          response = "😴 Sleep optimization strategy:\n\n⏰ **Bedtime**: Aim for 7-9 hours, go to bed at the same time daily\n🌙 **Environment**: Dark, cool (65-68°F), quiet room\n📱 **Habits**: No screens 1 hour before bed, read or meditate instead\n☕ **Avoid**: Caffeine after 2 PM, heavy meals before bed\n\nQuality sleep is your foundation for wellness!";
-        } else if (lowerPrompt.includes('stress') || lowerPrompt.includes('anxiety') || lowerPrompt.includes('mental')) {
-          response = "🧘‍♀️ Mental wellness approach:\n\n💆‍♂️ **Daily Practice**: 10-15 minutes meditation or deep breathing\n🏃‍♀️ **Physical Activity**: Exercise releases endorphins\n📝 **Journaling**: Write down thoughts and gratitude\n🎯 **Mindfulness**: Stay present, one task at a time\n\nRemember, mental health is just as important as physical health!";
-        } else {
-          response = "🌟 Based on your comprehensive wellness goals, here's my advice:\n\n💪 **For your 6am gym session**: Great timing! Morning workouts boost energy all day. Have a light snack 30 mins before (banana + coffee).\n\n🍽️ **For your anniversary dinner**: Enjoy it guilt-free! Balance it with lighter meals earlier and consider sharing appetizers.\n\n⚖️ **Managing the long work day**: Stay hydrated, take 5-min breaks every hour, and do desk stretches.\n\nYou're planning well - consistency beats perfection! 💪";
-        }
-        
-        setAiResponse(response);
-      }
+      // Simulate AI response (placeholder)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setAiResponse('This is a placeholder AI response. In the full version, this would connect to your wellness AI service.');
     } catch (error) {
       console.error('Failed to get AI advice:', error);
-      setAiResponse('Sorry, I encountered an error while generating your wellness advice. Please try again.');
     } finally {
       setIsLoadingAI(false);
     }
@@ -2643,59 +2566,40 @@ WORKOUT BREAKDOWN:
               isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
             )}>
               <CardContent className="p-6">
-                <div className="flex items-center space-x-4 mb-6">
-                  <div className="relative">
-                    <img 
-                      src="/agents/smasher.png" 
-                      alt="Smasher" 
-                      className="w-14 h-14 rounded-full shadow-lg border-2 border-blue-400"
-                    />
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className={cn(
+                    "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
+                    isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                  )}>
+                    <Brain className={cn(
+                      "w-5 h-5 transition-colors",
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    )} />
                   </div>
-                  <div>
-                    <h3 className={cn(
-                      "text-xl font-bold transition-colors",
-                      isDarkMode ? "text-white" : "text-gray-900"
-                    )}>AI Wellness Assistant - Smasher</h3>
-                    <p className={cn("text-sm mt-1", isDarkMode ? "text-gray-400" : "text-gray-600")}>
-                      Powered by Gymbro, Dietking & Sleepyjoe
-                    </p>
-                  </div>
+                  <h3 className={cn(
+                    "text-lg font-semibold transition-colors",
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  )}>AI Wellness Assistant</h3>
                 </div>
                 
                 <div className="space-y-4">
-                  <div className="relative">
-                    <textarea
-                      value={wellnessPrompt}
-                      onChange={(e) => setWellnessPrompt(e.target.value)}
-                      placeholder="Ask Smasher about your wellness goals, nutrition, exercise, or any health-related questions..."
-                      className={cn(
-                        "w-full p-4 border rounded-xl text-sm resize-none h-24 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 shadow-sm",
-                        isDarkMode 
-                          ? "border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:bg-gray-600" 
-                          : "border-gray-300 bg-white text-gray-900 placeholder-gray-500 focus:bg-gray-50"
-                      )}
-                    />
-                    {wellnessPrompt && (
-                      <div className="absolute bottom-2 right-2 text-xs text-gray-400">
-                        Click to send
-                      </div>
+                  <textarea
+                    value={wellnessPrompt}
+                    onChange={(e) => setWellnessPrompt(e.target.value)}
+                    placeholder="Ask me about your wellness goals, nutrition, exercise, or any health-related questions..."
+                    className={cn(
+                      "w-full p-4 border rounded-xl text-sm resize-none h-24 focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-colors",
+                      isDarkMode 
+                        ? "border-gray-600 bg-gray-700 text-white placeholder-gray-400" 
+                        : "border-gray-300 bg-white text-gray-900 placeholder-gray-500"
                     )}
-                  </div>
-                  
-
-                  
+                  />
                   <Button
                     onClick={handleGetAIAdvice}
                     disabled={isLoadingAI || !wellnessPrompt.trim()}
-                    className={cn(
-                      "w-full py-3 font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105",
-                      isDarkMode 
-                        ? "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800" 
-                        : "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-                    )}
+                    className="w-full"
                   >
-                    {isLoadingAI ? '🤖 Getting advice...' : '🚀 Get AI Advice'}
+                    {isLoadingAI ? 'Getting advice...' : 'Get AI Advice'}
                   </Button>
                   {aiResponse && (
                     <div className={cn(

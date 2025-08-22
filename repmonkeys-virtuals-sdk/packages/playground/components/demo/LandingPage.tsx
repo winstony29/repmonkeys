@@ -94,11 +94,10 @@ function ThemeToggleButton() {
 }
 
 function LandingPageContent() {
-  console.log('🚀 LandingPageContent - CONSTRUCTOR/RENDER called');
   const [currentView, setCurrentView] = useState<'landing' | 'onboarding' | 'dashboard'>('landing');
   const [wellnessPrompt, setWellnessPrompt] = useState('');
-  const [aiResponse, setAiResponse] = useState<any>(null);
-  const [isLoadingAI, setIsLoadingAI] = useState(false);
+     const [aiResponse, setAiResponse] = useState<any>(null);
+   const [isLoadingAI, setIsLoadingAI] = useState(false);
    
    // Chat interface state
    const [showChatModal, setShowChatModal] = useState(false);
@@ -255,9 +254,9 @@ function LandingPageContent() {
     setOnboardingStep(1);
   };
 
-  const getWellnessAdviceHandler = async () => {
-    if (!wellnessPrompt.trim()) return;
-    
+     const getWellnessAdviceHandler = async () => {
+     if (!wellnessPrompt.trim()) return;
+     
      // Add user message to chat
      const userMessage = {
        id: Date.now(),
@@ -338,7 +337,7 @@ function LandingPageContent() {
      
      // Default response
      return "🌟 Here's your comprehensive wellness advice:\n\n🎯 **Set Clear Goals**: Define what wellness means to you\n📊 **Track Progress**: Monitor your habits and improvements\n🔄 **Stay Consistent**: Small daily actions create lasting change\n🎉 **Celebrate Wins**: Acknowledge your progress, no matter how small\n\nYou're on the right path! Keep going! 💪";
-  };
+   };
 
   const generateWellnessImage = async () => {
     setIsGeneratingImage(true);
@@ -846,8 +845,6 @@ function LandingPageContent() {
   
     // Enhanced Debug logging for main app
   useEffect(() => {
-    console.log('🚀 LandingPageContent - useEffect MOUNTED');
-    
     if (address) {
       console.log('🔍 LandingPage Debug - Wallet connected:', address);
       console.log('🔍 LandingPage Debug - Chain ID:', chainId);
@@ -896,11 +893,6 @@ function LandingPageContent() {
         console.error('❌ Contract connectivity test failed:', error);
       });
     }
-
-    // Cleanup function to detect component unmounting
-    return () => {
-      console.log('🛑 LandingPageContent - useEffect CLEANUP/UNMOUNT');
-    };
   }, [address, chainId, contractReadError, profileError, wellnessError, isOnboarded, hasWellnessData, profileData, wellnessData, contractActivities, contractMeals, totalScore, streakCount, wellBalance]);
 
   // Force network switch to Base Sepolia on component mount
@@ -2400,7 +2392,7 @@ function LandingPageContent() {
                     isDarkMode ? "text-gray-400" : "text-gray-600"
                   )}>Your wellness score</div>
                   <div className="flex items-center space-x-2">
-                  <div className="text-green-500 text-sm font-medium">+12%</div>
+                    <div className="text-green-500 text-sm font-medium">+12%</div>
                     <button
                       onClick={() => window.location.reload()}
                       className={cn(
@@ -2506,431 +2498,38 @@ function LandingPageContent() {
                     "text-xl font-semibold transition-colors",
                     isDarkMode ? "text-white" : "text-gray-900"
                                      )}>AI Wellness Assistant - Smasher</h2>
-                    <p className={cn("text-sm mt-1", isDarkMode ? "text-gray-400" : "text-gray-600")}>
-                      Powered by Gymbro, Dietking & Sleepyjoe
-                    </p>
                 </div>
                 
-                {/* Chat Messages Area */}
-                <div className={cn(
-                  "max-h-96 overflow-y-auto mb-6 space-y-4 p-6 rounded-xl border shadow-inner",
-                  isDarkMode ? "border-gray-600 bg-gray-900" : "border-gray-200 bg-gray-50"
-                )}>
-                  {chatMessages.length === 0 ? (
-                    <div className="text-center py-12">
-                      <div className="relative mb-4">
-                        <img 
-                          src="/agents/smasher.png" 
-                          alt="Smasher" 
-                          className="w-16 h-16 rounded-full mx-auto shadow-lg border-2 border-blue-400"
-                        />
-                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white dark:border-gray-900 mx-auto transform translate-x-8"></div>
-                      </div>
-                      <h3 className={cn("font-semibold text-lg mb-2", isDarkMode ? "text-white" : "text-gray-900")}>
-                        Meet Smasher! 👋
-                      </h3>
-                      <p className={cn("text-sm leading-relaxed max-w-md mx-auto", isDarkMode ? "text-gray-400" : "text-gray-600")}>
-                        Your AI wellness coordinator powered by specialist agents. Ask me anything about fitness, nutrition, sleep, or mental health for personalized advice!
-                      </p>
-                    </div>
-                  ) : (
-                    chatMessages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={cn(
-                          "flex gap-3 p-3 rounded-lg border",
-                          message.type === 'user' 
-                            ? (isDarkMode ? "bg-gray-800 border-gray-600 ml-8" : "bg-gray-100 border-gray-300 ml-8")
-                            : (isDarkMode ? "bg-gray-700 border-gray-600 mr-8" : "bg-white border-gray-200 mr-8")
-                        )}
-                      >
-                        <div className="flex-shrink-0">
-                          {message.type === 'user' ? (
-                            <div className={cn(
-                              "w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-2",
-                              isDarkMode ? "bg-gradient-to-r from-blue-600 to-blue-700 border-blue-500" : "bg-gradient-to-r from-blue-500 to-blue-600 border-blue-400"
-                            )}>
-                              <span className="text-white text-lg">👤</span>
-                            </div>
-                          ) : (
-                            <div className="relative">
-                              <img 
-                                src="/agents/smasher.png" 
-                                alt="Smasher" 
-                                className="w-12 h-12 rounded-full shadow-lg border-2 border-gray-300 dark:border-gray-600"
-                              />
-                              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-sm">
-                              {message.type === 'user' ? 'You' : 'Smasher'}
-                            </span>
-                            <span className={cn("text-xs", isDarkMode ? "text-gray-400" : "text-gray-500")}>
-                              {message.timestamp.toLocaleTimeString()}
-                            </span>
-                          </div>
-                          <div className="text-sm whitespace-pre-wrap">{message.content}</div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                  
-                  {/* Thinking Progress Indicators */}
-                  {(thinkingProgress.gymbro > 0 || thinkingProgress.dietking > 0 || thinkingProgress.sleepyjoe > 0 || thinkingProgress.compiling > 0) && (
-                    <div className={cn(
-                      "p-4 rounded-lg border border-l-4",
-                      isDarkMode ? "bg-gray-700 border-gray-600 border-l-gray-400 mr-8" : "bg-gray-50 border-gray-200 border-l-gray-500 mr-8"
-                    )}>
-                      <div className="flex gap-3">
-                        <div className="relative">
-                          <img 
-                            src="/agents/smasher.png" 
-                            alt="Smasher" 
-                            className="w-12 h-12 rounded-full shadow-lg border-2 border-blue-400 animate-pulse"
-                          />
-                          <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 rounded-full border-2 border-white dark:border-gray-800 animate-ping"></div>
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-sm mb-2">Smasher is analyzing...</div>
-                          <div className="space-y-2 text-xs">
-                            {thinkingProgress.gymbro > 0 && (
-                              <div className={cn(
-                                "p-3 rounded-lg border",
-                                isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-200"
-                              )}>
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-3">
-                                    <div className="relative">
-                                      <img 
-                                        src="/agents/gymbro.png" 
-                                        alt="GymBro" 
-                                        className="w-8 h-8 rounded-full shadow-md border border-orange-300"
-                                      />
-                                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-orange-500 rounded-full border border-white dark:border-gray-800"></div>
-                                    </div>
-                                    <span className="font-medium text-sm">💪 GymBro analyzing...</span>
-                                  </div>
-                                  <span className="font-bold text-sm">{thinkingProgress.gymbro}%</span>
-                                </div>
-                                <div className={cn("w-full rounded-full h-3 shadow-inner", isDarkMode ? "bg-gray-700" : "bg-gray-200")}>
-                                  <div className="h-3 rounded-full transition-all duration-300 bg-gradient-to-r from-orange-400 to-orange-600 shadow-sm" style={{width: `${thinkingProgress.gymbro}%`}}></div>
-                                </div>
-                              </div>
-                            )}
-                            {thinkingProgress.dietking > 0 && (
-                              <div className={cn(
-                                "p-3 rounded-lg border",
-                                isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-200"
-                              )}>
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-3">
-                                    <div className="relative">
-                                      <img 
-                                        src="/agents/dietking.png" 
-                                        alt="DietKing" 
-                                        className="w-8 h-8 rounded-full shadow-md border border-green-300"
-                                      />
-                                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border border-white dark:border-gray-800"></div>
-                                    </div>
-                                    <span className="font-medium text-sm">🥗 DietKing consulting...</span>
-                                  </div>
-                                  <span className="font-bold text-sm">{thinkingProgress.dietking}%</span>
-                                </div>
-                                <div className={cn("w-full rounded-full h-3 shadow-inner", isDarkMode ? "bg-gray-700" : "bg-gray-200")}>
-                                  <div className="h-3 rounded-full transition-all duration-300 bg-gradient-to-r from-green-400 to-green-600 shadow-sm" style={{width: `${thinkingProgress.dietking}%`}}></div>
-                                </div>
-                              </div>
-                            )}
-                            {thinkingProgress.sleepyjoe > 0 && (
-                              <div className={cn(
-                                "p-3 rounded-lg border",
-                                isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-200"
-                              )}>
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-3">
-                                    <div className="relative">
-                                      <img 
-                                        src="/agents/sleepy joe.png" 
-                                        alt="SleepyJoe" 
-                                        className="w-8 h-8 rounded-full shadow-md border border-purple-300"
-                                      />
-                                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-purple-500 rounded-full border border-white dark:border-gray-800"></div>
-                                    </div>
-                                    <span className="font-medium text-sm">😴 SleepyJoe reviewing...</span>
-                                  </div>
-                                  <span className="font-bold text-sm">{thinkingProgress.sleepyjoe}%</span>
-                                </div>
-                                <div className={cn("w-full rounded-full h-3 shadow-inner", isDarkMode ? "bg-gray-700" : "bg-gray-200")}>
-                                  <div className="h-3 rounded-full transition-all duration-300 bg-gradient-to-r from-purple-400 to-purple-600 shadow-sm" style={{width: `${thinkingProgress.sleepyjoe}%`}}></div>
-                                </div>
-                              </div>
-                            )}
-                            {thinkingProgress.compiling > 0 && (
-                              <div className={cn(
-                                "p-3 rounded-lg border",
-                                isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-200"
-                              )}>
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-3">
-                                    <div className="relative">
-                                      <img 
-                                        src="/agents/smasher.png" 
-                                        alt="Smasher" 
-                                        className="w-8 h-8 rounded-full shadow-md border border-blue-300"
-                                      />
-                                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border border-white dark:border-gray-800"></div>
-                                    </div>
-                                    <span className="font-medium text-sm">⚡ Smasher compiling...</span>
-                                  </div>
-                                  <span className="font-bold text-sm">{thinkingProgress.compiling}%</span>
-                                </div>
-                                <div className={cn("w-full rounded-full h-3 shadow-inner", isDarkMode ? "bg-gray-700" : "bg-gray-200")}>
-                                  <div className="h-3 rounded-full transition-all duration-300 bg-gradient-to-r from-blue-400 to-blue-600 shadow-sm" style={{width: `${thinkingProgress.compiling}%`}}></div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Input Area */}
                 <div className="space-y-4">
-                  <div className="relative">
-                    <textarea
-                      value={wellnessPrompt}
-                      onChange={(e) => setWellnessPrompt(e.target.value)}
-                      placeholder="Ask Smasher about your wellness goals, nutrition, exercise, or any health-related questions..."
-                      className={cn(
-                        "w-full p-4 border rounded-xl text-sm resize-none h-24 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 shadow-sm",
-                        isDarkMode 
-                          ? "border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:bg-gray-600" 
-                          : "border-gray-300 bg-white text-gray-900 placeholder-gray-500 focus:bg-gray-50"
-                      )}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          // Trigger the send button click
-                          document.getElementById('send-message-btn')?.click();
-                        }
-                      }}
-                    />
-                    {wellnessPrompt && (
-                      <div className="absolute bottom-2 right-2 text-xs text-gray-400">
-                        Press Enter to send
-                      </div>
-                    )}
-                  </div>
-                  
-
-                  
-                  <button
-                    id="send-message-btn"
-                    onClick={() => {
-                      if (!wellnessPrompt.trim()) {
-                        return;
-                      }
-                      
-                      // Add user message to chat
-                      const userMessage = {
-                        id: Date.now(),
-                        type: 'user' as const,
-                        content: wellnessPrompt,
-                        timestamp: new Date()
-                      };
-                      
-                      setChatMessages(prev => [...prev, userMessage]);
-                      const currentPrompt = wellnessPrompt;
-                      setWellnessPrompt('');
-                      
-                      // Start the thinking process
-                      setThinkingProgress({ gymbro: 0, dietking: 0, sleepyjoe: 0, compiling: 0 });
-                      
-                      // Check for the specific demo query
-                      const isSpecificDemoQuery = currentPrompt.toLowerCase().includes('planning to hit the gym') && 
-                                                  currentPrompt.toLowerCase().includes('6am') &&
-                                                  currentPrompt.toLowerCase().includes('anniversary dinner');
-                      
-                      if (isSpecificDemoQuery) {
-                        // Simulate the exact SDK demo flow
-                        const simulateSdkDemo = async () => {
-                          // Discovery phase
-                          await new Promise(resolve => setTimeout(resolve, 500));
-                          setChatMessages(prev => [...prev, {
-                            id: Date.now() + 1,
-                            type: 'assistant' as const,
-                            content: "🔍 Discovering specialist agents...\n✅ Found DietKing (Nutrition Specialist)\n✅ Found SleepyJoe (Rest & Recovery Specialist)\n✅ Found GymBro (Fitness Specialist)\n✅ Found WellnessBuddy (Evaluation Specialist)\n✅ Found Smasher (Coordination Specialist)",
-                            timestamp: new Date()
-                          }]);
-                          
-                          await new Promise(resolve => setTimeout(resolve, 1000));
-                          setChatMessages(prev => [...prev, {
-                            id: Date.now() + 2,
-                            type: 'assistant' as const,
-                            content: "⏳ Agents are thinking for 30 seconds...\n🤔 Smasher is analyzing your specific needs...\n🍎 DietKing is crafting nutrition advice...\n😴 SleepyJoe is planning rest strategies...\n💪 GymBro is designing your workout...\n🤝 WellnessBuddy is preparing evaluation criteria...",
-                            timestamp: new Date()
-                          }]);
-                          
-                          // Extended thinking simulation with agent progress
-                          setThinkingProgress({ gymbro: 0, dietking: 0, sleepyjoe: 0, compiling: 0 });
-                          
-                          // Simulate 30 seconds with progress updates
-                          for (let second = 0; second <= 30; second++) {
-                            const progress = Math.min(100, (second / 30) * 100);
-                            setThinkingProgress(prev => ({
-                              gymbro: Math.min(100, progress + Math.random() * 10),
-                              dietking: Math.min(100, progress + Math.random() * 10),
-                              sleepyjoe: Math.min(100, progress + Math.random() * 10),
-                              compiling: Math.min(100, progress + Math.random() * 10)
-                            }));
-                            
-                            if (second % 5 === 0) {
-                              const progressPercent = Math.round((second / 30) * 100);
-                              setChatMessages(prev => [...prev, {
-                                id: Date.now() + 3 + second,
-                                type: 'assistant' as const,
-                                content: `📊 Progress: ${progressPercent}% - Agents are collaborating...`,
-                                timestamp: new Date()
-                              }]);
-                            }
-                            
-                            await new Promise(resolve => setTimeout(resolve, 1000));
-                          }
-                          
-                          setThinkingProgress({ gymbro: 0, dietking: 0, sleepyjoe: 0, compiling: 0 });
-                          
-                          // Final comprehensive response
-                          const comprehensiveResponse = `🎯 SMASHER'S COMPREHENSIVE WELLNESS RECOMMENDATIONS
-
-📋 ANALYSIS SUMMARY:
-• Scenario: Early morning gym session + long work day + anniversary dinner
-• Key Challenges: Energy conservation, Stress management, Celebration balance
-• Optimal Strategy: Light morning workout + meditation + guilt-free celebration
-
-🧘‍♂️ RECOMMENDATION 1: Pre-Sleep Meditation
-• Take a 10-minute meditation break before sleep
-• Duration: 10 minutes
-• Timing: 30 minutes before bedtime
-• Video Link: https://youtu.be/ZgPHetPG4MY
-• Benefits: Reduces stress, improves sleep quality, prepares mind for tomorrow's challenges
-• Expected Outcomes: Better sleep quality, reduced anxiety, improved morning energy
-
-💪 RECOMMENDATION 2: Morning Workout Plan
-• Energy-conserving morning workout before your long work day
-• Duration: 30-45 minutes
-• Intensity: Moderate - designed to energize without exhausting
-• Focus: Energy preservation, stress relief, and work preparation
-
-WORKOUT BREAKDOWN:
-🔥 Warm-up (5 min): Light walking, arm circles, hip rotations
-🏋️ Bodyweight Squats: 3 sets × 12-15 reps (60s rest)
-💪 Push-ups (modified): 3 sets × 8-12 reps (90s rest)  
-🏋️ Plank: 3 sets × 30 seconds (60s rest)
-🧘 Stretching: 10 minutes (cat-cow, child's pose, hip flexors)
-❄️ Cool-down (5 min): Gentle stretching, deep breathing
-
-🍽️ RECOMMENDATION 3: Anniversary Dinner Freedom
-• Enjoy your anniversary dinner without calorie worries
-• The combination of morning workout and long work day creates 600-900 calorie deficit
-• Focus on celebration and quality time with your wife
-• Order what you truly want, savor mindfully, enjoy dessert if desired
-
-🎯 SUCCESS METRICS:
-• Energy levels: 7-8/10 throughout work day
-• Stress management: 3-4/10 stress level
-• Celebration enjoyment: 100% guilt-free enjoyment
-• Sleep quality: 7-8 hours quality sleep
-• Work performance: 8-9/10 productivity
-
-💡 EXPERT INSIGHTS:
-🥗 DietKing: "Light morning nutrition supports workout without heavy digestion"
-😴 SleepyJoe: "Meditation before sleep improves recovery and next-day performance"  
-💪 GymBro: "Energy-conserving workout maintains strength without exhaustion"
-🤝 WellnessBuddy: "Integrated approach balances fitness, work, and celebration needs"
-
-✅ Analysis complete! Your personalized wellness plan is ready for tomorrow's success! 🌟`;
-
-                          setChatMessages(prev => [...prev, {
-                            id: Date.now() + 100,
-                            type: 'assistant' as const,
-                            content: comprehensiveResponse,
-                            timestamp: new Date()
-                          }]);
-                        };
-                        
-                        simulateSdkDemo();
-                      } else {
-                        // Original thinking simulation for other queries
-                        const simulateThinking = async () => {
-                          // Gymbro thinking (slower, more realistic)
-                          for (let i = 0; i <= 100; i += 8) {
-                            setThinkingProgress(prev => ({ ...prev, gymbro: i }));
-                            await new Promise(resolve => setTimeout(resolve, 200));
-                          }
-                          
-                          // Dietking thinking (extended duration)
-                          for (let i = 0; i <= 100; i += 10) {
-                            setThinkingProgress(prev => ({ ...prev, dietking: i }));
-                            await new Promise(resolve => setTimeout(resolve, 180));
-                          }
-                          
-                          // Sleepyjoe thinking (slower pace)
-                          for (let i = 0; i <= 100; i += 12) {
-                            setThinkingProgress(prev => ({ ...prev, sleepyjoe: i }));
-                            await new Promise(resolve => setTimeout(resolve, 220));
-                          }
-                          
-                          // Compiling (more deliberate)
-                          for (let i = 0; i <= 100; i += 15) {
-                            setThinkingProgress(prev => ({ ...prev, compiling: i }));
-                            await new Promise(resolve => setTimeout(resolve, 150));
-                          }
-                          
-                          // Generate response based on prompt
-                          const lowerPrompt = currentPrompt.toLowerCase();
-                          let response = "";
-                          
-                          if (lowerPrompt.includes('workout') || lowerPrompt.includes('exercise') || lowerPrompt.includes('gym')) {
-                            response = "💪 Based on your workout goals, I recommend a balanced approach:\n\n🏃‍♂️ **Cardio**: 3-4 sessions per week, 30-45 minutes\n🏋️‍♂️ **Strength Training**: 3 sessions per week, focusing on compound movements\n🧘‍♀️ **Recovery**: Include stretching and rest days\n\nStart with 3 days per week and gradually increase intensity. Remember, consistency beats perfection!";
-                          } else if (lowerPrompt.includes('diet') || lowerPrompt.includes('nutrition') || lowerPrompt.includes('food')) {
-                            response = "🥗 Here's your personalized nutrition plan:\n\n🍳 **Breakfast**: Protein + complex carbs (eggs + oatmeal)\n🥙 **Lunch**: Lean protein + vegetables + healthy fats\n🍽️ **Dinner**: Light protein + vegetables\n🍎 **Snacks**: Nuts, fruits, or Greek yogurt\n\nAim for 3 meals + 2 snacks daily. Stay hydrated with 8+ glasses of water!";
-                          } else if (lowerPrompt.includes('sleep') || lowerPrompt.includes('rest') || lowerPrompt.includes('bedtime')) {
-                            response = "😴 Sleep optimization strategy:\n\n⏰ **Bedtime**: Aim for 7-9 hours, go to bed at the same time daily\n🌙 **Environment**: Dark, cool (65-68°F), quiet room\n📱 **Habits**: No screens 1 hour before bed, read or meditate instead\n☕ **Avoid**: Caffeine after 2 PM, heavy meals before bed\n\nQuality sleep is your foundation for wellness!";
-                          } else if (lowerPrompt.includes('stress') || lowerPrompt.includes('anxiety') || lowerPrompt.includes('mental')) {
-                            response = "🧘‍♀️ Mental wellness approach:\n\n💆‍♂️ **Daily Practice**: 10-15 minutes meditation or deep breathing\n🏃‍♀️ **Physical Activity**: Exercise releases endorphins\n📝 **Journaling**: Write down thoughts and gratitude\n🎯 **Mindfulness**: Stay present, one task at a time\n\nRemember, mental health is just as important as physical health!";
-                          } else {
-                            response = "🌟 Based on your comprehensive wellness goals, here's my advice:\n\n💪 **For your 6am gym session**: Great timing! Morning workouts boost energy all day. Have a light snack 30 mins before (banana + coffee).\n\n🍽️ **For your anniversary dinner**: Enjoy it guilt-free! Balance it with lighter meals earlier and consider sharing appetizers.\n\n⚖️ **Managing the long work day**: Stay hydrated, take 5-min breaks every hour, and do desk stretches.\n\nYou're planning well - consistency beats perfection! 💪";
-                          }
-                          
-                          // Add Smasher's response
-                          const assistantMessage = {
-                            id: Date.now() + 1,
-                            type: 'assistant' as const,
-                            content: response,
-                            timestamp: new Date()
-                          };
-                          
-                          setChatMessages(prev => [...prev, assistantMessage]);
-                          setThinkingProgress({ gymbro: 0, dietking: 0, sleepyjoe: 0, compiling: 0 });
-                        };
-                        
-                        simulateThinking();
-                      }
-                    }}
-                    disabled={!wellnessPrompt.trim()}
+                  <textarea
+                    value={wellnessPrompt}
+                    onChange={(e) => setWellnessPrompt(e.target.value)}
+                    placeholder="Ask me about your wellness goals, nutrition, exercise, or any health-related questions..."
                     className={cn(
-                      "w-full px-6 py-3 rounded-xl font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105",
+                      "w-full p-4 border rounded-xl text-sm resize-none h-24 focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-colors",
                       isDarkMode 
-                        ? "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white" 
-                        : "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+                        ? "border-gray-600 bg-gray-700 text-white placeholder-gray-400" 
+                        : "border-gray-300 bg-white text-gray-900 placeholder-gray-500"
+                    )}
+                  />
+                  <button
+                    onClick={() => {
+                      console.log('🔍 Button clicked!');
+                      console.log('🔍 Current view:', currentView);
+                      console.log('🔍 Wellness prompt:', wellnessPrompt);
+                      setCurrentMessage(wellnessPrompt);
+                      getWellnessAdviceHandler();
+                      console.log('🔍 After calling function - showChatModal should be true');
+                    }}
+                    disabled={isLoadingAI || !wellnessPrompt.trim()}
+                    className={cn(
+                      "px-6 py-3 font-medium rounded-xl transition-colors",
+                      isDarkMode 
+                        ? "bg-white text-black hover:bg-gray-100 disabled:bg-gray-600" 
+                        : "bg-black text-white hover:bg-gray-800 disabled:bg-gray-300"
                     )}
                   >
-                    🚀 Send Message
+                    {isLoadingAI ? 'Getting advice...' : 'Get AI Advice'}
                   </button>
                   {aiResponse && (
                     <div className={cn(
@@ -4144,10 +3743,10 @@ WORKOUT BREAKDOWN:
         </div>
       </section>
       
-               {/* Chat Modal Overlay - TEMPORARILY SHOWING ON ALL VIEWS FOR DEBUGGING */}
+               {/* Chat Modal Overlay - Only show on dashboard */}
          {(() => {
-           console.log('🔍 Modal render check (DEBUG MODE):', { showChatModal, currentView, shouldShow: showChatModal });
-           return showChatModal; // TEMPORARILY REMOVED currentView === 'dashboard' condition
+           console.log('🔍 Modal render check:', { showChatModal, currentView, shouldShow: showChatModal && currentView === 'dashboard' });
+           return showChatModal && currentView === 'dashboard';
          })() && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-all duration-300">
           <div className={cn(
