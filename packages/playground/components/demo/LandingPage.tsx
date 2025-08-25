@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 import { useAccount, useReadContract, useBalance, useWriteContract, useChainId, useDisconnect } from 'wagmi';
 import { wellnessNFTAbi, wellTokenAbi, userProfileAbi, wellnessTrackerAbi, CONTRACT_ADDRESSES, formatTokenAmount, testContractConnectivity } from '@/lib/contracts';
 import { useWellnessAPI } from '@/lib/api';
-import { useSogniGeneration } from '@/lib/sogni';
+
 
 // Theme Context
 const ThemeContext = createContext<{
@@ -193,7 +193,7 @@ function LandingPageContent() {
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { getWellnessAdvice } = useWellnessAPI();
-  const { generateImage } = useSogniGeneration();
+
   const { writeContract, isPending: isWritingContract } = useWriteContract();
   
   // Contract interaction state
@@ -301,55 +301,214 @@ function LandingPageContent() {
          setThinkingProgress(prev => ({ ...prev, compiling: i }));
        }
        
-       // Add Smasher's response
-       const smasherResponse = {
-         id: Date.now() + 1,
-         type: 'assistant' as const,
-         content: generateSmasherResponse(wellnessPrompt),
-         timestamp: new Date()
-       };
+       // Get AI response from the new API
+       try {
+         const response = await fetch('/api/ai-wellness', {
+           method: 'POST',
+           headers: {
+             'Content-Type': 'application/json',
+           },
+           body: JSON.stringify({
+             userMessage: wellnessPrompt,
+             userGoals: userGoals,
+             userProfile: {
+               address: address,
+               goals: userGoals,
+               imageTheme: selectedImageTheme,
+               customPrompt: customPrompt
+             },
+             walletAddress: address,
+             chainId: chainId
+           }),
+         });
+         
+                  if (response.ok) {
+           const data = await response.json();
+           console.log('🤖 AI Wellness API Response:', data);
+           
+           let aiContent = '';
+           
+           if (data.success && data.response) {
+             // Parse the Python AI response properly
+             if (data.response.message) {
+               // Direct message from AI
+               aiContent = data.response.message;
+             } else if (data.response.recommendations?.primary?.content) {
+               // Structured recommendations
+               aiContent = data.response.recommendations.primary.content;
+             } else if (data.response.advice) {
+               // General advice
+               aiContent = data.response.advice;
+             } else if (data.response.raw_response) {
+               // Raw response content
+               aiContent = data.response.raw_response;
+             } else {
+               // Show the raw response structure for debugging
+               aiContent = `AI Response Structure:\n${JSON.stringify(data.response, null, 2)}`;
+             }
+             
+             console.log('✅ Using AI response:', aiContent);
+           } else {
+             // No fallback - show error message
+             aiContent = `❌ AI System Error: ${data.error || 'Unknown error occurred'}\n\nPlease try again or contact support.`;
+             console.error('❌ AI response structure invalid:', data);
+           }
+           
+           // Add Smasher's response
+           const smasherResponse = {
+             id: Date.now() + 1,
+             type: 'assistant' as const,
+             content: aiContent,
+             timestamp: new Date()
+           };
+           
+           setChatMessages(prev => [...prev, smasherResponse]);
+         } else {
+           console.error('❌ AI Wellness API failed:', response.status, response.statusText);
+           // No fallback - show error message
+           const smasherResponse = {
+             id: Date.now() + 1,
+             type: 'assistant' as const,
+             content: `❌ AI System Unavailable (${response.status})\n\nPlease try again later or contact support.`,
+             timestamp: new Date()
+           };
+           
+           setChatMessages(prev => [...prev, smasherResponse]);
+         }
+       } catch (error) {
+         console.error('❌ Error calling AI wellness API:', error);
+         // No fallback - show error message
+         const smasherResponse = {
+           id: Date.now() + 1,
+           type: 'assistant' as const,
+           content: `❌ AI System Connection Error\n\n${error instanceof Error ? error.message : 'Unknown error occurred'}\n\nPlease check your connection and try again.`,
+           timestamp: new Date()
+         };
+         
+         setChatMessages(prev => [...prev, smasherResponse]);
+       }
        
-       setChatMessages(prev => [...prev, smasherResponse]);
        setThinkingProgress({ gymbro: 0, dietking: 0, sleepyjoe: 0, compiling: 0 });
      };
      
      simulateThinking();
    };
    
-   // Generate hardcoded responses from Smasher
-   const generateSmasherResponse = (prompt: string): string => {
-     const lowerPrompt = prompt.toLowerCase();
-     
-     if (lowerPrompt.includes('workout') || lowerPrompt.includes('exercise') || lowerPrompt.includes('gym')) {
-       return "💪 Based on your workout goals, I recommend a balanced approach:\n\n🏃‍♂️ **Cardio**: 3-4 sessions per week, 30-45 minutes\n🏋️‍♂️ **Strength Training**: 3 sessions per week, focusing on compound movements\n🧘‍♀️ **Recovery**: Include stretching and rest days\n\nStart with 3 days per week and gradually increase intensity. Remember, consistency beats perfection!";
-     }
-     
-     if (lowerPrompt.includes('diet') || lowerPrompt.includes('nutrition') || lowerPrompt.includes('food')) {
-       return "🥗 Here's your personalized nutrition plan:\n\n🍳 **Breakfast**: Protein + complex carbs (eggs + oatmeal)\n🥙 **Lunch**: Lean protein + vegetables + healthy fats\n🍽️ **Dinner**: Light protein + vegetables\n🍎 **Snacks**: Nuts, fruits, or Greek yogurt\n\nAim for 3 meals + 2 snacks daily. Stay hydrated with 8+ glasses of water!";
-     }
-     
-     if (lowerPrompt.includes('sleep') || lowerPrompt.includes('rest') || lowerPrompt.includes('bedtime')) {
-       return "😴 Sleep optimization strategy:\n\n⏰ **Bedtime**: Aim for 7-9 hours, go to bed at the same time daily\n🌙 **Environment**: Dark, cool (65-68°F), quiet room\n📱 **Habits**: No screens 1 hour before bed, read or meditate instead\n☕ **Avoid**: Caffeine after 2 PM, heavy meals before bed\n\nQuality sleep is your foundation for wellness!";
-     }
-     
-     if (lowerPrompt.includes('stress') || lowerPrompt.includes('anxiety') || lowerPrompt.includes('mental')) {
-       return "🧘‍♀️ Mental wellness approach:\n\n💆‍♂️ **Daily Practice**: 10-15 minutes meditation or deep breathing\n🏃‍♀️ **Physical Activity**: Exercise releases endorphins\n📝 **Journaling**: Write down thoughts and gratitude\n🎯 **Mindfulness**: Stay present, one task at a time\n\nRemember, mental health is just as important as physical health!";
-     }
-     
-     // Default response
-     return "🌟 Here's your comprehensive wellness advice:\n\n🎯 **Set Clear Goals**: Define what wellness means to you\n📊 **Track Progress**: Monitor your habits and improvements\n🔄 **Stay Consistent**: Small daily actions create lasting change\n🎉 **Celebrate Wins**: Acknowledge your progress, no matter how small\n\nYou're on the right path! Keep going! 💪";
-  };
+   // AI response handler - no more hardcoded fallbacks
 
   const generateWellnessImage = async () => {
     setIsGeneratingImage(true);
+    setGeneratedImageUrl(''); // Clear previous image
+    
     try {
-      // Generate image using Sogni AI
-      const imageUrl = await generateImage(selectedImageTheme, customPrompt, userGoals);
-      setGeneratedImageUrl(imageUrl);
+      // Create a wellness-focused prompt based on theme and custom input
+      let basePrompt = '';
+      
+      switch (selectedImageTheme) {
+        case 'minimalist':
+          basePrompt = 'minimalist wellness art, clean lines, simple shapes, meditation symbols, zen aesthetic, white space, elegant design';
+          break;
+        case 'cosmic':
+          basePrompt = 'cosmic wellness art, space galaxy theme, stars, nebula, cosmic energy, wellness symbols, vibrant colors, mystical';
+          break;
+        case 'nature':
+          basePrompt = 'nature wellness art, forest, mountains, water, natural elements, organic shapes, calming colors, peaceful';
+          break;
+        case 'abstract':
+          basePrompt = 'abstract wellness art, flowing lines, geometric patterns, healing symbols, modern design, balanced composition';
+          break;
+        default:
+          basePrompt = 'wellness art, health, balance, harmony, beautiful design';
+      }
+      
+      // Combine with custom prompt if provided
+      const fullPrompt = customPrompt.trim() 
+        ? `${basePrompt}, ${customPrompt}` 
+        : basePrompt;
+      
+      // Generate unique seed for variety
+      const seed = Math.floor(Math.random() * 1000000);
+      
+      // Generate image using Pollinations.ai with multiple URL formats for reliability
+      const pollinationsUrls = [
+        `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=512&height=512&seed=${seed}`,
+        `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=512&height=512`,
+        `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}`
+      ];
+      
+      console.log('🎨 Generating wellness NFT image with prompt:', fullPrompt);
+      console.log('🔗 Pollinations.ai URLs:', pollinationsUrls);
+      
+      // Try each URL format until one works
+      let imageLoaded = false;
+      let successfulUrl = '';
+      
+      for (let i = 0; i < pollinationsUrls.length && !imageLoaded; i++) {
+        try {
+          console.log(`🔄 Testing Pollinations.ai URL ${i + 1}:`, pollinationsUrls[i]);
+          
+          // Test if image loads successfully
+          const testImage = new (window as any).Image();
+          testImage.crossOrigin = 'anonymous';
+          
+          await new Promise((resolve, reject) => {
+            testImage.onload = () => {
+              console.log('✅ Pollinations.ai image loaded successfully:', pollinationsUrls[i]);
+              imageLoaded = true;
+              successfulUrl = pollinationsUrls[i];
+              resolve(true);
+            };
+            
+            testImage.onerror = () => {
+              console.log(`❌ Pollinations.ai URL ${i + 1} failed:`, pollinationsUrls[i]);
+              if (i === pollinationsUrls.length - 1) {
+                console.log('❌ All Pollinations.ai URLs failed, using fallback');
+                reject(new Error('All Pollinations.ai URLs failed'));
+              }
+              resolve(false);
+            };
+            
+            // Set timeout for image loading
+            setTimeout(() => {
+              if (!imageLoaded) {
+                console.log(`⏰ Pollinations.ai URL ${i + 1} timed out`);
+                resolve(false);
+              }
+            }, 10000); // 10 second timeout
+            
+            testImage.src = pollinationsUrls[i];
+          });
+          
+          if (imageLoaded) break;
+          
+        } catch (error) {
+          console.log(`❌ Error testing Pollinations.ai URL ${i + 1}:`, error);
+          if (i === pollinationsUrls.length - 1) {
+            throw new Error('All Pollinations.ai URLs failed');
+          }
+        }
+      }
+      
+      if (imageLoaded && successfulUrl) {
+        setGeneratedImageUrl(successfulUrl);
+        console.log('🎉 Wellness NFT image generated successfully!');
+      } else {
+        throw new Error('Failed to generate image with Pollinations.ai');
+      }
+      
     } catch (error) {
-      console.error('Failed to generate image:', error);
-      // Fallback to placeholder on error
-      setGeneratedImageUrl('https://via.placeholder.com/400x400/8B5CF6/FFFFFF?text=Generation+Failed');
+      console.error('❌ Failed to generate wellness NFT image:', error);
+      
+      // Fallback to a beautiful placeholder image
+      const fallbackImages = [
+        'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=512&h=512&fit=crop&crop=center',
+        'https://images.unsplash.com/photo-1571019613452-5cb0a1f2e5b9?w=512&h=512&fit=crop&crop=center',
+        'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=512&h=512&fit=crop&crop=center'
+      ];
+      
+      const randomFallback = fallbackImages[Math.floor(Math.random() * fallbackImages.length)];
+      setGeneratedImageUrl(randomFallback);
+      console.log('🔄 Using fallback wellness image:', randomFallback);
     } finally {
       setIsGeneratingImage(false);
     }
@@ -403,35 +562,35 @@ function LandingPageContent() {
     
     // Save meal to smart contract if available
     if (address && hasWellnessData) {
-      // Force network switch to Base Sepolia if not already connected
+      // Force network switch to Base Mainnet if not already connected
       if (chainId !== 8453) {
-        console.log('🔄 Switching to Base Sepolia testnet for meal logging...');
+        console.log('🔄 Switching to Base Mainnet for meal logging...');
         try {
           await (window.ethereum as any).request({
             method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0x14a34' }], // 8453 in hex
+            params: [{ chainId: '0x2105' }], // 8453 in hex
           });
-          console.log('✅ Switched to Base Sepolia testnet');
+          console.log('✅ Switched to Base Mainnet');
           
           // Wait a moment for the switch to complete
           await new Promise(resolve => setTimeout(resolve, 1000));
           
           // Check if switch was successful
           const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
-          if (newChainId !== '0x14a34') {
+          if (newChainId !== '0x2105') {
             console.log('⚠️ Network switch failed - cannot log meal to blockchain');
             return;
           }
         } catch (error: any) {
-          console.error('Error switching to Base Sepolia:', error);
+          console.error('Error switching to Base Mainnet:', error);
           if (error.code === 4902) {
             // Chain not added, add it first
-            await addBaseSepoliaNetwork();
+            await addBaseMainnetNetwork();
             // Try switching again
             try {
               await (window.ethereum as any).request({
                 method: 'wallet_switchEthereumChain',
-                params: [{ chainId: '0x14a34' }],
+                params: [{ chainId: '0x2105' }],
               });
             } catch (switchError) {
               console.log('⚠️ Network switch failed after adding chain - cannot log meal to blockchain');
@@ -903,29 +1062,88 @@ function LandingPageContent() {
     };
   }, [address, chainId, contractReadError, profileError, wellnessError, isOnboarded, hasWellnessData, profileData, wellnessData, contractActivities, contractMeals, totalScore, streakCount, wellBalance]);
 
-  // No network switching required - Base Mainnet is already correct
+  // Force network switch to Base Mainnet on component mount
   useEffect(() => {
-    if (address && chainId === 8453) {
-      console.log('✅ Connected to Base Mainnet - ready to go!');
+    if (address && chainId !== 8453) {
+      console.log('🔄 Component mounted - checking network connection...');
+      console.log('⚠️ Wrong network detected:', chainId);
+      
+      // Auto-switch to Base Mainnet
+      const forceNetworkSwitch = async () => {
+        try {
+          console.log('🔄 Auto-switching to Base Mainnet...');
+          await (window.ethereum as any).request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x2105' }], // 8453 in hex
+          });
+          console.log('✅ Auto-switched to Base Mainnet');
+        } catch (error: any) {
+          console.error('Error auto-switching to Base Mainnet:', error);
+          if (error.code === 4902) {
+            // Chain not added, add it first
+            console.log('🔗 Adding Base Mainnet network first...');
+            await addBaseMainnetNetwork();
+            // Try switching again
+            try {
+              await (window.ethereum as any).request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0x2105' }],
+              });
+              console.log('✅ Auto-switched to Base Mainnet after adding network');
+            } catch (switchError) {
+              console.log('⚠️ Auto-switch failed after adding network');
+            }
+          }
+        }
+      };
+      
+      // Delay the auto-switch slightly to avoid conflicts
+      setTimeout(forceNetworkSwitch, 1000);
     }
   }, [address, chainId]);
 
-  // No aggressive network switching needed - Base Mainnet is correct
+  // Aggressive network switching - run immediately when wallet connects
   useEffect(() => {
     if (address) {
       console.log('🔍 Wallet connected, checking network...');
       
-      const checkNetwork = async () => {
+      const checkAndSwitchNetwork = async () => {
         // Get current network from MetaMask directly
         try {
           const currentChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
           console.log('🔍 Current MetaMask chain ID:', currentChainId);
           
-          if (currentChainId === '0x2105') { // Base Mainnet
-            console.log('✅ Already on Base Mainnet');
-            setIsNetworkSwitching(false);
+          if (currentChainId !== '0x2105') { // Not Base Mainnet
+            console.log('🚨 WRONG NETWORK DETECTED! Forcing switch to Base Mainnet...');
+            setIsNetworkSwitching(true);
+            setNetworkSwitchAttempts(prev => prev + 1);
+            
+            // Force switch immediately
+            try {
+              await (window.ethereum as any).request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0x2105' }],
+              });
+              console.log('✅ Forced network switch to Base Mainnet');
+              setIsNetworkSwitching(false);
+            } catch (error: any) {
+              console.error('❌ Network switch failed:', error);
+              if (error.code === 4902) {
+                console.log('🔗 Adding Base Mainnet network...');
+                await addBaseMainnetNetwork();
+                // Try switching again
+                await (window.ethereum as any).request({
+                  method: 'wallet_switchEthereumChain',
+                  params: [{ chainId: '0x2105' }],
+                });
+                console.log('✅ Network switch successful after adding chain');
+                setIsNetworkSwitching(false);
+              } else {
+                setIsNetworkSwitching(false);
+              }
+            }
           } else {
-            console.log('⚠️ Not on Base Mainnet, but no auto-switching needed');
+            console.log('✅ Already on Base Mainnet');
             setIsNetworkSwitching(false);
           }
         } catch (error) {
@@ -934,8 +1152,14 @@ function LandingPageContent() {
         }
       };
       
-      // Run the check
-      checkNetwork();
+      // Run immediately and also after a short delay
+      checkAndSwitchNetwork();
+      setTimeout(checkAndSwitchNetwork, 500);
+      setTimeout(() => {
+        if (networkSwitchAttempts < 3) {
+          checkAndSwitchNetwork();
+        }
+      }, 2000);
     }
   }, [address, networkSwitchAttempts]);
   
@@ -1235,22 +1459,22 @@ function LandingPageContent() {
       
       // Initialize wellness data on WellnessTracker contract if not already done
       if (!hasWellnessData) {
-        // Force network switch to Base Sepolia if not already connected
+        // Force network switch to Base Mainnet if not already connected
         if (chainId !== 8453) {
-          console.log('🔄 Switching to Base Sepolia testnet for profile initialization...');
+          console.log('🔄 Switching to Base Mainnet for profile initialization...');
           try {
             await (window.ethereum as any).request({
               method: 'wallet_switchEthereumChain',
-              params: [{ chainId: '0x14a34' }], // 8453 in hex
+              params: [{ chainId: '0x2105' }], // 8453 in hex
             });
-            console.log('✅ Switched to Base Sepolia testnet');
+            console.log('✅ Switched to Base Mainnet');
             
             // Wait a moment for the switch to complete
             await new Promise(resolve => setTimeout(resolve, 1000));
             
             // Check if switch was successful
             const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
-            if (newChainId !== '0x14a34') {
+            if (newChainId !== '0x2105') {
               console.log('⚠️ Network switch failed, skipping smart contract initialization');
             } else {
               console.log('🚀 Initializing wellness data on smart contract...');
@@ -1263,15 +1487,15 @@ function LandingPageContent() {
               console.log('✅ Wellness data initialized on smart contract');
             }
           } catch (error: any) {
-            console.error('Error switching to Base Sepolia:', error);
+            console.error('Error switching to Base Mainnet:', error);
             if (error.code === 4902) {
               // Chain not added, add it first
-              await addBaseSepoliaNetwork();
+              await addBaseMainnetNetwork();
               // Try switching again
               try {
                 await (window.ethereum as any).request({
                   method: 'wallet_switchEthereumChain',
-                  params: [{ chainId: '0x14a34' }],
+                  params: [{ chainId: '0x2105' }],
                 });
                 console.log('🚀 Initializing wellness data on smart contract...');
                 await writeContract({
@@ -1328,37 +1552,37 @@ function LandingPageContent() {
   const initializeWellnessData = async () => {
     if (!address) return false;
     
-    // Force network switch to Base Sepolia if not already connected
+    // Force network switch to Base Mainnet if not already connected
     if (chainId !== 8453) {
-      console.log('🔄 Switching to Base Sepolia testnet...');
+      console.log('🔄 Switching to Base Mainnet...');
       try {
         await (window.ethereum as any).request({
           method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0x14a34' }], // 8453 in hex
+          params: [{ chainId: '0x2105' }], // 8453 in hex
         });
-        console.log('✅ Switched to Base Sepolia testnet');
+        console.log('✅ Switched to Base Mainnet');
         
         // Wait a moment for the switch to complete
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Check if switch was successful
         const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
-        if (newChainId !== '0x14a34') {
-          setContractError('Failed to switch to Base Sepolia testnet. Please switch manually.');
+        if (newChainId !== '0x2105') {
+          setContractError('Failed to switch to Base Mainnet. Please switch manually.');
           return false;
         }
       } catch (error: any) {
-        console.error('Error switching to Base Sepolia:', error);
+        console.error('Error switching to Base Mainnet:', error);
         if (error.code === 4902) {
           // Chain not added, add it first
-          await addBaseSepoliaNetwork();
+          await addBaseMainnetNetwork();
           // Try switching again
           await (window.ethereum as any).request({
             method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0x14a34' }],
+            params: [{ chainId: '0x2105' }],
           });
         } else {
-          setContractError('Failed to switch to Base Sepolia testnet. Please switch manually.');
+          setContractError('Failed to switch to Base Mainnet. Please switch manually.');
           return false;
         }
       }
@@ -1386,42 +1610,42 @@ function LandingPageContent() {
   const resetWeeklyGoals = async () => {
     if (!address || !hasWellnessData) return false;
     
-    // Force network switch to Base Sepolia if not already connected
+    // Force network switch to Base Mainnet if not already connected
     if (chainId !== 8453) {
-      console.log('🔄 Switching to Base Sepolia testnet for weekly goals reset...');
+      console.log('🔄 Switching to Base Mainnet for weekly goals reset...');
       try {
         await (window.ethereum as any).request({
           method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0x14a34' }], // 8453 in hex
+          params: [{ chainId: '0x2105' }], // 8453 in hex
         });
-        console.log('✅ Switched to Base Sepolia testnet');
+        console.log('✅ Switched to Base Mainnet');
         
         // Wait a moment for the switch to complete
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Check if switch was successful
         const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
-        if (newChainId !== '0x14a34') {
-          setContractError('Failed to switch to Base Sepolia testnet. Please switch manually.');
+        if (newChainId !== '0x2105') {
+          setContractError('Failed to switch to Base Mainnet. Please switch manually.');
           return false;
         }
       } catch (error: any) {
-        console.error('Error switching to Base Sepolia:', error);
+        console.error('Error switching to Base Mainnet:', error);
         if (error.code === 4902) {
           // Chain not added, add it first
-          await addBaseSepoliaNetwork();
+          await addBaseMainnetNetwork();
           // Try switching again
           try {
             await (window.ethereum as any).request({
               method: 'wallet_switchEthereumChain',
-              params: [{ chainId: '0x14a34' }],
+              params: [{ chainId: '0x2105' }],
             });
           } catch (switchError) {
-            setContractError('Failed to switch to Base Sepolia testnet after adding chain. Please switch manually.');
+            setContractError('Failed to switch to Base Mainnet after adding chain. Please switch manually.');
             return false;
           }
         } else {
-          setContractError('Failed to switch to Base Sepolia testnet. Please switch manually.');
+          setContractError('Failed to switch to Base Mainnet. Please switch manually.');
           return false;
         }
       }
@@ -1452,8 +1676,8 @@ function LandingPageContent() {
     }
   };
 
-  // Add Base Sepolia network to MetaMask
-  const addBaseSepoliaNetwork = async () => {
+  // Add Base Mainnet network to MetaMask
+  const addBaseMainnetNetwork = async () => {
     if (typeof window.ethereum === 'undefined') {
       alert('MetaMask is not installed. Please install MetaMask first.');
       return;
@@ -1463,24 +1687,24 @@ function LandingPageContent() {
       await (window.ethereum as any).request({
         method: 'wallet_addEthereumChain',
         params: [{
-          chainId: '0x14a34', // 8453 in hex
-          chainName: 'Base Sepolia',
+          chainId: '0x2105', // 8453 in hex
+          chainName: 'Base',
           nativeCurrency: {
             name: 'ETH',
             symbol: 'ETH',
             decimals: 18,
           },
-          rpcUrls: ['https://sepolia.base.org'],
-          blockExplorerUrls: ['https://sepolia.basescan.org'],
+          rpcUrls: ['https://mainnet.base.org'],
+          blockExplorerUrls: ['https://basescan.org'],
         }],
       });
-      console.log('✅ Base Sepolia network added to MetaMask');
+      console.log('✅ Base Mainnet network added to MetaMask');
     } catch (error: any) {
-      console.error('Error adding Base Sepolia network:', error);
+      console.error('Error adding Base Mainnet network:', error);
       if (error.code === 4001) {
         alert('Network addition was rejected by user.');
       } else {
-        alert('Failed to add Base Sepolia network. Please add it manually.');
+        alert('Failed to add Base Mainnet network. Please add it manually.');
       }
     }
   };
@@ -1499,7 +1723,7 @@ function LandingPageContent() {
             <h2 className={cn(
               "text-xl font-semibold transition-colors",
               isDarkMode ? "text-white" : "text-gray-900"
-            )}>Switching to Base Sepolia Testnet...</h2>
+            )}>Switching to Base Mainnet...</h2>
             <p className={cn(
               "transition-colors",
               isDarkMode ? "text-gray-400" : "text-gray-600"
@@ -1509,7 +1733,7 @@ function LandingPageContent() {
                 <strong>Current Network:</strong> {chainId === 1 ? 'Ethereum Mainnet' : `Network ID ${chainId}`}
               </p>
               <p className="text-sm text-red-800 mt-1">
-                <strong>Required:</strong> Base Sepolia Testnet (Chain ID: 8453)
+                <strong>Required:</strong> Base Mainnet (Chain ID: 8453)
               </p>
             </div>
           </div>
@@ -2193,7 +2417,7 @@ function LandingPageContent() {
                   <p className="font-bold text-lg">🚨 CRITICAL: Wrong Network Detected</p>
                   <p className="text-sm opacity-90">
                     You're currently connected to <strong>{chainId === 1 ? 'Ethereum Mainnet' : `Network ID ${chainId}`}</strong>. 
-                    WellSpace requires <strong>Base Sepolia Testnet (Chain ID: 8453)</strong>.
+                    WellSpace requires <strong>Base Mainnet (Chain ID: 8453)</strong>.
                   </p>
                   <p className="text-sm opacity-90 mt-2">
                     <strong>⚠️ WARNING:</strong> Transactions on the wrong network will fail and may charge you gas fees on the wrong blockchain!
@@ -2203,13 +2427,13 @@ function LandingPageContent() {
                     <ol className="list-decimal list-inside mt-1 space-y-1">
                       <li>Open MetaMask</li>
                       <li>Click the network dropdown (top of MetaMask)</li>
-                      <li>Select "Base Sepolia" or add it if not listed</li>
-                      <li>If adding manually: Network Name: "Base Sepolia", RPC URL: "https://sepolia.base.org", Chain ID: "8453"</li>
+                      <li>Select "Base" or add it if not listed</li>
+                      <li>If adding manually: Network Name: "Base", RPC URL: "https://mainnet.base.org", Chain ID: "8453"</li>
                     </ol>
                   </div>
                   <div className="mt-3 flex space-x-3">
                     <button
-                      onClick={addBaseSepoliaNetwork}
+                      onClick={addBaseMainnetNetwork}
                       className={cn(
                         "px-4 py-2 text-sm rounded-lg transition-colors font-medium",
                         isDarkMode 
@@ -2217,18 +2441,18 @@ function LandingPageContent() {
                           : "bg-red-100 hover:bg-red-200 text-red-800"
                       )}
                     >
-                      🔗 Add Base Sepolia to MetaMask
+                      🔗 Add Base Mainnet to MetaMask
                     </button>
                     <button
                       onClick={async () => {
                         try {
                           await (window.ethereum as any).request({
                             method: 'wallet_switchEthereumChain',
-                            params: [{ chainId: '0x14a34' }],
+                            params: [{ chainId: '0x2105' }],
                           });
                         } catch (error: any) {
                           if (error.code === 4902) {
-                            await addBaseSepoliaNetwork();
+                            await addBaseMainnetNetwork();
                           }
                         }
                       }}
@@ -2239,7 +2463,7 @@ function LandingPageContent() {
                           : "bg-blue-100 hover:bg-blue-200 text-blue-800"
                       )}
                     >
-                      🔄 Switch to Base Sepolia Now
+                      🔄 Switch to Base Mainnet Now
                     </button>
                   </div>
                 </div>
@@ -2265,7 +2489,7 @@ function LandingPageContent() {
                   chainId === 8453 ? "bg-green-500" : "bg-red-500"
                 )} />
                 <span className="text-sm font-medium">
-                  {chainId === 8453 ? '✅ Base Sepolia Testnet' : '❌ Wrong Network'}
+                  {chainId === 8453 ? '✅ Base Mainnet' : '❌ Wrong Network'}
                 </span>
                 {chainId !== 8453 && (
                   <span className="text-xs opacity-75">
@@ -2279,11 +2503,11 @@ function LandingPageContent() {
                     try {
                       await (window.ethereum as any).request({
                         method: 'wallet_switchEthereumChain',
-                        params: [{ chainId: '0x14a34' }],
+                        params: [{ chainId: '0x2105' }],
                       });
                     } catch (error: any) {
                       if (error.code === 4902) {
-                        await addBaseSepoliaNetwork();
+                        await addBaseMainnetNetwork();
                       }
                     }
                   }}
@@ -2698,13 +2922,19 @@ function LandingPageContent() {
                       const currentPrompt = wellnessPrompt;
                       setWellnessPrompt('');
                       
+                      console.log('🎬 === CHAT FUNCTION STARTED ===');
+                      console.log('📝 Wellness prompt:', wellnessPrompt);
+                      console.log('🎯 User goals:', userGoals);
+                      console.log('👤 Address:', address);
+                      console.log('⛓️ Chain ID:', chainId);
+                      
                       // Start the thinking process
                       setThinkingProgress({ gymbro: 0, dietking: 0, sleepyjoe: 0, compiling: 0 });
+                      console.log('🔄 Thinking progress started');
                       
-                      // Check for the specific demo query
-                      const isSpecificDemoQuery = currentPrompt.toLowerCase().includes('planning to hit the gym') && 
-                                                  currentPrompt.toLowerCase().includes('6am') &&
-                                                  currentPrompt.toLowerCase().includes('anniversary dinner');
+                      // Check for the specific demo query - DISABLED, using real AI instead
+                      const isSpecificDemoQuery = false; // Always use real AI API
+                      console.log('🚫 Demo mode disabled, using real AI');
                       
                       if (isSpecificDemoQuery) {
                         // Simulate the exact SDK demo flow
@@ -2911,62 +3141,138 @@ function LandingPageContent() {
                         };
                         
                         simulateSdkDemo();
-                      } else {
-                        // Original thinking simulation for other queries
-                        const simulateThinking = async () => {
-                          // Gymbro thinking (slower, more realistic)
-                          for (let i = 0; i <= 100; i += 8) {
-                            setThinkingProgress(prev => ({ ...prev, gymbro: i }));
-                            await new Promise(resolve => setTimeout(resolve, 200));
+                                            } else {
+                        // Use real AI API instead of hardcoded responses
+                        const callAIAPI = async () => {
+                          console.log('🚀 Starting AI API call...');
+                          console.log('📝 User message:', currentPrompt);
+                          console.log('🎯 User goals:', userGoals);
+                          console.log('👤 User profile:', { address, goals: userGoals, imageTheme: selectedImageTheme, customPrompt });
+                          console.log('🔗 Wallet address:', address);
+                          console.log('⛓️ Chain ID:', chainId);
+                          
+                          const startTime = Date.now();
+                          console.log('⏱️ API call started at:', new Date().toISOString());
+                          
+                          try {
+                            console.log('📡 Making fetch request to /api/ai-wellness...');
+                            const response = await fetch('/api/ai-wellness', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({
+                                userMessage: currentPrompt,
+                                userGoals: userGoals,
+                                userProfile: {
+                                  address: address,
+                                  goals: userGoals,
+                                  imageTheme: selectedImageTheme,
+                                  customPrompt: customPrompt
+                                },
+                                walletAddress: address,
+                                chainId: chainId
+                              }),
+                            });
+                            
+                            const endTime = Date.now();
+                            console.log('⏱️ API call completed in:', endTime - startTime, 'ms');
+                            console.log('📊 Response status:', response.status);
+                            console.log('📊 Response status text:', response.statusText);
+                            console.log('📊 Response headers:', Object.fromEntries(response.headers.entries()));
+                                
+                            if (response.ok) {
+                              console.log('✅ Response is OK, parsing JSON...');
+                              const data = await response.json();
+                              console.log('🤖 AI Wellness API Response:', data);
+                              console.log('🔍 Response type:', typeof data);
+                              console.log('🔍 Response keys:', Object.keys(data));
+                              
+                              let aiContent = '';
+                              
+                              if (data.success && data.response) {
+                                console.log('✅ Data has success and response');
+                                console.log('🔍 Response type:', typeof data.response);
+                                console.log('🔍 Response keys:', Object.keys(data.response));
+                                
+                                // Parse the Python AI response properly
+                                if (data.response.message) {
+                                  console.log('📝 Found message field');
+                                  aiContent = data.response.message;
+                                } else if (data.response.recommendations?.primary?.content) {
+                                  console.log('📝 Found recommendations.primary.content field');
+                                  aiContent = data.response.recommendations.primary.content;
+                                } else if (data.response.advice) {
+                                  console.log('📝 Found advice field');
+                                  aiContent = data.response.advice;
+                                } else if (data.response.raw_response) {
+                                  console.log('📝 Found raw_response field');
+                                  aiContent = data.response.raw_response;
+                                } else {
+                                  console.log('⚠️ No recognized response fields, showing structure');
+                                  aiContent = `AI Response Structure:\n${JSON.stringify(data.response, null, 2)}`;
+                                }
+                                
+                                console.log('✅ Using AI response:', aiContent);
+                              } else {
+                                console.log('❌ Data missing success or response');
+                                console.log('🔍 Success field:', data.success);
+                                console.log('🔍 Response field:', data.response);
+                                aiContent = `❌ AI System Error: ${data.error || 'Unknown error occurred'}\n\nPlease try again or contact support.`;
+                                console.error('❌ AI response structure invalid:', data);
+                              }
+                              
+                              // Add Smasher's response
+                              console.log('📝 Creating Smasher response with content:', aiContent);
+                              const smasherResponse = {
+                                id: Date.now() + 1,
+                                type: 'assistant' as const,
+                                content: aiContent,
+                                timestamp: new Date()
+                              };
+                              
+                              console.log('💬 Adding response to chat messages...');
+                              setChatMessages(prev => [...prev, smasherResponse]);
+                              console.log('✅ Response added to chat successfully');
+                            } else {
+                              console.error('❌ AI Wellness API failed:', response.status, response.statusText);
+                              console.log('🔍 Creating error response for failed API call');
+                              const smasherResponse = {
+                                id: Date.now() + 1,
+                                type: 'assistant' as const,
+                                content: `❌ AI System Unavailable (${response.status})\n\nPlease try again later or contact support.`,
+                                timestamp: new Date()
+                              };
+                              
+                              console.log('💬 Adding error response to chat...');
+                              setChatMessages(prev => [...prev, smasherResponse]);
+                              console.log('✅ Error response added to chat');
+                            }
+                          } catch (error) {
+                            console.error('❌ Error calling AI wellness API:', error);
+                            console.log('🔍 Error type:', typeof error);
+                            console.log('🔍 Error constructor:', error?.constructor?.name);
+                            console.log('🔍 Error message:', (error as any)?.message);
+                            console.log('🔍 Error stack:', (error as any)?.stack);
+                            
+                            const smasherResponse = {
+                              id: Date.now() + 1,
+                              type: 'assistant' as const,
+                              content: `❌ AI System Connection Error\n\n${error instanceof Error ? error.message : 'Unknown error occurred'}\n\nPlease check your connection and try again.`,
+                              timestamp: new Date()
+                            };
+                            
+                            console.log('💬 Adding error response to chat...');
+                            setChatMessages(prev => [...prev, smasherResponse]);
+                            console.log('✅ Error response added to chat');
                           }
                           
-                          // Dietking thinking (extended duration)
-                          for (let i = 0; i <= 100; i += 10) {
-                            setThinkingProgress(prev => ({ ...prev, dietking: i }));
-                            await new Promise(resolve => setTimeout(resolve, 180));
-                          }
-                          
-                          // Sleepyjoe thinking (slower pace)
-                          for (let i = 0; i <= 100; i += 12) {
-                            setThinkingProgress(prev => ({ ...prev, sleepyjoe: i }));
-                            await new Promise(resolve => setTimeout(resolve, 220));
-                          }
-                          
-                          // Compiling (more deliberate)
-                          for (let i = 0; i <= 100; i += 15) {
-                            setThinkingProgress(prev => ({ ...prev, compiling: i }));
-                            await new Promise(resolve => setTimeout(resolve, 150));
-                          }
-                          
-                          // Generate response based on prompt
-                          const lowerPrompt = currentPrompt.toLowerCase();
-                          let response = "";
-                          
-                          if (lowerPrompt.includes('workout') || lowerPrompt.includes('exercise') || lowerPrompt.includes('gym')) {
-                            response = "💪 Based on your workout goals, I recommend a balanced approach:\n\n🏃‍♂️ **Cardio**: 3-4 sessions per week, 30-45 minutes\n🏋️‍♂️ **Strength Training**: 3 sessions per week, focusing on compound movements\n🧘‍♀️ **Recovery**: Include stretching and rest days\n\nStart with 3 days per week and gradually increase intensity. Remember, consistency beats perfection!";
-                          } else if (lowerPrompt.includes('diet') || lowerPrompt.includes('nutrition') || lowerPrompt.includes('food')) {
-                            response = "🥗 Here's your personalized nutrition plan:\n\n🍳 **Breakfast**: Protein + complex carbs (eggs + oatmeal)\n🥙 **Lunch**: Lean protein + vegetables + healthy fats\n🍽️ **Dinner**: Light protein + vegetables\n🍎 **Snacks**: Nuts, fruits, or Greek yogurt\n\nAim for 3 meals + 2 snacks daily. Stay hydrated with 8+ glasses of water!";
-                          } else if (lowerPrompt.includes('sleep') || lowerPrompt.includes('rest') || lowerPrompt.includes('bedtime')) {
-                            response = "😴 Sleep optimization strategy:\n\n⏰ **Bedtime**: Aim for 7-9 hours, go to bed at the same time daily\n🌙 **Environment**: Dark, cool (65-68°F), quiet room\n📱 **Habits**: No screens 1 hour before bed, read or meditate instead\n☕ **Avoid**: Caffeine after 2 PM, heavy meals before bed\n\nQuality sleep is your foundation for wellness!";
-                          } else if (lowerPrompt.includes('stress') || lowerPrompt.includes('anxiety') || lowerPrompt.includes('mental')) {
-                            response = "🧘‍♀️ Mental wellness approach:\n\n💆‍♂️ **Daily Practice**: 10-15 minutes meditation or deep breathing\n🏃‍♀️ **Physical Activity**: Exercise releases endorphins\n📝 **Journaling**: Write down thoughts and gratitude\n🎯 **Mindfulness**: Stay present, one task at a time\n\nRemember, mental health is just as important as physical health!";
-                          } else {
-                            response = "🌟 Based on your comprehensive wellness goals, here's my advice:\n\n💪 **For your 6am gym session**: Great timing! Morning workouts boost energy all day. Have a light snack 30 mins before (banana + coffee).\n\n🍽️ **For your anniversary dinner**: Enjoy it guilt-free! Balance it with lighter meals earlier and consider sharing appetizers.\n\n⚖️ **Managing the long work day**: Stay hydrated, take 5-min breaks every hour, and do desk stretches.\n\nYou're planning well - consistency beats perfection! 💪";
-                          }
-                          
-                          // Add Smasher's response
-                          const assistantMessage = {
-                            id: Date.now() + 1,
-                            type: 'assistant' as const,
-                            content: response,
-                            timestamp: new Date()
-                          };
-                          
-                          setChatMessages(prev => [...prev, assistantMessage]);
                           setThinkingProgress({ gymbro: 0, dietking: 0, sleepyjoe: 0, compiling: 0 });
+                          console.log('🔄 Thinking progress reset to 0');
                         };
                         
-                        simulateThinking();
+                        // Call the AI API function
+                        callAIAPI();
                       }
                     }}
                     disabled={!wellnessPrompt.trim()}
@@ -3584,7 +3890,7 @@ function LandingPageContent() {
             )}>
               You're currently connected to <strong>{chainId === 1 ? 'Ethereum Mainnet' : `Network ID ${chainId}`}</strong>.
               <br />
-              WellSpace requires <strong>Base Sepolia Testnet (Chain ID: 8453)</strong>.
+              WellSpace requires <strong>Base Mainnet (Chain ID: 8453)</strong>.
             </p>
             <div className="space-y-3">
               <button
@@ -3592,23 +3898,23 @@ function LandingPageContent() {
                   try {
                     await (window.ethereum as any).request({
                       method: 'wallet_switchEthereumChain',
-                      params: [{ chainId: '0x14a34' }],
+                      params: [{ chainId: '0x2105' }],
                     });
                   } catch (error: any) {
                     if (error.code === 4902) {
-                      await addBaseSepoliaNetwork();
+                      await addBaseMainnetNetwork();
                     }
                   }
                 }}
                 className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
               >
-                🔄 Switch to Base Sepolia Now
+                🔄 Switch to Base Mainnet Now
               </button>
               <button
-                onClick={addBaseSepoliaNetwork}
+                onClick={addBaseMainnetNetwork}
                 className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg transition-colors ml-3"
               >
-                🔗 Add Base Sepolia to MetaMask
+                🔗 Add Base Mainnet to MetaMask
               </button>
             </div>
             <div className="mt-6 p-4 bg-yellow-100 border border-yellow-300 rounded-lg text-sm text-yellow-800">

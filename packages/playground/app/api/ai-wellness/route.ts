@@ -1,71 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import path from 'path';
+import fs from 'fs';
 
 export async function POST(request: NextRequest) {
   try {
     const { userMessage, userGoals, userProfile, walletAddress, chainId } = await request.json();
 
-    // Path to the Python script - need to go up from packages/playground to project root
-    const pythonScriptPath = path.join(process.cwd(), '..', '..', 'repmonkeys-acp-python-sdk', 'ai_wellness_api.py');
+    // Path to the Python script
+    const scriptPath = path.resolve(process.cwd(), '..', '..', 'repmonkeys-acp-python-sdk', 'test_acp_agent_coordination.py');
     
-    console.log('🔍 AI Wellness API - Script path:', pythonScriptPath);
+    console.log('🔍 AI Wellness API - Current working directory:', process.cwd());
+    console.log('🔍 AI Wellness API - Script path:', scriptPath);
+    console.log('🔍 AI Wellness API - Script exists:', fs.existsSync(scriptPath));
     console.log('🔍 AI Wellness API - Request data:', { userMessage, userGoals, userProfile, walletAddress, chainId });
     
-    // Check if Python script exists
-    const fs = require('fs');
-    if (!fs.existsSync(pythonScriptPath)) {
-      console.error('❌ Python script not found at:', pythonScriptPath);
-      throw new Error(`Python script not found at ${pythonScriptPath}`);
+    // Check if script exists
+    if (!fs.existsSync(scriptPath)) {
+      console.error('❌ Python script not found at:', scriptPath);
+      throw new Error(`Python script not found at ${scriptPath}`);
     }
     
-    // Prepare the data to send to Python with blockchain context
+    // Prepare the data to send to Python - format expected by the script
     const requestData = {
       user_message: userMessage,
       user_goals: userGoals || [],
       user_profile: userProfile || {},
-      wallet_address: walletAddress || null,
-      chain_id: chainId || 8453, // Default to Base mainnet
-      timestamp: new Date().toISOString(),
-      blockchain_context: {
-        network: 'base-mainnet',
-        contracts: {
-          wellness_tracker: process.env.NEXT_PUBLIC_WELLNESS_TRACKER_ADDRESS,
-          well_token: process.env.NEXT_PUBLIC_WELL_TOKEN_ADDRESS,
-          wellness_nft: process.env.NEXT_PUBLIC_WELLNESS_NFT_ADDRESS,
-          user_profile: process.env.NEXT_PUBLIC_USER_PROFILE_ADDRESS,
-          rewards: process.env.NEXT_PUBLIC_REWARDS_ADDRESS
-        }
-      }
-    };
-
-    console.log('🔍 AI Wellness API - Calling Python script with enhanced data:', requestData);
-
-    // Call the Python script
-    const result = await callPythonScript(pythonScriptPath, requestData);
-    
-    console.log('✅ AI Wellness API - Python script returned:', result);
-    
-    // Enhance response with blockchain integration suggestions
-    const enhancedResult = {
-      ...result,
-      blockchain_integration: {
-        suggested_actions: generateBlockchainActions(result, userMessage),
-        wellness_score_impact: calculateWellnessScoreImpact(result),
-        token_rewards: estimateTokenRewards(result)
-      },
+      wallet_address: walletAddress,
+      chain_id: chainId,
       timestamp: new Date().toISOString()
     };
+
+    console.log('🔍 AI Wellness API - Calling ACP agent coordination script with data:', requestData);
+
+    // Call the Python script
+    const result = await callPythonScript(scriptPath, requestData);
+    
+    console.log('✅ AI Wellness API - ACP agent coordination script returned:', result);
     
     return NextResponse.json({
       success: true,
-      response: enhancedResult,
+      response: result,
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
     console.error('❌ AI Wellness API Error:', error);
-    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error stack:', (error as Error).stack);
     
     // Try to get userMessage for fallback
     let userMessage = 'general wellness advice';
@@ -79,7 +60,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { 
         success: false, 
-        error: error.message || 'Failed to get AI wellness advice',
+        error: (error as Error).message || 'Failed to get AI wellness advice',
         fallback_response: generateFallbackResponse(userMessage)
       },
       { status: 500 }
@@ -89,7 +70,16 @@ export async function POST(request: NextRequest) {
 
 async function callPythonScript(scriptPath: string, data: any): Promise<any> {
   return new Promise((resolve, reject) => {
-    const pythonProcess = spawn('python3', [scriptPath, JSON.stringify(data)]);
+    // Call the Python script with the full path to the virtual environment's Python
+    const pythonPath = path.resolve(process.cwd(), '..', '..', 'repmonkeys-acp-python-sdk', 'venv', 'bin', 'python3.12');
+    const args = [scriptPath, '--user-input', JSON.stringify(data)];
+    
+    console.log('🔍 AI Wellness API - Executing Python script with venv:', pythonPath, args.join(' '));
+    
+    const pythonProcess = spawn(pythonPath, args, {
+      cwd: path.dirname(scriptPath), // Set working directory to script location
+      env: { ...process.env, PYTHONPATH: path.dirname(scriptPath) } // Set Python path
+    });
     
     let output = '';
     let errorOutput = '';
@@ -142,71 +132,6 @@ async function callPythonScript(scriptPath: string, data: any): Promise<any> {
       reject(new Error('Python script timeout'));
     }, 30000); // 30 second timeout
   });
-}
-
-function generateBlockchainActions(aiResponse: any, userMessage: string): any[] {
-  const actions = [];
-  const lowerMessage = userMessage.toLowerCase();
-  
-  // Suggest blockchain actions based on AI response and user message
-  if (lowerMessage.includes('workout') || lowerMessage.includes('exercise')) {
-    actions.push({
-      type: 'log_workout',
-      description: 'Log this workout to earn $WELL tokens',
-      contract_function: 'logWorkout',
-      estimated_rewards: '5-10 $WELL tokens'
-    });
-  }
-  
-  if (lowerMessage.includes('meal') || lowerMessage.includes('nutrition')) {
-    actions.push({
-      type: 'log_meal',
-      description: 'Track your nutrition for wellness score',
-      contract_function: 'logMeal',
-      estimated_rewards: '2-5 $WELL tokens'
-    });
-  }
-  
-  if (lowerMessage.includes('meditation') || lowerMessage.includes('sleep')) {
-    actions.push({
-      type: 'log_wellness_activity',
-      description: 'Record your wellness activity',
-      contract_function: 'logWellnessActivity',
-      estimated_rewards: '3-7 $WELL tokens'
-    });
-  }
-  
-  return actions;
-}
-
-function calculateWellnessScoreImpact(aiResponse: any): number {
-  // Calculate potential wellness score impact based on AI response
-  let impact = 0;
-  
-  if (aiResponse.type === 'workout') {
-    impact = 15; // Workouts have high impact
-  } else if (aiResponse.type === 'recipe') {
-    impact = 8; // Nutrition has medium-high impact
-  } else if (aiResponse.type === 'general') {
-    impact = 5; // General advice has medium impact
-  }
-  
-  return impact;
-}
-
-function estimateTokenRewards(aiResponse: any): string {
-  // Estimate $WELL token rewards based on AI response
-  let tokens = 0;
-  
-  if (aiResponse.type === 'workout') {
-    tokens = 8; // Workouts earn more tokens
-  } else if (aiResponse.type === 'recipe') {
-    tokens = 5; // Nutrition earns medium tokens
-  } else if (aiResponse.type === 'general') {
-    tokens = 3; // General advice earns fewer tokens
-  }
-  
-  return `${tokens} $WELL tokens`;
 }
 
 function generateFallbackResponse(userMessage: string): string {

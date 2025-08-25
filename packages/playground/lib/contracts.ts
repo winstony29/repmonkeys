@@ -449,9 +449,10 @@ if (typeof window !== 'undefined') {
 export const testContractConnectivity = async () => {
   console.log('🌐 Testing contract connectivity...');
   
-  // Test Base Sepolia RPC connection
+  // Test Base Mainnet RPC connection
   try {
-    const rpcUrl = 'https://sepolia.base.org';
+    // Use Alchemy RPC for better reliability (you can also use Infura or QuickNode)
+    const rpcUrl = process.env.NEXT_PUBLIC_ALCHEMY_BASE_URL || 'https://mainnet.base.org';
     console.log(`📡 Testing RPC connection to: ${rpcUrl}`);
     
     const response = await fetch(rpcUrl, {
@@ -465,16 +466,24 @@ export const testContractConnectivity = async () => {
       })
     });
     
+    if (!response.ok) {
+      if (response.status === 429) {
+        console.warn('⚠️ Rate limited by RPC provider. Consider using Alchemy or Infura for better reliability.');
+      }
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
     const data = await response.json();
     console.log('📡 RPC Response:', data);
     
-                if (data.result === '0x14a34') { // 84532 in hex (Base Sepolia)
-              console.log('✅ Base Sepolia RPC connection successful');
-            } else {
-              console.error('❌ Unexpected chain ID from RPC. Expected: 0x14a34, Got:', data.result);
-            }
+    if (data.result === '0x2105') { // 8453 in hex (Base Mainnet)
+      console.log('✅ Base Mainnet RPC connection successful');
+    } else {
+      console.error('❌ Unexpected chain ID from RPC. Expected: 0x2105, Got:', data.result);
+    }
   } catch (error) {
     console.error('❌ RPC connection failed:', error);
+    console.log('💡 Tip: Consider setting NEXT_PUBLIC_ALCHEMY_BASE_URL for better RPC reliability');
   }
   
   // Test each contract address
@@ -482,7 +491,7 @@ export const testContractConnectivity = async () => {
     if (address && typeof address === 'string' && address.startsWith('0x')) {
       console.log(`🔍 Testing contract ${name} at ${address}`);
       try {
-        const response = await fetch('https://sepolia.base.org', {
+        const response = await fetch(process.env.NEXT_PUBLIC_ALCHEMY_BASE_URL || 'https://mainnet.base.org', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -493,11 +502,20 @@ export const testContractConnectivity = async () => {
           })
         });
         
+        if (!response.ok) {
+          if (response.status === 429) {
+            console.warn(`⚠️ Rate limited while checking ${name} contract. Consider using Alchemy or Infura.`);
+            continue; // Skip this contract check if rate limited
+          }
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const data = await response.json();
         if (data.result && data.result !== '0x') {
           console.log(`✅ Contract ${name} exists at ${address}`);
         } else {
           console.error(`❌ No contract code found at ${address} for ${name}`);
+          console.log(`💡 This contract may not be deployed yet. Run the deployment script to deploy to mainnet.`);
         }
       } catch (error) {
         console.error(`❌ Failed to check contract ${name}:`, error);
@@ -505,6 +523,25 @@ export const testContractConnectivity = async () => {
     } else {
       console.error(`❌ Contract ${name} has undefined address`);
     }
+  }
+  
+  // Check if any contracts are missing and provide guidance
+  const deployedContracts = Object.entries(CONTRACT_ADDRESSES).filter(([name, address]) => 
+    address && typeof address === 'string' && address.startsWith('0x')
+  );
+  
+  if (deployedContracts.length === 0) {
+    console.log('');
+    console.log('🚨 No contracts found! Here\'s what you need to do:');
+    console.log('1. Deploy contracts to Base mainnet using: cd packages/contracts && ./deploy-mainnet.sh');
+    console.log('2. Update your .env file with the new contract addresses');
+    console.log('3. Consider using a reliable RPC provider like Alchemy or Infura');
+    console.log('   Set NEXT_PUBLIC_ALCHEMY_BASE_URL in your .env file');
+  } else {
+    console.log('');
+    console.log('📋 Contract deployment status:');
+    console.log(`   Found ${deployedContracts.length} contract addresses`);
+    console.log('   Make sure all contracts are deployed to Base mainnet');
   }
 };
 
@@ -533,7 +570,7 @@ export const parseTokenAmount = (amount: string, decimals: number = 18): bigint 
 
 // Wellness-specific contract interactions
 export const WELLNESS_CONTRACT_CONFIG = {
-  chainId: 84532, // Base Sepolia testnet (where contracts are deployed)
+  chainId: 8453, // Base Mainnet (where contracts are deployed)
   contracts: {
     wellnessNFT: {
       address: CONTRACT_ADDRESSES.WELLNESS_NFT,

@@ -15,6 +15,21 @@ interface AIResponse {
     wellness_score_impact: number;
     token_rewards: string;
   };
+  primary_focus?: string;
+  primary_agent?: string;
+  agent_contributions?: {
+    [key: string]: {
+      specialty: string;
+      contribution: string;
+      recommendations: string[];
+    };
+  };
+  integrated_recommendations?: {
+    weekly_schedule: {
+      [key: string]: string;
+    };
+  };
+  implementation_priority?: string[];
 }
 
 interface AIWellnessChatProps {
@@ -114,9 +129,90 @@ export const AIWellnessChat: React.FC<AIWellnessChatProps> = ({ className = '' }
             
             {/* AI Response */}
             <div className="flex justify-start">
-              <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-4 py-3 max-w-2xl">
+              <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-4 py-3 max-w-4xl">
                 <div className="text-sm text-gray-900 dark:text-white">
-                  {chat.ai.advice || chat.ai.message}
+                  {/* Display the main message */}
+                  <div className="mb-3 font-medium">
+                    {chat.ai.message}
+                  </div>
+                  
+                  {/* Display the full wellness plan */}
+                  {chat.ai.primary_focus && (
+                    <div className="space-y-4">
+                      {/* Primary Focus */}
+                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                          🎯 Primary Focus: {chat.ai.primary_focus}
+                        </h4>
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          Led by {chat.ai.primary_agent}
+                        </p>
+                      </div>
+                      
+                      {/* Agent Contributions */}
+                      {chat.ai.agent_contributions && (
+                        <div className="space-y-3">
+                          <h4 className="font-semibold text-gray-800 dark:text-gray-200">
+                            🤝 Specialist Agent Recommendations
+                          </h4>
+                          
+                          {Object.entries(chat.ai.agent_contributions).map(([agentName, agentData]: [string, any]) => (
+                            <div key={agentName} className="p-3 bg-white dark:bg-gray-700 rounded-lg border">
+                              <h5 className="font-medium text-gray-900 dark:text-white mb-2">
+                                {agentName === 'GymBro' ? '💪 GymBro' : 
+                                 agentName === 'DietKing' ? '🥗 DietKing' : 
+                                 agentName === 'SleepyJoe' ? '😴 SleepyJoe' : 
+                                 '🌟 WellnessBuddy'} - {agentData.specialty}
+                              </h5>
+                              <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                                {agentData.contribution}
+                              </p>
+                              <div className="space-y-1">
+                                {agentData.recommendations && agentData.recommendations.map((rec: string, index: number) => (
+                                  <div key={index} className="text-sm text-gray-700 dark:text-gray-300">
+                                    • {rec}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Weekly Schedule */}
+                      {chat.ai.integrated_recommendations?.weekly_schedule && (
+                        <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                          <h4 className="font-semibold text-green-800 dark:text-green-200 mb-2">
+                            📅 Weekly Schedule
+                          </h4>
+                          <div className="grid grid-cols-1 gap-2 text-sm">
+                            {Object.entries(chat.ai.integrated_recommendations.weekly_schedule).map(([day, activity]: [string, string]) => (
+                              <div key={day} className="flex justify-between">
+                                <span className="font-medium capitalize text-green-700 dark:text-green-300">{day}:</span>
+                                <span className="text-green-600 dark:text-green-400">{activity}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Implementation Priority */}
+                      {chat.ai.implementation_priority && (
+                        <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                          <h4 className="font-semibold text-purple-800 dark:text-purple-200 mb-2">
+                            🚀 Implementation Priority
+                          </h4>
+                          <div className="space-y-1">
+                            {chat.ai.implementation_priority.map((priority: string, index: number) => (
+                              <div key={index} className="text-sm text-purple-700 dark:text-purple-300">
+                                {priority}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 
                 {/* Blockchain Integration */}
