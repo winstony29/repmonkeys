@@ -404,12 +404,12 @@ function LandingPageContent() {
     // Save meal to smart contract if available
     if (address && hasWellnessData) {
       // Force network switch to Base Sepolia if not already connected
-      if (chainId !== 84532) {
+      if (chainId !== 8453) {
         console.log('🔄 Switching to Base Sepolia testnet for meal logging...');
         try {
           await (window.ethereum as any).request({
             method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0x14a34' }], // 84532 in hex
+            params: [{ chainId: '0x14a34' }], // 8453 in hex
           });
           console.log('✅ Switched to Base Sepolia testnet');
           
@@ -489,7 +489,7 @@ function LandingPageContent() {
         });
         console.log('🔄 Smart contract failed - no localStorage fallback');
       }
-    } else if (chainId !== 84532) {
+    } else if (chainId !== 8453) {
       console.log('⚠️ Wrong network detected - cannot log meal to blockchain');
     }
     
@@ -903,88 +903,29 @@ function LandingPageContent() {
     };
   }, [address, chainId, contractReadError, profileError, wellnessError, isOnboarded, hasWellnessData, profileData, wellnessData, contractActivities, contractMeals, totalScore, streakCount, wellBalance]);
 
-  // Force network switch to Base Sepolia on component mount
+  // No network switching required - Base Mainnet is already correct
   useEffect(() => {
-    if (address && chainId !== 84532) {
-      console.log('🔄 Component mounted - checking network connection...');
-      console.log('⚠️ Wrong network detected:', chainId);
-      
-      // Auto-switch to Base Sepolia
-      const forceNetworkSwitch = async () => {
-        try {
-          console.log('🔄 Auto-switching to Base Sepolia testnet...');
-          await (window.ethereum as any).request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0x14a34' }], // 84532 in hex
-          });
-          console.log('✅ Auto-switched to Base Sepolia testnet');
-        } catch (error: any) {
-          console.error('Error auto-switching to Base Sepolia:', error);
-          if (error.code === 4902) {
-            // Chain not added, add it first
-            console.log('🔗 Adding Base Sepolia network first...');
-            await addBaseSepoliaNetwork();
-            // Try switching again
-            try {
-              await (window.ethereum as any).request({
-                method: 'wallet_switchEthereumChain',
-                params: [{ chainId: '0x14a34' }],
-              });
-              console.log('✅ Auto-switched to Base Sepolia testnet after adding network');
-            } catch (switchError) {
-              console.log('⚠️ Auto-switch failed after adding network');
-            }
-          }
-        }
-      };
-      
-      // Delay the auto-switch slightly to avoid conflicts
-      setTimeout(forceNetworkSwitch, 1000);
+    if (address && chainId === 8453) {
+      console.log('✅ Connected to Base Mainnet - ready to go!');
     }
   }, [address, chainId]);
 
-  // Aggressive network switching - run immediately when wallet connects
+  // No aggressive network switching needed - Base Mainnet is correct
   useEffect(() => {
     if (address) {
       console.log('🔍 Wallet connected, checking network...');
       
-      const checkAndSwitchNetwork = async () => {
+      const checkNetwork = async () => {
         // Get current network from MetaMask directly
         try {
           const currentChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
           console.log('🔍 Current MetaMask chain ID:', currentChainId);
           
-          if (currentChainId !== '0x14a34') { // Not Base Sepolia
-            console.log('🚨 WRONG NETWORK DETECTED! Forcing switch to Base Sepolia...');
-            setIsNetworkSwitching(true);
-            setNetworkSwitchAttempts(prev => prev + 1);
-            
-            // Force switch immediately
-            try {
-              await (window.ethereum as any).request({
-                method: 'wallet_switchEthereumChain',
-                params: [{ chainId: '0x14a34' }],
-              });
-              console.log('✅ Forced network switch to Base Sepolia');
-              setIsNetworkSwitching(false);
-            } catch (error: any) {
-              console.error('❌ Network switch failed:', error);
-              if (error.code === 4902) {
-                console.log('🔗 Adding Base Sepolia network...');
-                await addBaseSepoliaNetwork();
-                // Try switching again
-                await (window.ethereum as any).request({
-                  method: 'wallet_switchEthereumChain',
-                  params: [{ chainId: '0x14a34' }],
-                });
-                console.log('✅ Network switch successful after adding chain');
-                setIsNetworkSwitching(false);
-              } else {
-                setIsNetworkSwitching(false);
-              }
-            }
+          if (currentChainId === '0x2105') { // Base Mainnet
+            console.log('✅ Already on Base Mainnet');
+            setIsNetworkSwitching(false);
           } else {
-            console.log('✅ Already on Base Sepolia testnet');
+            console.log('⚠️ Not on Base Mainnet, but no auto-switching needed');
             setIsNetworkSwitching(false);
           }
         } catch (error) {
@@ -993,14 +934,8 @@ function LandingPageContent() {
         }
       };
       
-      // Run immediately and also after a short delay
-      checkAndSwitchNetwork();
-      setTimeout(checkAndSwitchNetwork, 500);
-      setTimeout(() => {
-        if (networkSwitchAttempts < 3) {
-          checkAndSwitchNetwork();
-        }
-      }, 2000);
+      // Run the check
+      checkNetwork();
     }
   }, [address, networkSwitchAttempts]);
   
@@ -1267,7 +1202,7 @@ function LandingPageContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           address: CONTRACT_ADDRESSES.USER_PROFILE,
-          chainId: 84532 
+          chainId: 8453 
         })
       });
       
@@ -1301,12 +1236,12 @@ function LandingPageContent() {
       // Initialize wellness data on WellnessTracker contract if not already done
       if (!hasWellnessData) {
         // Force network switch to Base Sepolia if not already connected
-        if (chainId !== 84532) {
+        if (chainId !== 8453) {
           console.log('🔄 Switching to Base Sepolia testnet for profile initialization...');
           try {
             await (window.ethereum as any).request({
               method: 'wallet_switchEthereumChain',
-              params: [{ chainId: '0x14a34' }], // 84532 in hex
+              params: [{ chainId: '0x14a34' }], // 8453 in hex
             });
             console.log('✅ Switched to Base Sepolia testnet');
             
@@ -1394,12 +1329,12 @@ function LandingPageContent() {
     if (!address) return false;
     
     // Force network switch to Base Sepolia if not already connected
-    if (chainId !== 84532) {
+    if (chainId !== 8453) {
       console.log('🔄 Switching to Base Sepolia testnet...');
       try {
         await (window.ethereum as any).request({
           method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0x14a34' }], // 84532 in hex
+          params: [{ chainId: '0x14a34' }], // 8453 in hex
         });
         console.log('✅ Switched to Base Sepolia testnet');
         
@@ -1452,12 +1387,12 @@ function LandingPageContent() {
     if (!address || !hasWellnessData) return false;
     
     // Force network switch to Base Sepolia if not already connected
-    if (chainId !== 84532) {
+    if (chainId !== 8453) {
       console.log('🔄 Switching to Base Sepolia testnet for weekly goals reset...');
       try {
         await (window.ethereum as any).request({
           method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0x14a34' }], // 84532 in hex
+          params: [{ chainId: '0x14a34' }], // 8453 in hex
         });
         console.log('✅ Switched to Base Sepolia testnet');
         
@@ -1528,7 +1463,7 @@ function LandingPageContent() {
       await (window.ethereum as any).request({
         method: 'wallet_addEthereumChain',
         params: [{
-          chainId: '0x14a34', // 84532 in hex
+          chainId: '0x14a34', // 8453 in hex
           chainName: 'Base Sepolia',
           nativeCurrency: {
             name: 'ETH',
@@ -1551,7 +1486,7 @@ function LandingPageContent() {
   };
 
   // Network switching overlay - prevent any OnchainKit components from rendering until network is correct
-  if (address && chainId !== 84532 && isNetworkSwitching) {
+  if (address && chainId !== 8453 && isNetworkSwitching) {
     return (
       <div className={cn(
         "min-h-screen w-full overflow-hidden transition-colors duration-300",
@@ -1574,7 +1509,7 @@ function LandingPageContent() {
                 <strong>Current Network:</strong> {chainId === 1 ? 'Ethereum Mainnet' : `Network ID ${chainId}`}
               </p>
               <p className="text-sm text-red-800 mt-1">
-                <strong>Required:</strong> Base Sepolia Testnet (Chain ID: 84532)
+                <strong>Required:</strong> Base Sepolia Testnet (Chain ID: 8453)
               </p>
             </div>
           </div>
@@ -2243,7 +2178,7 @@ function LandingPageContent() {
           )}
 
           {/* Network Switch Banner */}
-          {address && chainId !== 84532 && (
+          {address && chainId !== 8453 && (
             <div className={cn(
               "mb-6 p-4 rounded-xl border transition-colors",
               isDarkMode 
@@ -2258,7 +2193,7 @@ function LandingPageContent() {
                   <p className="font-bold text-lg">🚨 CRITICAL: Wrong Network Detected</p>
                   <p className="text-sm opacity-90">
                     You're currently connected to <strong>{chainId === 1 ? 'Ethereum Mainnet' : `Network ID ${chainId}`}</strong>. 
-                    WellSpace requires <strong>Base Sepolia Testnet (Chain ID: 84532)</strong>.
+                    WellSpace requires <strong>Base Sepolia Testnet (Chain ID: 8453)</strong>.
                   </p>
                   <p className="text-sm opacity-90 mt-2">
                     <strong>⚠️ WARNING:</strong> Transactions on the wrong network will fail and may charge you gas fees on the wrong blockchain!
@@ -2269,7 +2204,7 @@ function LandingPageContent() {
                       <li>Open MetaMask</li>
                       <li>Click the network dropdown (top of MetaMask)</li>
                       <li>Select "Base Sepolia" or add it if not listed</li>
-                      <li>If adding manually: Network Name: "Base Sepolia", RPC URL: "https://sepolia.base.org", Chain ID: "84532"</li>
+                      <li>If adding manually: Network Name: "Base Sepolia", RPC URL: "https://sepolia.base.org", Chain ID: "8453"</li>
                     </ol>
                   </div>
                   <div className="mt-3 flex space-x-3">
@@ -2317,7 +2252,7 @@ function LandingPageContent() {
             <div className="mb-6 flex items-center justify-between">
               <div className={cn(
                 "flex items-center space-x-2 px-3 py-2 rounded-lg border transition-colors",
-                chainId === 84532
+                chainId === 8453
                   ? isDarkMode 
                     ? "bg-green-900/20 border-green-700/50 text-green-200" 
                     : "bg-green-50 border-green-200 text-green-800"
@@ -2327,18 +2262,18 @@ function LandingPageContent() {
               )}>
                 <div className={cn(
                   "w-2 h-2 rounded-full",
-                  chainId === 84532 ? "bg-green-500" : "bg-red-500"
+                  chainId === 8453 ? "bg-green-500" : "bg-red-500"
                 )} />
                 <span className="text-sm font-medium">
-                  {chainId === 84532 ? '✅ Base Sepolia Testnet' : '❌ Wrong Network'}
+                  {chainId === 8453 ? '✅ Base Sepolia Testnet' : '❌ Wrong Network'}
                 </span>
-                {chainId !== 84532 && (
+                {chainId !== 8453 && (
                   <span className="text-xs opacity-75">
                     (Current: {chainId === 1 ? 'Ethereum Mainnet' : `ID ${chainId}`})
                   </span>
                 )}
               </div>
-              {chainId !== 84532 && (
+              {chainId !== 8453 && (
                 <button
                   onClick={async () => {
                     try {
@@ -3625,7 +3560,7 @@ function LandingPageContent() {
 
   // Landing Page View
   // Check network before rendering any OnchainKit components
-  if (address && chainId !== 84532) {
+  if (address && chainId !== 8453) {
     return (
       <div className={cn(
         "min-h-screen w-full overflow-hidden transition-colors duration-300",
@@ -3649,7 +3584,7 @@ function LandingPageContent() {
             )}>
               You're currently connected to <strong>{chainId === 1 ? 'Ethereum Mainnet' : `Network ID ${chainId}`}</strong>.
               <br />
-              WellSpace requires <strong>Base Sepolia Testnet (Chain ID: 84532)</strong>.
+              WellSpace requires <strong>Base Sepolia Testnet (Chain ID: 8453)</strong>.
             </p>
             <div className="space-y-3">
               <button
