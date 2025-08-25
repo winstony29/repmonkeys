@@ -77,3 +77,5 @@ def test_wellness_buddy():
 
 if __name__ == "__main__":
     test_wellness_buddy()
+
+

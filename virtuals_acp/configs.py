@@ -45,5 +45,5 @@ BASE_MAINNET_CONFIG = ACPContractConfig(
 # Define the default configuration for the SDK
 # For a production-ready SDK, this would typically be BASE_MAINNET_CONFIG.
 # For initial development/testing, BASE_SEPOLIA_CONFIG might be more appropriate.
-DEFAULT_CONFIG = BASE_MAINNET_CONFIG 
-# Or: DEFAULT_CONFIG = BASE_SEPOLIA_CONFIG
+# DEFAULT_CONFIG = BASE_MAINNET_CONFIG 
+DEFAULT_CONFIG = BASE_SEPOLIA_CONFIG

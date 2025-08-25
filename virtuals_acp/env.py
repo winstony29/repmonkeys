@@ -13,8 +13,17 @@ class EnvSettings(BaseSettings):
     BUYER_ENTITY_ID: Optional[int] = None
     SELLER_ENTITY_ID: Optional[int] = None
     EVALUATOR_ENTITY_ID: Optional[int] = None
+    
+    # New agent wallet addresses
+    DIETKING_WALLET_ADDRESS: Optional[str] = None
+    GYMBRO_WALLET_ADDRESS: Optional[str] = None
+    SLEEPYJOE_WALLET_ADDRESS: Optional[str] = None
+    DIETKING_ENTITY_ID: Optional[int] = None
+    GYMBRO_ENTITY_ID: Optional[int] = None
+    SLEEPYJOE_ENTITY_ID: Optional[int] = None
 
-    @field_validator("BUYER_AGENT_WALLET_ADDRESS", "SELLER_AGENT_WALLET_ADDRESS", "EVALUATOR_AGENT_WALLET_ADDRESS")
+    @field_validator("BUYER_AGENT_WALLET_ADDRESS", "SELLER_AGENT_WALLET_ADDRESS", "EVALUATOR_AGENT_WALLET_ADDRESS", 
+                    "DIETKING_WALLET_ADDRESS", "GYMBRO_WALLET_ADDRESS", "SLEEPYJOE_WALLET_ADDRESS")
     def validate_wallet_address(cls, v: str) -> str:
         if v is None:
             return None
