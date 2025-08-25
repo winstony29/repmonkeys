@@ -2,7 +2,7 @@
 
 import { IdentityCard } from '@coinbase/onchainkit/identity';
 import { ConnectWallet } from '@coinbase/onchainkit/wallet';
-import { baseSepolia } from 'viem/chains';
+import { base } from 'viem/chains';
 import { useAccount } from 'wagmi';
 
 export function IdentityCardDemo() {
@@ -17,7 +17,7 @@ export function IdentityCardDemo() {
               Base Sepolia Testnet
             </h2>
 
-            <IdentityCard address={address} chain={baseSepolia} />
+            <IdentityCard address={address} chain={base} />
           </div>
         </div>
       ) : (

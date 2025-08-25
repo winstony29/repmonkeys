@@ -1,0 +1,23 @@
+# Build artifacts
+dist/
+
+# Virtual environments
+venv/
+.venv/
+.venv_*/
+
+# pyenv local version
+.python-version
+
+# Python bytecode cache
+__pycache__/
+*.py[cod]
+
+# Environment variables
+.env
+
+# macOS system files
+.DS_Store
+
+# Intellij IDEA files
+.idea/

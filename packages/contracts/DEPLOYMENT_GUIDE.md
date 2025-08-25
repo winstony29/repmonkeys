@@ -2,7 +2,7 @@
 
 ## 📋 Prerequisites
 
-1. **Base Sepolia Testnet ETH**: You need some testnet ETH for gas fees
+1. **Base Mainnet ETH**: You need some mainnet ETH for gas fees
 2. **Private Key**: A wallet private key (without 0x prefix)
 3. **Foundry Installed**: Make sure you have Foundry installed
 
@@ -12,25 +12,24 @@ Create a `.env` file in the `packages/contracts` directory:
 
 ```bash
 # Private key for contract deployment (without 0x prefix)
-# IMPORTANT: Use a test wallet with some Base Sepolia ETH for gas fees
+# IMPORTANT: Use a wallet with some Base Mainnet ETH for gas fees
 PRIVATE_KEY=your_private_key_here
 
 # RPC URLs
-BASE_SEPOLIA_RPC=https://sepolia.base.org
+BASE_MAINNET_RPC=https://mainnet.base.org
 
-# Etherscan API key for contract verification (optional)
-ETHERSCAN_API_KEY_BASE_SEPOLIA=your_api_key_here
+# Contract verification (optional - using Sourcify or manual verification)
 
 # Deployment Configuration
-CHAIN_ID=84532
-CHAIN_NAME=base-sepolia
+CHAIN_ID=8453
+CHAIN_NAME=base-mainnet
 ```
 
-## 💰 Step 2: Get Base Sepolia Testnet ETH
+## 💰 Step 2: Get Base Mainnet ETH
 
-1. **Visit Base Sepolia Faucet**: https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet
-2. **Connect your wallet** (the one you'll use for deployment)
-3. **Request testnet ETH** (usually 0.01 ETH is sufficient)
+1. **Bridge ETH to Base**: Use the official Base bridge at https://bridge.base.org
+2. **Or buy directly**: Purchase ETH on Coinbase and withdraw to Base
+3. **Ensure sufficient balance**: You'll need ETH for gas fees (recommend at least 0.1 ETH)
 
 ## 🚀 Step 3: Deploy the Contract
 
@@ -39,13 +38,11 @@ Navigate to the contracts directory and run the deployment:
 ```bash
 cd packages/contracts
 
-# Deploy to Base Sepolia testnet
-forge script script/DeployWellnessTracker.s.sol \
-  --rpc-url https://sepolia.base.org \
+# Deploy to Base mainnet
+forge script script/DeployMainnet.s.sol \
+  --rpc-url https://mainnet.base.org \
   --broadcast \
-  --verify \
-  --etherscan-api-key $ETHERSCAN_API_KEY_BASE_SEPOLIA \
-  --chain-id 84532
+  --chain-id 8453
 ```
 
 ## 📝 Step 4: Update Frontend Environment
@@ -60,7 +57,7 @@ NEXT_PUBLIC_WELLNESS_TRACKER_ADDRESS=0x... # Your deployed contract address
 ## ✅ Step 5: Verify Deployment
 
 1. **Check the deployment logs** for the contract address
-2. **Verify on Base Sepolia Explorer**: https://sepolia.basescan.org
+2. **Verify on Base Mainnet Explorer**: https://basescan.org
 3. **Test the contract functions** using the explorer
 
 ## 🔍 Step 6: Test Contract Functions
@@ -79,8 +76,8 @@ forge test --match-test testWellnessTracker
 
 ### Common Issues:
 
-1. **Insufficient Gas**: Make sure you have enough Base Sepolia ETH
-2. **Wrong Network**: Ensure you're on Base Sepolia (Chain ID: 84532)
+1. **Insufficient Gas**: Make sure you have enough Base Mainnet ETH
+2. **Wrong Network**: Ensure you're on Base Mainnet (Chain ID: 8453)
 3. **Private Key Format**: Remove the 0x prefix from your private key
 4. **RPC Issues**: Try alternative RPC endpoints if needed
 
@@ -88,9 +85,9 @@ forge test --match-test testWellnessTracker
 
 ```bash
 # If the main RPC fails, try these:
-https://base-sepolia.public.blastapi.io
-https://base-sepolia.drpc.org
-https://sepolia.base.org
+https://base.public.blastapi.io
+https://base.drpc.org
+https://mainnet.base.org
 ```
 
 ## 📊 Expected Output
@@ -111,7 +108,7 @@ Deployer: 0xabcd...efgh
 
 ## 🎯 Success Criteria
 
-- ✅ Contract deployed to Base Sepolia
+- ✅ Contract deployed to Base Mainnet
 - ✅ Contract address obtained
 - ✅ Frontend environment updated
 - ✅ Wellness data initialization working

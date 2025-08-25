@@ -36,15 +36,15 @@ import { useAccount, useReadContract, useBalance, useWriteContract, useChainId, 
 import { wellnessTrackerAbi, wellnessNFTAbi, CONTRACT_ADDRESSES, testContractConnectivity } from '@/lib/contracts';
 import { http, createConfig, createStorage } from 'wagmi';
 import { WagmiProvider } from 'wagmi';
-import { baseSepolia } from 'wagmi/chains';
+import { base } from 'wagmi/chains';
 import { coinbaseWallet } from 'wagmi/connectors';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Wagmi configuration for standalone Farcaster page
 const wagmiConfig = createConfig({
-  chains: [baseSepolia],
-  transports: {
-    [baseSepolia.id]: http(),
+        chains: [base],
+      transports: {
+        [base.id]: http(),
   },
   ssr: true,
   connectors: [

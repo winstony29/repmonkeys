@@ -51,7 +51,7 @@ type State = {
 
 export const defaultState: State = {
   activeComponent: OnchainKitComponent.LandingPage,
-  chainId: baseSepolia.id,
+          chainId: base.id,
   componentTheme: 'default',
   setComponentTheme: () => {},
   componentMode: 'auto',
@@ -67,9 +67,9 @@ export const AppContext = createContext(defaultState);
 
 // Wagmi configuration
 const wagmiConfig = createConfig({
-  chains: [baseSepolia],
-  transports: {
-    [baseSepolia.id]: http(),
+        chains: [base],
+      transports: {
+        [base.id]: http(),
   },
   ssr: true,
   connectors: [
@@ -249,7 +249,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         >
           <OnchainKitProvider
             apiKey={ENVIRONMENT_VARIABLES[ENVIRONMENT.API_KEY] || ''}
-            chain={baseSepolia}
+            chain={base}
             config={{
               appearance: {
                 name: 'WellSpace',

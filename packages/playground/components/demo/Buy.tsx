@@ -4,7 +4,7 @@ import type { LifecycleStatus } from '@coinbase/onchainkit/swap';
 import type { SwapError } from '@coinbase/onchainkit/swap';
 import { useCallback, useContext } from 'react';
 import type { TransactionReceipt } from 'viem';
-import { baseSepolia } from 'viem/chains';
+import { base } from 'viem/chains';
 import { degenToken } from '../../lib/constants';
 import { AppContext } from '../AppProvider';
 
@@ -26,12 +26,12 @@ function BuyComponent() {
   }, []);
   return (
     <div className="relative mb-[50%] flex h-full w-full flex-col items-center">
-      {chainId !== baseSepolia.id ? (
+      {chainId !== base.id ? (
         <div className="absolute top-0 left-0 z-10 flex h-full w-full flex-col justify-center rounded-xl bg-[#000000] bg-opacity-50 text-center">
           <div className="mx-auto w-2/3 rounded-md bg-muted p-6 text-sm">
-            Buy Demo is only available on Base Sepolia.
+            Buy Demo is only available on Base Mainnet.
             <br />
-            You're connected to a different network. Switch to Base Sepolia to continue
+            You're connected to a different network. Switch to Base Mainnet to continue
             using the app.
           </div>
         </div>
@@ -39,7 +39,7 @@ function BuyComponent() {
         <></>
       )}
       {ENVIRONMENT_VARIABLES[ENVIRONMENT.ENVIRONMENT] === 'production' &&
-      chainId === baseSepolia.id ? (
+      chainId === base.id ? (
         <div className="mb-5 italic">
           Note: Buy is disabled on production. To test, run the app locally.
         </div>
