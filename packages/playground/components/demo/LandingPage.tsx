@@ -322,7 +322,7 @@ function LandingPageContent() {
            }),
          });
          
-                  if (response.ok) {
+         if (response.ok) {
            const data = await response.json();
            console.log('🤖 AI Wellness API Response:', data);
            
@@ -3141,7 +3141,7 @@ function LandingPageContent() {
                         };
                         
                         simulateSdkDemo();
-                                            } else {
+                      } else {
                         // Use real AI API instead of hardcoded responses
                         const callAIAPI = async () => {
                           console.log('🚀 Starting AI API call...');
@@ -3198,18 +3198,100 @@ function LandingPageContent() {
                                 // Parse the Python AI response properly
                                 if (data.response.message) {
                                   console.log('📝 Found message field');
-                                  aiContent = data.response.message;
+                                  console.log('📝 Message content length:', data.response.message.length);
+                                  console.log('📝 Message content preview:', data.response.message.substring(0, 200) + '...');
+                                  
+                                  // Build comprehensive response from multiple fields
+                                  let comprehensiveContent = data.response.message + '\n\n';
+                                  
+                                  // Add primary focus and agent
+                                  if (data.response.primary_focus && data.response.primary_agent) {
+                                    comprehensiveContent += `🎯 **Primary Focus**: ${data.response.primary_focus}\n`;
+                                    comprehensiveContent += `🤖 **Lead Agent**: ${data.response.primary_agent}\n\n`;
+                                  }
+                                  
+                                  // Add agent contributions
+                                  if (data.response.agent_contributions) {
+                                    comprehensiveContent += '## 🤝 **Agent Contributions**\n\n';
+                                    Object.entries(data.response.agent_contributions).forEach(([agent, details]: [string, any]) => {
+                                      comprehensiveContent += `### ${details.emoji || '🌟'} **${agent}**\n`;
+                                      comprehensiveContent += `**Specialty**: ${details.specialty}\n`;
+                                      comprehensiveContent += `**Contribution**: ${details.contribution}\n`;
+                                      
+                                      if (details.focus_areas && details.focus_areas.length > 0) {
+                                        comprehensiveContent += `**Focus Areas**: ${details.focus_areas.join(', ')}\n`;
+                                      }
+                                      
+                                      if (details.recommendations && details.recommendations.length > 0) {
+                                        comprehensiveContent += `**Recommendations**:\n`;
+                                        details.recommendations.forEach((rec: string) => {
+                                          comprehensiveContent += `  • ${rec}\n`;
+                                        });
+                                      }
+                                      comprehensiveContent += '\n';
+                                    });
+                                  }
+                                  
+                                  // Add integrated recommendations
+                                  if (data.response.integrated_recommendations) {
+                                    comprehensiveContent += '## 📋 **Integrated Recommendations**\n\n';
+                                    
+                                    if (data.response.integrated_recommendations.immediate_actions) {
+                                      comprehensiveContent += '### 🚀 **Immediate Actions**\n';
+                                      data.response.integrated_recommendations.immediate_actions.forEach((action: string) => {
+                                        comprehensiveContent += `  • ${action}\n`;
+                                      });
+                                      comprehensiveContent += '\n';
+                                    }
+                                    
+                                    if (data.response.integrated_recommendations.weekly_schedule) {
+                                      comprehensiveContent += '### 📅 **Weekly Schedule**\n';
+                                      Object.entries(data.response.integrated_recommendations.weekly_schedule).forEach(([day, activity]: [string, unknown]) => {
+                                        comprehensiveContent += `  • **${day.charAt(0).toUpperCase() + day.slice(1)}**: ${activity as string}\n`;
+                                      });
+                                      comprehensiveContent += '\n';
+                                    }
+                                    
+                                    if (data.response.integrated_recommendations.success_metrics) {
+                                      comprehensiveContent += '### 📊 **Success Metrics**\n';
+                                      Object.entries(data.response.integrated_recommendations.success_metrics).forEach(([metric, description]: [string, unknown]) => {
+                                        comprehensiveContent += `  • **${metric.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}**: ${description as string}\n`;
+                                      });
+                                      comprehensiveContent += '\n';
+                                    }
+                                  }
+                                  
+                                  // Add implementation priority
+                                  if (data.response.implementation_priority) {
+                                    comprehensiveContent += '## 🎯 **Implementation Priority**\n\n';
+                                    data.response.implementation_priority.forEach((priority: string) => {
+                                      comprehensiveContent += `  • ${priority}\n`;
+                                    });
+                                    comprehensiveContent += '\n';
+                                  }
+                                  
+                                  // Add coordination notes
+                                  if (data.response.coordination_notes) {
+                                    comprehensiveContent += '## 💡 **Coordination Notes**\n\n';
+                                    comprehensiveContent += data.response.coordination_notes + '\n';
+                                  }
+                                  
+                                  aiContent = comprehensiveContent;
                                 } else if (data.response.recommendations?.primary?.content) {
                                   console.log('📝 Found recommendations.primary.content field');
+                                  console.log('📝 Content length:', data.response.recommendations.primary.content.length);
                                   aiContent = data.response.recommendations.primary.content;
                                 } else if (data.response.advice) {
                                   console.log('📝 Found advice field');
+                                  console.log('📝 Advice length:', data.response.advice.length);
                                   aiContent = data.response.advice;
                                 } else if (data.response.raw_response) {
                                   console.log('📝 Found raw_response field');
+                                  console.log('📝 Raw response length:', data.response.raw_response.length);
                                   aiContent = data.response.raw_response;
-                                } else {
+                          } else {
                                   console.log('⚠️ No recognized response fields, showing structure');
+                                  console.log('🔍 Available fields:', Object.keys(data.response));
                                   aiContent = `AI Response Structure:\n${JSON.stringify(data.response, null, 2)}`;
                                 }
                                 
@@ -3220,17 +3302,17 @@ function LandingPageContent() {
                                 console.log('🔍 Response field:', data.response);
                                 aiContent = `❌ AI System Error: ${data.error || 'Unknown error occurred'}\n\nPlease try again or contact support.`;
                                 console.error('❌ AI response structure invalid:', data);
-                              }
-                              
-                              // Add Smasher's response
+                          }
+                          
+                          // Add Smasher's response
                               console.log('📝 Creating Smasher response with content:', aiContent);
                               const smasherResponse = {
-                                id: Date.now() + 1,
-                                type: 'assistant' as const,
+                            id: Date.now() + 1,
+                            type: 'assistant' as const,
                                 content: aiContent,
-                                timestamp: new Date()
-                              };
-                              
+                            timestamp: new Date()
+                          };
+                          
                               console.log('💬 Adding response to chat messages...');
                               setChatMessages(prev => [...prev, smasherResponse]);
                               console.log('✅ Response added to chat successfully');

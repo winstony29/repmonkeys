@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
 
     console.log('🔍 AI Wellness API - Calling ACP agent coordination script with data:', requestData);
 
-    // Call the Python script
-    const result = await callPythonScript(scriptPath, requestData);
+    // Call the Python script and collect all progress updates
+    const result = await callPythonScriptWithProgress(scriptPath, requestData);
     
     console.log('✅ AI Wellness API - ACP agent coordination script returned:', result);
     
@@ -43,32 +43,19 @@ export async function POST(request: NextRequest) {
       response: result,
       timestamp: new Date().toISOString()
     });
-
+    
   } catch (error) {
     console.error('❌ AI Wellness API Error:', error);
-    console.error('❌ Error stack:', (error as Error).stack);
     
-    // Try to get userMessage for fallback
-    let userMessage = 'general wellness advice';
-    try {
-      const body = await request.json();
-      userMessage = body.userMessage || 'general wellness advice';
-    } catch (parseError) {
-      console.error('Failed to parse request body for fallback:', parseError);
-    }
-    
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: (error as Error).message || 'Failed to get AI wellness advice',
-        fallback_response: generateFallbackResponse(userMessage)
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+      fallback_response: "🌟 Here's your comprehensive wellness advice:\n\n🎯 **Set Clear Goals**: Define what wellness means to you\n📊 **Track Progress**: Monitor your habits and improvements\n🔄 **Stay Consistent**: Small daily actions create lasting change\n🎉 **Celebrate Wins**: Acknowledge your progress, no matter how small\n\nYou're on the right path! Keep going! 💪"
+    }, { status: 500 });
   }
 }
 
-async function callPythonScript(scriptPath: string, data: any): Promise<any> {
+async function callPythonScriptWithProgress(scriptPath: string, data: any): Promise<any> {
   return new Promise((resolve, reject) => {
     // Call the Python script with the full path to the virtual environment's Python
     const pythonPath = path.resolve(process.cwd(), '..', '..', 'repmonkeys-acp-python-sdk', 'venv', 'bin', 'python3.12');
@@ -83,9 +70,28 @@ async function callPythonScript(scriptPath: string, data: any): Promise<any> {
     
     let output = '';
     let errorOutput = '';
+    let wellnessPlan: any = null;
+    const progressUpdates: any[] = [];
 
     pythonProcess.stdout.on('data', (data) => {
-      output += data.toString();
+      const lines = data.toString().split('\n').filter((line: string) => line.trim());
+      
+      lines.forEach((line: string) => {
+        try {
+          const update = JSON.parse(line);
+          
+          if (update.type === 'wellness_plan') {
+            // This is the final wellness plan
+            wellnessPlan = update.data;
+          } else {
+            // This is a progress update
+            progressUpdates.push(update);
+          }
+        } catch (parseError) {
+          // If it's not valid JSON, treat it as regular output
+          output += line + '\n';
+        }
+      });
     });
 
     pythonProcess.stderr.on('data', (data) => {
@@ -94,25 +100,13 @@ async function callPythonScript(scriptPath: string, data: any): Promise<any> {
 
     pythonProcess.on('close', (code) => {
       if (code === 0) {
-        try {
-          // Clean the output - remove any warning messages and find the JSON
-          const cleanOutput = output.trim();
-          console.log('🔍 Raw Python output:', cleanOutput);
-          
-          // Try to find JSON in the output (in case there are warning messages)
-          const jsonMatch = cleanOutput.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const jsonString = jsonMatch[0];
-            const result = JSON.parse(jsonString);
-            resolve(result);
-          } else {
-            console.error('No JSON found in Python output');
-            reject(new Error('No JSON response from Python script'));
-          }
-        } catch (parseError) {
-          console.error('Failed to parse Python output:', parseError);
-          console.error('Raw output was:', output);
-          reject(new Error('Invalid response from Python script'));
+        if (wellnessPlan) {
+          // Add progress updates to the wellness plan
+          wellnessPlan.progress_updates = progressUpdates;
+          resolve(wellnessPlan);
+        } else {
+          console.error('No wellness plan found in output');
+          reject(new Error('No wellness plan response from Python script'));
         }
       } else {
         console.error('Python script failed with code:', code);
@@ -130,29 +124,6 @@ async function callPythonScript(scriptPath: string, data: any): Promise<any> {
     setTimeout(() => {
       pythonProcess.kill();
       reject(new Error('Python script timeout'));
-    }, 30000); // 30 second timeout
+    }, 60000); // 60 second timeout for progress updates
   });
-}
-
-function generateFallbackResponse(userMessage: string): string {
-  const lowerPrompt = userMessage.toLowerCase();
-  
-  if (lowerPrompt.includes('workout') || lowerPrompt.includes('exercise') || lowerPrompt.includes('gym')) {
-    return "💪 Based on your workout goals, I recommend a balanced approach:\n\n🏃‍♂️ **Cardio**: 3-4 sessions per week, 30-45 minutes\n🏋️‍♂️ **Strength Training**: 3 sessions per week, focusing on compound movements\n🧘‍♀️ **Recovery**: Include stretching and rest days\n\nStart with 3 days per week and gradually increase intensity. Remember, consistency beats perfection!";
-  }
-  
-  if (lowerPrompt.includes('diet') || lowerPrompt.includes('nutrition') || lowerPrompt.includes('food')) {
-    return "🥗 Here's your personalized nutrition plan:\n\n🍳 **Breakfast**: Protein + complex carbs (eggs + oatmeal)\n🥙 **Lunch**: Lean protein + vegetables + healthy fats\n🍽️ **Dinner**: Light protein + vegetables\n🍎 **Snacks**: Nuts, fruits, or Greek yogurt\n\nAim for 3 meals + 2 snacks daily. Stay hydrated with 8+ glasses of water!";
-  }
-  
-  if (lowerPrompt.includes('sleep') || lowerPrompt.includes('rest') || lowerPrompt.includes('bedtime')) {
-    return "😴 Sleep optimization strategy:\n\n⏰ **Bedtime**: Aim for 7-9 hours, go to bed at the same time daily\n🌙 **Environment**: Dark, cool (65-68°F), quiet room\n📱 **Habits**: No screens 1 hour before bed, read or meditate instead\n☕ **Avoid**: Caffeine after 2 PM, heavy meals before bed\n\nQuality sleep is your foundation for wellness!";
-  }
-  
-  if (lowerPrompt.includes('stress') || lowerPrompt.includes('anxiety') || lowerPrompt.includes('mental')) {
-    return "🧘‍♀️ Mental wellness approach:\n\n💆‍♂️ **Daily Practice**: 10-15 minutes meditation or deep breathing\n🏃‍♀️ **Physical Activity**: Exercise releases endorphins\n📝 **Journaling**: Write down thoughts and gratitude\n🎯 **Mindfulness**: Stay present, one task at a time\n\nRemember, mental health is just as important as physical health!";
-  }
-  
-  // Default response
-  return "🌟 Here's your comprehensive wellness advice:\n\n🎯 **Set Clear Goals**: Define what wellness means to you\n📊 **Track Progress**: Monitor your habits and improvements\n🔄 **Stay Consistent**: Small daily actions create lasting change\n🎉 **Celebrate Wins**: Acknowledge your progress, no matter how small\n\nYou're on the right path! Keep going! 💪";
 }

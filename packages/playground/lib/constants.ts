@@ -1,6 +1,6 @@
 import type { Token } from '@coinbase/onchainkit/token';
 import type { Address } from 'viem';
-import { base } from 'viem/chains';
+import { baseSepolia } from 'viem/chains';
 
 export const deployedContracts: Record<number, { click: Address }> = {
   [8543]: {
@@ -42,7 +42,7 @@ export const ethToken: Token = {
   decimals: 18,
   image:
     'https://wallet-api-production.s3.amazonaws.com/uploads/tokens/eth_288.png',
-  chainId: base.id,
+  chainId: baseSepolia.id,
 };
 
 export const usdcToken: Token = {
@@ -52,7 +52,7 @@ export const usdcToken: Token = {
   decimals: 6,
   image:
     'https://d3r81g40ycuhqg.cloudfront.net/wallet/wais/44/2b/442b80bd16af0c0d9b22e03a16753823fe826e5bfd457292b55fa0ba8c1ba213-ZWUzYjJmZGUtMDYxNy00NDcyLTg0NjQtMWI4OGEwYjBiODE2',
-  chainId: base.id,
+  chainId: baseSepolia.id,
 };
 
 export const degenToken: Token = {
@@ -62,7 +62,7 @@ export const degenToken: Token = {
   decimals: 18,
   image:
     'https://d3r81g40ycuhqg.cloudfront.net/wallet/wais/3b/bf/3bbf118b5e6dc2f9e7fc607a6e7526647b4ba8f0bea87125f971446d57b296d2-MDNmNjY0MmEtNGFiZi00N2I0LWIwMTItMDUyMzg2ZDZhMWNm',
-  chainId: base.id,
+  chainId: baseSepolia.id,
 };
 
 export const daiToken: Token = {
@@ -71,6 +71,6 @@ export const daiToken: Token = {
   symbol: 'DAI',
   decimals: 18,
   image:
-    'https://d3r81g40ycuhqg.cloudfront.net/wallet/walls/92/13/9213e31b84c98a693f4c624580fdbe6e4c1cb550efbba15aa9ea68fd25ffb90c-ZTE1NmNjMGUtZGVkYi00ZDliLWI2N2QtNTY2ZWRjMmYwZmMw',
-  chainId: base.id,
+    'https://d3r81g40ycuhqg.cloudfront.net/wallet/wais/92/13/9213e31b84c98a693f4c624580fdbe6e4c1cb550efbba15aa9ea68fd25ffb90c-ZTE1NmNjMGUtZGVkYi00ZDliLWI2N2QtNTY2ZWRjMmYwZmMw',
+  chainId: baseSepolia.id,
 };

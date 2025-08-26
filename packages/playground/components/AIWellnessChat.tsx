@@ -30,6 +30,13 @@ interface AIResponse {
     };
   };
   implementation_priority?: string[];
+  progress_updates?: Array<{
+    type: string;
+    agent: string;
+    message: string;
+    emoji?: string;
+    progress?: number;
+  }>;
 }
 
 interface AIWellnessChatProps {
@@ -47,6 +54,12 @@ export const AIWellnessChat: React.FC<AIWellnessChatProps> = ({ className = '' }
     ai: AIResponse;
     timestamp: Date;
   }>>([]);
+  
+  // New state for thinking animations
+  const [thinkingStatus, setThinkingStatus] = useState<string>('');
+  const [agentProgress, setAgentProgress] = useState<{
+    [key: string]: { status: string; progress: number; message: string; emoji: string };
+  }>({});
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +67,8 @@ export const AIWellnessChat: React.FC<AIWellnessChatProps> = ({ className = '' }
 
     setIsLoading(true);
     setError(null);
+    setThinkingStatus('🚀 Starting AI Wellness Assistant...');
+    setAgentProgress({});
 
     try {
       const response = await fetch('/api/ai-wellness', {
@@ -80,6 +95,44 @@ export const AIWellnessChat: React.FC<AIWellnessChatProps> = ({ className = '' }
         const newResponse = data.response;
         setAiResponse(newResponse);
         
+        // Process progress updates to show thinking animations
+        if (newResponse.progress_updates) {
+          newResponse.progress_updates.forEach((update: any) => {
+            if (update.type === 'status') {
+              setThinkingStatus(update.message);
+            } else if (update.type === 'agent_thinking') {
+              setAgentProgress(prev => ({
+                ...prev,
+                [update.agent]: {
+                  status: 'thinking',
+                  progress: 0,
+                  message: update.message,
+                  emoji: update.emoji
+                }
+              }));
+            } else if (update.type === 'agent_progress') {
+              setAgentProgress(prev => ({
+                ...prev,
+                [update.agent]: {
+                  ...prev[update.agent],
+                  progress: update.progress,
+                  message: update.message
+                }
+              }));
+            } else if (update.type === 'agent_complete') {
+              setAgentProgress(prev => ({
+                ...prev,
+                [update.agent]: {
+                  ...prev[update.agent],
+                  status: 'complete',
+                  progress: 100,
+                  message: update.message
+                }
+              }));
+            }
+          });
+        }
+        
         // Add to chat history
         setChatHistory(prev => [...prev, {
           user: message,
@@ -88,12 +141,16 @@ export const AIWellnessChat: React.FC<AIWellnessChatProps> = ({ className = '' }
         }]);
         
         setMessage('');
+        setThinkingStatus('');
+        setAgentProgress({});
       } else {
         throw new Error(data.error || 'Failed to get AI response');
       }
     } catch (err) {
       console.error('AI Wellness API Error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
+      setThinkingStatus('');
+      setAgentProgress({});
     } finally {
       setIsLoading(false);
     }
@@ -115,6 +172,57 @@ export const AIWellnessChat: React.FC<AIWellnessChatProps> = ({ className = '' }
           Get personalized wellness advice powered by AI agents. Ask about workouts, nutrition, sleep, or mental health!
         </p>
       </div>
+
+      {/* Thinking Animations */}
+      {isLoading && (
+        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+          <div className="text-center mb-4">
+            <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
+              {thinkingStatus}
+            </h4>
+            <p className="text-sm text-blue-600 dark:text-blue-300">
+              Coordinating with specialist agents...
+            </p>
+          </div>
+          
+          {/* Agent Progress Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {Object.entries(agentProgress).map(([agentName, progress]) => (
+              <div key={agentName} className="p-3 bg-white dark:bg-gray-700 rounded-lg border">
+                <div className="flex items-center justify-between mb-2">
+                  <h5 className="font-medium text-gray-900 dark:text-white">
+                    {progress.emoji} {agentName}
+                  </h5>
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    progress.status === 'thinking' ? 'bg-yellow-100 text-yellow-800' :
+                    progress.status === 'complete' ? 'bg-green-100 text-green-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {progress.status === 'thinking' ? 'Thinking...' :
+                     progress.status === 'complete' ? 'Complete' : 'Ready'}
+                  </span>
+                </div>
+                
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                  {progress.message}
+                </p>
+                
+                {/* Progress Bar */}
+                <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                  <div 
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${progress.progress}%` }}
+                  ></div>
+                </div>
+                
+                <div className="text-xs text-gray-500 mt-1">
+                  {progress.progress}% complete
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Chat History */}
       <div className="mb-6 max-h-96 overflow-y-auto space-y-4">
@@ -259,11 +367,92 @@ export const AIWellnessChat: React.FC<AIWellnessChatProps> = ({ className = '' }
       {aiResponse && !chatHistory.length && (
         <div className="mb-6 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
           <div className="text-gray-900 dark:text-white mb-3">
-            {aiResponse.advice || aiResponse.message}
+            {/* Display the main message */}
+            <div className="mb-3 font-medium">
+              {aiResponse.message}
+            </div>
+            
+            {/* Display the full wellness plan */}
+            {aiResponse.primary_focus && (
+              <div className="space-y-4">
+                {/* Primary Focus */}
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                    🎯 Primary Focus: {aiResponse.primary_focus}
+                  </h4>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    Led by {aiResponse.primary_agent}
+                  </p>
+                </div>
+                
+                {/* Agent Contributions */}
+                {aiResponse.agent_contributions && (
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-gray-800 dark:text-gray-200">
+                      🤝 Specialist Agent Recommendations
+                    </h4>
+                    
+                    {Object.entries(aiResponse.agent_contributions).map(([agentName, agentData]: [string, any]) => (
+                      <div key={agentName} className="p-3 bg-white dark:bg-gray-700 rounded-lg border">
+                        <h5 className="font-medium text-gray-900 dark:text-white mb-2">
+                          {agentName === 'GymBro' ? '💪 GymBro' : 
+                           agentName === 'DietKing' ? '🥗 DietKing' : 
+                           agentName === 'SleepyJoe' ? '😴 SleepyJoe' : 
+                           '🌟 WellnessBuddy'} - {agentData.specialty}
+                        </h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                          {agentData.contribution}
+                        </p>
+                        <div className="space-y-1">
+                          {agentData.recommendations && agentData.recommendations.map((rec: string, index: number) => (
+                            <div key={index} className="text-sm text-gray-700 dark:text-gray-300">
+                              • {rec}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Weekly Schedule */}
+                {aiResponse.integrated_recommendations?.weekly_schedule && (
+                  <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <h4 className="font-semibold text-green-800 dark:text-green-200 mb-2">
+                      📅 Weekly Schedule
+                    </h4>
+                    <div className="grid grid-cols-1 gap-2 text-sm">
+                      {Object.entries(aiResponse.integrated_recommendations.weekly_schedule).map(([day, activity]: [string, string]) => (
+                        <div key={day} className="flex justify-between">
+                          <span className="font-medium capitalize text-green-700 dark:text-green-300">{day}:</span>
+                          <span className="text-green-600 dark:text-green-400">{activity}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Implementation Priority */}
+                {aiResponse.implementation_priority && (
+                  <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                    <h4 className="font-semibold text-purple-800 dark:text-purple-200 mb-2">
+                      🚀 Implementation Priority
+                    </h4>
+                    <div className="space-y-1">
+                      {aiResponse.implementation_priority.map((priority: string, index: number) => (
+                        <div key={index} className="text-sm text-purple-700 dark:text-purple-300">
+                          {priority}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
           {aiResponse.blockchain_integration && (
-            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
               <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
                 🔗 Suggested Blockchain Actions
               </h4>
