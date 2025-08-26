@@ -2953,7 +2953,7 @@ function LandingPageContent() {
             <div className="lg:col-span-2 space-y-6">
               {/* AI Wellness Assistant */}
               <div className={cn(
-                "rounded-2xl p-6 border shadow-sm transition-colors",
+                "rounded-2xl p-8 border shadow-sm transition-colors min-h-[700px]",
                 isDarkMode 
                   ? "bg-gray-800 border-gray-700" 
                   : "bg-white border-gray-200"
@@ -2983,7 +2983,7 @@ function LandingPageContent() {
                 
                 {/* Chat Messages Area */}
                 <div className={cn(
-                  "max-h-96 overflow-y-auto mb-6 space-y-4 p-6 rounded-xl border shadow-inner",
+                  "max-h-[600px] min-h-[500px] overflow-y-auto mb-6 space-y-6 p-8 rounded-xl border shadow-inner",
                   isDarkMode ? "border-gray-600 bg-gray-900" : "border-gray-200 bg-gray-50"
                 )}
                 style={{ 
@@ -3013,7 +3013,7 @@ function LandingPageContent() {
                       <div
                         key={message.id}
                         className={cn(
-                          "flex gap-3 p-3 rounded-lg border",
+                          "flex gap-4 p-4 rounded-lg border",
                           message.type === 'user' 
                             ? (isDarkMode ? "bg-gray-800 border-gray-600 ml-8" : "bg-gray-100 border-gray-300 ml-8")
                             : (isDarkMode ? "bg-gray-700 border-gray-600 mr-8" : "bg-white border-gray-200 mr-8")
@@ -3022,25 +3022,25 @@ function LandingPageContent() {
                         <div className="flex-shrink-0">
                           {message.type === 'user' ? (
                             <div className={cn(
-                              "w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-2",
+                              "w-14 h-14 rounded-full flex items-center justify-center shadow-lg border-2",
                               isDarkMode ? "bg-gradient-to-r from-blue-600 to-blue-700 border-blue-500" : "bg-gradient-to-r from-blue-500 to-blue-600 border-blue-400"
                             )}>
-                              <span className="text-white text-lg">👤</span>
+                              <span className="text-white text-xl">👤</span>
                             </div>
                           ) : (
                             <div className="relative">
                               <img 
                                 src="/agents/smasher.png" 
                                 alt="Smasher" 
-                                className="w-12 h-12 rounded-full shadow-lg border-2 border-gray-300 dark:border-gray-600"
+                                className="w-14 h-14 rounded-full shadow-lg border-2 border-gray-300 dark:border-gray-600"
                               />
                               <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
                             </div>
                           )}
                         </div>
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-sm">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="font-medium text-base">
                               {message.type === 'user' ? 'You' : 'Smasher'}
                             </span>
                             <span className={cn("text-xs", isDarkMode ? "text-gray-400" : "text-gray-500")}>
@@ -3048,7 +3048,7 @@ function LandingPageContent() {
                             </span>
                           </div>
                                                       <div className={cn(
-                              "text-sm whitespace-pre-wrap break-words",
+                              "text-base leading-relaxed whitespace-pre-wrap break-words",
                               isDarkMode ? "text-gray-200" : "text-gray-900"
                             )}
                             style={{ 
@@ -3073,7 +3073,7 @@ function LandingPageContent() {
                         <img 
                           src="/agents/smasher.png" 
                           alt="Smasher" 
-                          className="w-12 h-12 rounded-full shadow-lg border-2 border-gray-300 dark:border-gray-600"
+                          className="w-14 h-14 rounded-full shadow-lg border-2 border-gray-300 dark:border-gray-600"
                         />
                         <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
                       </div>
