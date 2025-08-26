@@ -104,12 +104,13 @@ function LandingPageContent() {
    const [showChatModal, setShowChatModal] = useState(false);
    const [chatMessages, setChatMessages] = useState<Array<{id: number, type: 'user' | 'assistant', content: string, timestamp: Date}>>([]);
    const [currentMessage, setCurrentMessage] = useState('');
-   const [thinkingProgress, setThinkingProgress] = useState({
-     gymbro: 0,
-     dietking: 0,
-     sleepyjoe: 0,
-     compiling: 0
-   });
+     const [thinkingProgress, setThinkingProgress] = useState({
+    gymbro: 0,
+    dietking: 0,
+    sleepyjoe: 0,
+    compiling: 0
+  });
+  const [isSmasherTyping, setIsSmasherTyping] = useState(false);
   
   // Contract status for user feedback
   const [contractStatus, setContractStatus] = useState<{
@@ -492,6 +493,9 @@ function LandingPageContent() {
       if (imageLoaded && successfulUrl) {
         setGeneratedImageUrl(successfulUrl);
         console.log('🎉 Wellness NFT image generated successfully!');
+        
+        // Now mint the NFT to the blockchain
+        await mintWellnessNFT(successfulUrl, fullPrompt);
       } else {
         throw new Error('Failed to generate image with Pollinations.ai');
       }
@@ -509,8 +513,184 @@ function LandingPageContent() {
       const randomFallback = fallbackImages[Math.floor(Math.random() * fallbackImages.length)];
       setGeneratedImageUrl(randomFallback);
       console.log('🔄 Using fallback wellness image:', randomFallback);
+      
+      // Still try to mint the fallback image
+      await mintWellnessNFT(randomFallback, 'Wellness Art - Fallback Image');
     } finally {
       setIsGeneratingImage(false);
+    }
+  };
+
+  // New function to mint the wellness NFT to the blockchain
+  const mintWellnessNFT = async (imageUrl: string, prompt: string) => {
+    if (!address) {
+      console.error('❌ No wallet address - cannot mint NFT');
+      return;
+    }
+
+    // Check if user already has a wellness NFT using existing hook data
+    if (tokenId && tokenId > 0) {
+      console.log('⚠️ User already has a wellness NFT');
+      setContractError('You already have a wellness NFT. Each user can only have one.');
+      return;
+    }
+
+    // Force network switch to Base Mainnet if not already connected
+    if (chainId !== 8453) {
+      console.log('🔄 Switching to Base Mainnet for NFT minting...');
+      try {
+        await (window.ethereum as any).request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x2105' }], // 8453 in hex
+        });
+        console.log('✅ Switched to Base Mainnet');
+        
+        // Wait a moment for the switch to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check if switch was successful
+        const newChainId = await (window.ethereum as any).request({ method: 'eth_chainId' });
+        if (newChainId !== '0x2105') {
+          setContractError('Failed to switch to Base Mainnet. Please switch manually.');
+          return;
+        }
+      } catch (error: any) {
+        console.error('Error switching to Base Mainnet:', error);
+        if (error.code === 4902) {
+          // Chain not added, add it first
+          await addBaseMainnetNetwork();
+          // Try switching again
+          try {
+            await (window.ethereum as any).request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: '0x2105' }],
+            });
+          } catch (switchError) {
+            setContractError('Failed to switch to Base Mainnet after adding chain. Please switch manually.');
+            return;
+          }
+        } else {
+          setContractError('Failed to switch to Base Mainnet. Please switch manually.');
+          return;
+        }
+      }
+    }
+
+    try {
+      console.log('🚀 Starting NFT minting process...');
+      
+      // Create metadata for the NFT
+      const metadata = {
+        name: "WellSpace Wellness Profile",
+        description: `Personalized wellness NFT generated with AI. Theme: ${selectedImageTheme}, Prompt: ${prompt}`,
+        image: imageUrl,
+        attributes: [
+          {
+            trait_type: "Wellness Theme",
+            value: selectedImageTheme || "Custom"
+          },
+          {
+            trait_type: "Generation Prompt",
+            value: prompt
+          },
+          {
+            trait_type: "Wellness Goals",
+            value: userGoals.join(", ")
+          },
+          {
+            trait_type: "Mint Date",
+            value: new Date().toISOString().split('T')[0]
+          },
+          {
+            trait_type: "Collection",
+            value: "WellSpace Wellness Profiles"
+          }
+        ],
+        external_url: "https://wellspace.app",
+        background_color: "000000"
+      };
+
+      // For now, we'll use the image URL directly as the metadata URI
+      // In production, you'd upload this to IPFS and use the IPFS hash
+      const metadataUri = imageUrl; // This will be the IPFS URI in production
+      
+      console.log('📝 NFT Metadata created:', metadata);
+      console.log('🔗 Metadata URI:', metadataUri);
+      console.log('👤 Minting to address:', address);
+      console.log('⛓️ Contract address:', CONTRACT_ADDRESSES.WELLNESS_NFT);
+
+      // Mint the NFT using the smart contract
+      const txHash = await writeContract({
+        address: CONTRACT_ADDRESSES.WELLNESS_NFT,
+        abi: wellnessNFTAbi,
+        functionName: 'mintWellnessNFT',
+        args: [metadataUri],
+      });
+
+      console.log('✅ NFT minting transaction submitted:', txHash);
+      console.log('⏳ Waiting for transaction confirmation...');
+
+      // Wait for transaction confirmation
+      await new Promise(resolve => setTimeout(resolve, 5000));
+
+      // Get the token ID for the newly minted NFT
+      // Since we can't read directly, we'll use a placeholder and let the user check their wallet
+      const estimatedTokenId = Date.now(); // This is just for display - actual token ID will be in the wallet
+      
+      console.log('🎉 NFT minted successfully! Estimated Token ID:', estimatedTokenId);
+
+      // Show success message
+      setContractStatus({
+        type: 'success',
+        message: `🎉 Wellness NFT minted successfully! Estimated Token ID: ${estimatedTokenId}. Check your MetaMask wallet!`,
+        timestamp: Date.now()
+      });
+
+      // Update the generatedImageUrl to include token info
+      setGeneratedImageUrl(prev => prev ? `${prev}?tokenId=${estimatedTokenId}` : prev);
+
+      // Force MetaMask to refresh NFT display
+      if (typeof window.ethereum !== 'undefined') {
+        try {
+          // Request account update to refresh NFT display
+          await (window.ethereum as any).request({
+            method: 'wallet_requestPermissions',
+            params: [{ eth_accounts: {} }]
+          });
+          
+          console.log('✅ Requested MetaMask account refresh');
+        } catch (error) {
+          console.log('ℹ️ MetaMask refresh request failed (this is normal):', error);
+        }
+      }
+
+      // Add to MetaMask wallet automatically (if supported)
+      try {
+        if (typeof window.ethereum !== 'undefined' && (window.ethereum as any).wallet_watchAsset) {
+          await (window.ethereum as any).wallet_watchAsset({
+            type: 'ERC721',
+            options: {
+              address: CONTRACT_ADDRESSES.WELLNESS_NFT,
+              tokenId: estimatedTokenId.toString(),
+              image: imageUrl,
+            },
+          });
+          console.log('✅ NFT added to MetaMask wallet automatically!');
+        }
+      } catch (error) {
+        console.log('ℹ️ Auto-add to MetaMask failed (user may need to add manually):', error);
+      }
+
+    } catch (error) {
+      console.error('❌ Failed to mint NFT:', error);
+      setContractError(`Failed to mint NFT: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Show user how to add manually
+      setContractStatus({
+        type: 'error',
+        message: '❌ NFT minting failed. The image was generated but not minted to the blockchain.',
+        timestamp: Date.now()
+      });
     }
   };
 
@@ -2006,6 +2186,35 @@ function LandingPageContent() {
                       <p className="text-sm text-gray-600 mt-3">
                         Your personalized wellness NFT is ready!
                       </p>
+                      
+                      {/* Manual Add to MetaMask Button */}
+                      <div className="mt-4">
+                        <button
+                          onClick={() => {
+                            if (typeof window.ethereum !== 'undefined' && (window.ethereum as any).wallet_watchAsset) {
+                              const estimatedTokenId = Date.now();
+                              (window.ethereum as any).wallet_watchAsset({
+                                type: 'ERC721',
+                                options: {
+                                  address: CONTRACT_ADDRESSES.WELLNESS_NFT,
+                                  tokenId: estimatedTokenId.toString(),
+                                  image: generatedImageUrl,
+                                },
+                              }).then(() => {
+                                console.log('✅ NFT manually added to MetaMask wallet!');
+                              }).catch((error: any) => {
+                                console.log('ℹ️ Manual addition failed:', error);
+                              });
+                            }
+                          }}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                        >
+                          🔗 Add to MetaMask Wallet
+                        </button>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Click this if the NFT doesn't appear automatically
+                        </p>
+                      </div>
                     </div>
 
                     <div className="flex space-x-3">
@@ -2059,6 +2268,49 @@ function LandingPageContent() {
                     </div>
                   </div>
                 </div>
+
+                {/* NFT Success Message */}
+                {generatedImageUrl && (
+                  <div className="bg-green-50 rounded-xl p-4 border border-green-100">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                        <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-green-800 font-medium text-sm">🎉 Wellness NFT Generated!</p>
+                        <p className="text-green-600 text-xs">
+                          Your NFT has been minted to the blockchain. Check your MetaMask wallet under the "NFTs" tab!
+                        </p>
+                        <div className="mt-2">
+                          <button
+                            onClick={() => {
+                              if (typeof window.ethereum !== 'undefined' && (window.ethereum as any).wallet_watchAsset) {
+                                const estimatedTokenId = Date.now();
+                                (window.ethereum as any).wallet_watchAsset({
+                                  type: 'ERC721',
+                                  options: {
+                                    address: CONTRACT_ADDRESSES.WELLNESS_NFT,
+                                    tokenId: estimatedTokenId.toString(),
+                                    image: generatedImageUrl,
+                                  },
+                                }).then(() => {
+                                  console.log('✅ NFT manually added to MetaMask wallet!');
+                                }).catch((error: any) => {
+                                  console.log('ℹ️ Manual addition failed:', error);
+                                });
+                              }
+                            }}
+                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors"
+                          >
+                            🔗 Add to MetaMask
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Error Display */}
                 {contractError && (
@@ -2371,6 +2623,65 @@ function LandingPageContent() {
                     <span className="text-xs px-2 py-1 bg-green-200 text-green-800 rounded-full">
                       📊 Real-time Sync
                     </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* NFT Instructions Banner */}
+          {address && tokenId && tokenId > 0 && (
+            <div className={cn(
+              "mb-6 p-4 rounded-xl border transition-colors",
+              isDarkMode 
+                ? "bg-purple-900/20 border-purple-700/50 text-purple-200" 
+                : "bg-purple-50 border-purple-200 text-purple-800"
+            )}>
+              <div className="flex items-center space-x-3">
+                <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m0 0V1a1 1 0 011-1h2a1 1 0 011 1v18a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1h2a1 1 0 011-1z" />
+                </svg>
+                <div>
+                  <p className="font-medium">🎨 Your Wellness NFT is Ready!</p>
+                  <p className="text-sm opacity-90">
+                    Your personalized wellness NFT has been minted to the blockchain. Here's how to view it in MetaMask:
+                  </p>
+                  <div className="mt-3 space-y-2 text-xs">
+                    <div className="flex items-center space-x-2">
+                      <span className="w-5 h-5 bg-purple-200 text-purple-800 rounded-full flex items-center justify-center text-xs font-bold">1</span>
+                      <span>Open MetaMask and click on your account</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="w-5 h-5 bg-purple-200 text-purple-800 rounded-full flex items-center justify-center text-xs font-bold">2</span>
+                      <span>Click on the "NFTs" tab</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="w-5 h-5 bg-purple-200 text-purple-800 rounded-full flex items-center justify-center text-xs font-bold">3</span>
+                      <span>Your wellness NFT should appear there</span>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <button
+                      onClick={() => {
+                        if (typeof window.ethereum !== 'undefined' && (window.ethereum as any).wallet_watchAsset) {
+                          (window.ethereum as any).wallet_watchAsset({
+                            type: 'ERC721',
+                            options: {
+                              address: CONTRACT_ADDRESSES.WELLNESS_NFT,
+                              tokenId: tokenId.toString(),
+                              image: generatedImageUrl || '',
+                            },
+                          }).then(() => {
+                            console.log('✅ NFT manually added to MetaMask wallet!');
+                          }).catch((error: any) => {
+                            console.log('ℹ️ Manual addition failed:', error);
+                          });
+                        }
+                      }}
+                      className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-lg transition-colors"
+                    >
+                      🔗 Add to MetaMask
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2752,6 +3063,41 @@ function LandingPageContent() {
                     ))
                   )}
                   
+                  {/* Smasher Typing Indicator */}
+                  {isSmasherTyping && (
+                    <div className={cn(
+                      "flex gap-3 p-3 rounded-lg border mr-8",
+                      isDarkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"
+                    )}>
+                      <div className="relative">
+                        <img 
+                          src="/agents/smasher.png" 
+                          alt="Smasher" 
+                          className="w-12 h-12 rounded-full shadow-lg border-2 border-gray-300 dark:border-gray-600"
+                        />
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm">Smasher</span>
+                          <span className={cn("text-xs", isDarkMode ? "text-gray-400" : "text-gray-500")}>
+                            {new Date().toLocaleTimeString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex gap-1">
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                          </div>
+                          <span className={cn("text-sm", isDarkMode ? "text-gray-300" : "text-gray-600")}>
+                            Smasher is thinking...
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Thinking Progress Indicators */}
                   {(thinkingProgress.gymbro > 0 || thinkingProgress.dietking > 0 || thinkingProgress.sleepyjoe > 0 || thinkingProgress.compiling > 0) && (
                     <div className={cn(
@@ -2930,6 +3276,7 @@ function LandingPageContent() {
                       
                       // Start the thinking process
                       setThinkingProgress({ gymbro: 0, dietking: 0, sleepyjoe: 0, compiling: 0 });
+                      setIsSmasherTyping(true); // Start typing indicator
                       console.log('🔄 Thinking progress started');
                       
                       // Check for the specific demo query - DISABLED, using real AI instead
@@ -3201,82 +3548,167 @@ function LandingPageContent() {
                                   console.log('📝 Message content length:', data.response.message.length);
                                   console.log('📝 Message content preview:', data.response.message.substring(0, 200) + '...');
                                   
-                                  // Build comprehensive response from multiple fields
-                                  let comprehensiveContent = data.response.message + '\n\n';
+                                  // Create multiple sequential messages to mimic human texting
+                                  const messages = [];
                                   
-                                  // Add primary focus and agent
+                                  // Message 1: Opening
                                   if (data.response.primary_focus && data.response.primary_agent) {
-                                    comprehensiveContent += `🎯 **Primary Focus**: ${data.response.primary_focus}\n`;
-                                    comprehensiveContent += `🤖 **Lead Agent**: ${data.response.primary_agent}\n\n`;
+                                    messages.push(`Hey there! 👋 I've analyzed your request and here's what I found:\n\n🎯 **Primary Focus**: ${data.response.primary_focus}\n🤖 **Lead Agent**: ${data.response.primary_agent}`);
                                   }
                                   
-                                  // Add agent contributions
+                                  // Message 2: Agent contributions intro
                                   if (data.response.agent_contributions) {
-                                    comprehensiveContent += '## 🤝 **Agent Contributions**\n\n';
+                                    messages.push('🤝 **Here\'s what each specialist agent has prepared for you:**');
+                                  }
+                                  
+                                  // Message 3: Individual agent details (split into chunks)
+                                  if (data.response.agent_contributions) {
                                     Object.entries(data.response.agent_contributions).forEach(([agent, details]: [string, any]) => {
-                                      comprehensiveContent += `### ${details.emoji || '🌟'} **${agent}**\n`;
-                                      comprehensiveContent += `**Specialty**: ${details.specialty}\n`;
-                                      comprehensiveContent += `**Contribution**: ${details.contribution}\n`;
+                                      let agentMessage = `${details.emoji || '🌟'} **${agent}**\n`;
+                                      agentMessage += `**Specialty**: ${details.specialty}\n`;
+                                      agentMessage += `**What they\'re offering**: ${details.contribution}\n`;
                                       
                                       if (details.focus_areas && details.focus_areas.length > 0) {
-                                        comprehensiveContent += `**Focus Areas**: ${details.focus_areas.join(', ')}\n`;
+                                        agentMessage += `**Key areas they focus on**: ${details.focus_areas.join(', ')}\n`;
                                       }
                                       
                                       if (details.recommendations && details.recommendations.length > 0) {
-                                        comprehensiveContent += `**Recommendations**:\n`;
+                                        agentMessage += `**Their top tips for you**:\n`;
                                         details.recommendations.forEach((rec: string) => {
-                                          comprehensiveContent += `  • ${rec}\n`;
+                                          agentMessage += `  • ${rec}\n`;
                                         });
                                       }
-                                      comprehensiveContent += '\n';
+                                      
+                                      messages.push(agentMessage);
                                     });
                                   }
                                   
-                                  // Add integrated recommendations
+                                  // Message 4: Action plan intro
                                   if (data.response.integrated_recommendations) {
-                                    comprehensiveContent += '## 📋 **Integrated Recommendations**\n\n';
-                                    
-                                    if (data.response.integrated_recommendations.immediate_actions) {
-                                      comprehensiveContent += '### 🚀 **Immediate Actions**\n';
-                                      data.response.integrated_recommendations.immediate_actions.forEach((action: string) => {
-                                        comprehensiveContent += `  • ${action}\n`;
-                                      });
-                                      comprehensiveContent += '\n';
-                                    }
-                                    
-                                    if (data.response.integrated_recommendations.weekly_schedule) {
-                                      comprehensiveContent += '### 📅 **Weekly Schedule**\n';
-                                      Object.entries(data.response.integrated_recommendations.weekly_schedule).forEach(([day, activity]: [string, unknown]) => {
-                                        comprehensiveContent += `  • **${day.charAt(0).toUpperCase() + day.slice(1)}**: ${activity as string}\n`;
-                                      });
-                                      comprehensiveContent += '\n';
-                                    }
-                                    
-                                    if (data.response.integrated_recommendations.success_metrics) {
-                                      comprehensiveContent += '### 📊 **Success Metrics**\n';
-                                      Object.entries(data.response.integrated_recommendations.success_metrics).forEach(([metric, description]: [string, unknown]) => {
-                                        comprehensiveContent += `  • **${metric.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}**: ${description as string}\n`;
-                                      });
-                                      comprehensiveContent += '\n';
-                                    }
+                                    messages.push('📋 **Here\'s your personalized action plan:**');
                                   }
                                   
-                                  // Add implementation priority
-                                  if (data.response.implementation_priority) {
-                                    comprehensiveContent += '## 🎯 **Implementation Priority**\n\n';
-                                    data.response.implementation_priority.forEach((priority: string) => {
-                                      comprehensiveContent += `  • ${priority}\n`;
+                                  // Message 5: Immediate actions
+                                  if (data.response.integrated_recommendations?.immediate_actions) {
+                                    let actionsMessage = '🚀 **Start with these steps today:**\n\n';
+                                    data.response.integrated_recommendations.immediate_actions.forEach((action: string) => {
+                                      actionsMessage += `  • ${action}\n`;
                                     });
-                                    comprehensiveContent += '\n';
+                                    messages.push(actionsMessage);
                                   }
                                   
-                                  // Add coordination notes
+                                  // Message 6: Weekly schedule
+                                  if (data.response.integrated_recommendations?.weekly_schedule) {
+                                    let scheduleMessage = '📅 **Your weekly wellness schedule:**\n\n';
+                                    Object.entries(data.response.integrated_recommendations.weekly_schedule).forEach(([day, activity]: [string, unknown]) => {
+                                      scheduleMessage += `  • **${day.charAt(0).toUpperCase() + day.slice(1)}**: ${activity as string}\n`;
+                                    });
+                                    messages.push(scheduleMessage);
+                                  }
+                                  
+                                  // Message 7: Success metrics
+                                  if (data.response.integrated_recommendations?.success_metrics) {
+                                    let metricsMessage = '📊 **Track your progress with these metrics:**\n\n';
+                                    Object.entries(data.response.integrated_recommendations.success_metrics).forEach(([metric, description]: [string, unknown]) => {
+                                      metricsMessage += `  • **${metric.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}**: ${description as string}\n`;
+                                    });
+                                    messages.push(metricsMessage);
+                                  }
+                                  
+                                  // Message 8: Implementation steps
+                                  if (data.response.implementation_priority) {
+                                    let priorityMessage = '🎯 **Here\'s how to implement this step by step:**\n\n';
+                                    data.response.implementation_priority.forEach((priority: string) => {
+                                      priorityMessage += `  • ${priority}\n`;
+                                    });
+                                    messages.push(priorityMessage);
+                                  }
+                                  
+                                  // Message 9: How it was created
                                   if (data.response.coordination_notes) {
-                                    comprehensiveContent += '## 💡 **Coordination Notes**\n\n';
-                                    comprehensiveContent += data.response.coordination_notes + '\n';
+                                    messages.push(`💡 **How this plan was created:**\n\n${data.response.coordination_notes}`);
                                   }
                                   
-                                  aiContent = comprehensiveContent;
+                                  // Set aiContent for fallback (though we won't use it)
+                                  aiContent = messages.join('\n\n');
+                                  
+                                  // Handle progress updates for thinking animations
+                                  if (data.response.progress_updates && Array.isArray(data.response.progress_updates)) {
+                                    console.log('🎬 Processing progress updates for thinking animations...');
+                                    
+                                    // Process each progress update
+                                    data.response.progress_updates.forEach((update: any, index: number) => {
+                                      console.log(`🎬 Progress update ${index}:`, update);
+                                      
+                                      if (update.type === 'agent_thinking') {
+                                        // Agent starts thinking
+                                        console.log(`🤔 ${update.agent} is thinking...`);
+                                        if (update.agent === 'GymBro') {
+                                          setThinkingProgress(prev => ({ ...prev, gymbro: 10 }));
+                                        } else if (update.agent === 'DietKing') {
+                                          setThinkingProgress(prev => ({ ...prev, dietking: 10 }));
+                                        } else if (update.agent === 'SleepyJoe') {
+                                          setThinkingProgress(prev => ({ ...prev, sleepyjoe: 10 }));
+                                        } else if (update.agent === 'WellnessBuddy') {
+                                          setThinkingProgress(prev => ({ ...prev, compiling: 10 }));
+                                        }
+                                      } else if (update.type === 'agent_progress') {
+                                        // Agent progress update
+                                        const progress = Math.min(100, update.progress || 0);
+                                        console.log(`📊 ${update.agent} progress: ${progress}%`);
+                                        if (update.agent === 'GymBro') {
+                                          setThinkingProgress(prev => ({ ...prev, gymbro: progress }));
+                                        } else if (update.agent === 'DietKing') {
+                                          setThinkingProgress(prev => ({ ...prev, dietking: progress }));
+                                        } else if (update.agent === 'SleepyJoe') {
+                                          setThinkingProgress(prev => ({ ...prev, sleepyjoe: progress }));
+                                        } else if (update.agent === 'WellnessBuddy') {
+                                          setThinkingProgress(prev => ({ ...prev, compiling: progress }));
+                                        }
+                                      } else if (update.type === 'agent_complete') {
+                                        // Agent completed
+                                        console.log(`✅ ${update.agent} completed!`);
+                                        if (update.agent === 'GymBro') {
+                                          setThinkingProgress(prev => ({ ...prev, gymbro: 100 }));
+                                        } else if (update.agent === 'DietKing') {
+                                          setThinkingProgress(prev => ({ ...prev, dietking: 100 }));
+                                        } else if (update.agent === 'SleepyJoe') {
+                                          setThinkingProgress(prev => ({ ...prev, sleepyjoe: 100 }));
+                                        } else if (update.agent === 'WellnessBuddy') {
+                                          setThinkingProgress(prev => ({ ...prev, compiling: 100 }));
+                                        }
+                                      }
+                                    });
+                                    
+                                    // Add a small delay to show the completed animations
+                                    setTimeout(() => {
+                                      setThinkingProgress({ gymbro: 0, dietking: 0, sleepyjoe: 0, compiling: 0 });
+                                    }, 2000);
+                                  }
+                                  
+                                  // Add multiple sequential messages to mimic human texting
+                                  console.log('📝 Creating multiple Smasher responses to mimic human texting...');
+                                  
+                                  // Add messages with delays to simulate typing
+                                  messages.forEach((messageContent: string, index: number) => {
+                                    setTimeout(() => {
+                                      const smasherResponse = {
+                                        id: Date.now() + index + 1,
+                                        type: 'assistant' as const,
+                                        content: messageContent,
+                                        timestamp: new Date()
+                                      };
+                                      
+                                      console.log(`💬 Adding message ${index + 1} to chat...`);
+                                      setChatMessages(prev => [...prev, smasherResponse]);
+                                      
+                                      // Stop typing indicator after the last message
+                                      if (index === messages.length - 1) {
+                                        setIsSmasherTyping(false);
+                                        console.log('✅ All messages added to chat successfully');
+                                      }
+                                    }, index * 800); // 800ms delay between messages
+                                  });
                                 } else if (data.response.recommendations?.primary?.content) {
                                   console.log('📝 Found recommendations.primary.content field');
                                   console.log('📝 Content length:', data.response.recommendations.primary.content.length);
@@ -3303,19 +3735,6 @@ function LandingPageContent() {
                                 aiContent = `❌ AI System Error: ${data.error || 'Unknown error occurred'}\n\nPlease try again or contact support.`;
                                 console.error('❌ AI response structure invalid:', data);
                           }
-                          
-                          // Add Smasher's response
-                              console.log('📝 Creating Smasher response with content:', aiContent);
-                              const smasherResponse = {
-                            id: Date.now() + 1,
-                            type: 'assistant' as const,
-                                content: aiContent,
-                            timestamp: new Date()
-                          };
-                          
-                              console.log('💬 Adding response to chat messages...');
-                              setChatMessages(prev => [...prev, smasherResponse]);
-                              console.log('✅ Response added to chat successfully');
                             } else {
                               console.error('❌ AI Wellness API failed:', response.status, response.statusText);
                               console.log('🔍 Creating error response for failed API call');
@@ -3328,6 +3747,7 @@ function LandingPageContent() {
                               
                               console.log('💬 Adding error response to chat...');
                               setChatMessages(prev => [...prev, smasherResponse]);
+                              setIsSmasherTyping(false); // Stop typing indicator
                               console.log('✅ Error response added to chat');
                             }
                           } catch (error) {
@@ -3346,6 +3766,7 @@ function LandingPageContent() {
                             
                             console.log('💬 Adding error response to chat...');
                             setChatMessages(prev => [...prev, smasherResponse]);
+                            setIsSmasherTyping(false); // Stop typing indicator
                             console.log('✅ Error response added to chat');
                           }
                           

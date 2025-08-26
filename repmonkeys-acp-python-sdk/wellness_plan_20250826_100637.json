@@ -1,0 +1,131 @@
+{
+  "coordinator": "Smasher",
+  "status": "completed",
+  "timestamp": "2025-08-26T10:06:37",
+  "user_input": {
+    "message": "I am so tired and sleepy everyday help me",
+    "goals": [
+      "Exercise Routine"
+    ],
+    "profile": {
+      "address": "0x938b9642dB80F48BD3E4eB8CEF0Da573495B8D2B",
+      "goals": [
+        "Exercise Routine"
+      ],
+      "imageTheme": "abstract",
+      "customPrompt": ""
+    }
+  },
+  "primary_focus": "Sleep Optimization",
+  "primary_agent": "SleepyJoe",
+  "message": "\ud83c\udfaf Personalized wellness plan delivered based on your request: I am so tired and sleepy everyday help me...",
+  "analysis_summary": {
+    "scenario": "User sleep optimization consultation",
+    "key_challenges": [
+      "Personalized guidance",
+      "Multi-domain integration",
+      "Implementation support"
+    ],
+    "optimal_strategy": "Coordinated multi-agent approach led by SleepyJoe"
+  },
+  "agent_contributions": {
+    "GymBro": {
+      "specialty": "Fitness & Exercise",
+      "contribution": "\ud83d\udcaa Comprehensive workout plan designed for your fitness level and goals",
+      "focus_areas": [
+        "Strength training",
+        "Cardio",
+        "Flexibility",
+        "Recovery"
+      ],
+      "recommendations": [
+        "Start with 3-4 workouts per week",
+        "Focus on compound movements",
+        "Include proper warm-up and cool-down",
+        "Progressive overload for continuous improvement"
+      ]
+    },
+    "DietKing": {
+      "specialty": "Nutrition & Diet",
+      "contribution": "\ud83e\udd57 Personalized nutrition strategy to support your wellness goals",
+      "focus_areas": [
+        "Meal planning",
+        "Macro balance",
+        "Hydration",
+        "Supplementation"
+      ],
+      "recommendations": [
+        "Eat 3 balanced meals + 2 snacks daily",
+        "Prioritize protein and complex carbs",
+        "Stay hydrated with 8+ glasses of water",
+        "Consider meal prep for consistency"
+      ]
+    },
+    "SleepyJoe": {
+      "specialty": "Sleep Optimization",
+      "contribution": "\ud83d\ude34 Sleep hygiene and circadian rhythm optimization",
+      "focus_areas": [
+        "Bedtime routine",
+        "Environment optimization",
+        "Stress management",
+        "Sleep schedule"
+      ],
+      "recommendations": [
+        "Establish a consistent 10 PM bedtime routine",
+        "Create a dark, cool (65-68\u00b0F) sleep environment",
+        "Avoid screens 2 hours before bed",
+        "Practice 10-minute meditation before sleep",
+        "Use white noise or calming sounds",
+        "Limit caffeine after 2 PM",
+        "Exercise early in the day, not before bed"
+      ]
+    },
+    "WellnessBuddy": {
+      "specialty": "Holistic Wellness",
+      "contribution": "\ud83c\udf1f Integrated wellness strategy and progress tracking",
+      "focus_areas": [
+        "Goal setting",
+        "Progress tracking",
+        "Habit formation",
+        "Motivation"
+      ],
+      "recommendations": [
+        "Set specific, measurable wellness goals",
+        "Track progress weekly",
+        "Build one habit at a time",
+        "Celebrate small wins and milestones"
+      ]
+    }
+  },
+  "integrated_recommendations": {
+    "immediate_actions": [
+      "Start with the primary focus area: Sleep Optimization",
+      "Implement one new habit per week",
+      "Track your progress daily",
+      "Stay consistent with your routine"
+    ],
+    "weekly_schedule": {
+      "monday": "Focus on Sleep Optimization + light stretching",
+      "tuesday": "Implement nutrition improvements for better sleep",
+      "wednesday": "Focus on stress reduction and relaxation",
+      "thursday": "Sleep optimization and recovery techniques",
+      "friday": "Sleep quality assessment and adjustment",
+      "saturday": "Gentle recovery and sleep preparation",
+      "sunday": "Planning and preparation for next week's sleep routine"
+    },
+    "success_metrics": {
+      "energy_levels": "Track daily energy on 1-10 scale",
+      "sleep_quality": "Monitor sleep duration and quality",
+      "workout_consistency": "Track workout completion rate",
+      "nutrition_adherence": "Monitor meal plan following",
+      "overall_wellness": "Weekly wellness score assessment"
+    }
+  },
+  "implementation_priority": [
+    "1. Start with Sleep Optimization (led by SleepyJoe)",
+    "2. Gradually integrate other wellness domains",
+    "3. Establish consistent daily routines",
+    "4. Monitor progress and adjust as needed"
+  ],
+  "coordination_notes": "This plan was created through coordinated analysis by all specialist agents, with SleepyJoe taking the lead on Sleep Optimization based on your specific request."
+}
